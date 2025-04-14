@@ -24,7 +24,7 @@ import com.google.common.hash.Hashing;
 import org.junit.Test;
 
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertThat;
 import static org.sonatype.nexus.common.hash.HashAlgorithm.MD5;
 import static org.sonatype.nexus.common.hash.HashAlgorithm.SHA1;
 import static org.sonatype.nexus.common.hash.HashAlgorithm.SHA512;
@@ -37,11 +37,8 @@ public class HashesTest
   private static final String DATA = "This is a test message for hashing!";
 
   private static final String MD5_HASH = "b4b91fa27dd64d4f14cd1e22e6a3c714";
-
   private static final String SHA1_HASH = "410fee1895a6af9449ae1647276259fd69a75b15";
-
-  private static final String SHA512_HASH =
-      "b90de0708205534bf3bc4e478c3718c7bf78b5ec60902dbbea234aadd748c004cdf94deda2034b0fa8bdc559ac59d6ac622211956bf782da33444d29e8d9f160";
+  private static final String SHA512_HASH = "b90de0708205534bf3bc4e478c3718c7bf78b5ec60902dbbea234aadd748c004cdf94deda2034b0fa8bdc559ac59d6ac622211956bf782da33444d29e8d9f160";
 
   @Test
   public void hashOne() throws Exception {
@@ -72,7 +69,6 @@ public class HashesTest
     return new ByteArrayInputStream(DATA.getBytes(StandardCharsets.UTF_8));
   }
 
-  @SuppressWarnings("deprecation")
   @Test
   public void hashStreamWithFunction() throws Exception {
     byte[] bytes = DATA.getBytes(StandardCharsets.UTF_8);

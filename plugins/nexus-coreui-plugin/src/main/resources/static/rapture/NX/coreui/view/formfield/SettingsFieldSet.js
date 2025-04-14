@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -33,28 +29,11 @@ Ext.define('NX.coreui.view.formfield.SettingsFieldSet', {
     'NX.coreui.view.formfield.factory.FormfieldNumberFieldFactory',
     'NX.coreui.view.formfield.factory.FormfieldTextAreaFactory',
     'NX.coreui.view.formfield.factory.FormfieldTextFieldFactory',
-    'NX.coreui.view.formfield.factory.FormfieldUrlFactory',
-    'NX.coreui.view.formfield.factory.FormfieldStaticInfoFactory',
-    'NX.coreui.view.formfield.factory.FormfieldTaskScopeFactory'
+    'NX.coreui.view.formfield.factory.FormfieldUrlFactory'
   ],
 
   mixins: {
     logAware: 'NX.LogAware'
-  },
-
-  plugins: {
-    responsive:true
-  },
-  responsiveConfig: {
-    'width <= 1366': {
-      width: 600
-    },
-    'width <= 1600': {
-      width: 800
-    },
-    'width > 1600' : {
-      width: 1000
-    }
   },
 
   /**
@@ -98,25 +77,11 @@ Ext.define('NX.coreui.view.formfield.SettingsFieldSet', {
           factory = Ext.ClassManager.getByAlias('nx.formfield.factory.string');
         }
         if (factory) {
-          var config = {
+          item = Ext.apply(factory.create(formField), {
             requiresPermission: true,
             name: 'property_' + formField.id,
-            factory: factory,
-            delimiter: me.delimiter,
-            listeners: {
-              afterrender: {
-                fn: function() {
-                  // fixes an issue with hidden validation errors when the error is added before the field is rendered
-                  this.validate();
-                }
-              }
-            }
-          };
-          if (Ext.isDefined(me.delimiter)) {
-            config.delimiter = me.delimiter;
-          }
-          item = Ext.apply(factory.create(formField, me.disableSort), config);
-          me.configureListeners(formField, item);
+            factory: factory
+          });
           me.add(item);
         }
       });
@@ -137,11 +102,7 @@ Ext.define('NX.coreui.view.formfield.SettingsFieldSet', {
       Ext.Array.each(me.formFields, function (formField) {
         value = values['property_' + formField.id];
         if (Ext.isDefined(value) && value !== null) {
-          if (Ext.isArray(value)) {
-            properties[formField.id] = value;
-          } else {
-            properties[formField.id] = String(value);
-          }
+          properties[formField.id] = String(value);
           delete values['property_' + formField.id];
         }
         else {
@@ -186,7 +147,6 @@ Ext.define('NX.coreui.view.formfield.SettingsFieldSet', {
 
       form.setValues(data);
     }
-    me.fireEvent("propertiesimported", me, properties);
   },
 
   /**
@@ -222,62 +182,7 @@ Ext.define('NX.coreui.view.formfield.SettingsFieldSet', {
     }
 
     if (remainingMessages.length > 0) {
-      NX.Messages.warning(remainingMessages.join('\n'));
-    }
-  },
-  /**
-   * Associates field listeners with their corresponding handlers defined in attributes.listeners configuration.
-   * @param formField Field configuration.
-   * @param item Instance of the field.
-   */
-  configureListeners: function(formField, item) {
-    const me = this;
-
-    if(formField.attributes["listeners"]) {
-      const listeners = formField.attributes["listeners"];
-
-      Ext.Array.each(Object.keys(listeners),function (key) {
-        const listener = me[listeners[key]];
-
-        if(listener) {
-          item.on(key, me[listeners[key]]);
-        }
-      })
-    }
-  },
-  /**
-   * Filters the repositoryName field to display only repositories associated with the blob store selected in the blobStoreName field.
-   * @param selector Instance of the blobStoreName ItemSelector
-   * @param newValue The blob stores selected.
-   */
-  filterRepositoryBySelectedBlobstore: function(selector, newValue) {
-    const repositoryNameItems = selector.up('nx-coreui-formfield-settingsfieldset').query("nx-itemselector[name=property_repositoryName]")
-    const selectedBlobStores = Ext.Array.filter(newValue.split(','), function(value) { return value !== "" });
-    const filter = function (record) {
-      return selectedBlobStores.length === 0
-          || Ext.Array.contains(selectedBlobStores, record.get('blobStoreName'));
-    };
-
-    if(repositoryNameItems) {
-      Ext.Array.each(repositoryNameItems, function(repositoryNameItem) {
-        const filterField = repositoryNameItem.fromField.down('textfield');
-        var store = repositoryNameItem.store;
-        const newSelectedRepositories = repositoryNameItem.value && repositoryNameItem.value.length > 0
-            ? Ext.Array.filter(repositoryNameItem.getRecordsForValue(repositoryNameItem.value), filter)
-            : [];
-
-        if(store.remoteFilter) {
-          store = Ext.create('Ext.data.ChainedStore', { source: store });
-          repositoryNameItem.store = store;
-        }
-
-        filterField.setValue('');
-        store.clearFilter();
-        store.filterBy(filter);
-
-        repositoryNameItem.populateFromStore(store);
-        repositoryNameItem.setValue(Ext.Array.map(newSelectedRepositories, function(record) { return record.get("name"); }));
-      })
+      NX.Messages.add({ text: remainingMessages.join('\n'), type: 'warning' });
     }
   }
 

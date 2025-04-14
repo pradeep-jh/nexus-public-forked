@@ -14,18 +14,14 @@ package org.sonatype.nexus.internal.webresources;
 
 import javax.inject.Named;
 
-import org.sonatype.nexus.common.app.FeatureFlag;
 import org.sonatype.nexus.security.FilterChainModule;
 import org.sonatype.nexus.security.SecurityFilter;
 import org.sonatype.nexus.security.anonymous.AnonymousFilter;
-import org.sonatype.nexus.security.authc.AntiCsrfFilter;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Binder;
 import com.google.inject.servlet.ServletModule;
 import org.eclipse.sisu.inject.Sources;
-
-import static org.sonatype.nexus.common.app.FeatureFlags.SESSION_ENABLED;
 
 /**
  * Web resources module. Both servlet and filter-chain are installed with the lowest priority.
@@ -33,7 +29,6 @@ import static org.sonatype.nexus.common.app.FeatureFlags.SESSION_ENABLED;
  * @since 2.8
  */
 @Named
-@FeatureFlag(name = SESSION_ENABLED)
 public class WebResourcesModule
     extends AbstractModule
 {
@@ -54,7 +49,7 @@ public class WebResourcesModule
     {
       @Override
       protected void configure() {
-        addFilterChain("/**", AnonymousFilter.NAME, AntiCsrfFilter.NAME);
+        addFilterChain("/**", AnonymousFilter.NAME);
       }
     });
   }

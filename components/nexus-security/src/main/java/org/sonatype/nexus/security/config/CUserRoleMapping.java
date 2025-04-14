@@ -15,33 +15,91 @@ package org.sonatype.nexus.security.config;
 import java.io.Serializable;
 import java.util.Set;
 
+import org.sonatype.nexus.common.entity.Entity;
+
+import com.google.common.collect.Sets;
+
 /**
  * Persistent user-role mapping.
- *
- * @since 3.0
  */
-public interface CUserRoleMapping
-    extends Serializable, Cloneable
+public class CUserRoleMapping
+    extends Entity
+    implements Serializable, Cloneable
 {
-  void addRole(final String string);
+  private String userId;
 
-  Set<String> getRoles();
+  private String source;
 
-  String getSource();
+  private Set<String> roles;
 
-  String getUserId();
+  private String version;
 
-  void removeRole(final String string);
+  public void addRole(String string) {
+    getRoles().add(string);
+  }
 
-  void setRoles(final Set<String> roles);
+  public Set<String> getRoles() {
+    if (this.roles == null) {
+      this.roles = Sets.newHashSet();
+    }
+    return this.roles;
+  }
 
-  void setSource(final String source);
+  public String getSource() {
+    return this.source;
+  }
 
-  void setUserId(final String userId);
+  public String getUserId() {
+    return this.userId;
+  }
 
-  String getVersion();
+  public void removeRole(String string) {
+    getRoles().remove(string);
+  }
 
-  void setVersion(final String version);
+  public void setRoles(Set<String> roles) {
+    this.roles = roles;
+  }
 
-  CUserRoleMapping clone();
+  public void setSource(String source) {
+    this.source = source;
+  }
+
+  public void setUserId(String userId) {
+    this.userId = userId;
+  }
+
+  public String getVersion() {
+    return version;
+  }
+
+  public void setVersion(final String version) {
+    this.version = version;
+  }
+
+  @Override
+  public CUserRoleMapping clone() {
+    try {
+      CUserRoleMapping copy = (CUserRoleMapping) super.clone();
+
+      if (this.roles != null) {
+        copy.roles = Sets.newHashSet(this.roles);
+      }
+
+      return copy;
+    }
+    catch (CloneNotSupportedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + "{" +
+        "userId='" + userId + '\'' +
+        ", source='" + source + '\'' +
+        ", roles=" + roles +
+        ", version='" + version + '\'' +
+        '}';
+  }
 }

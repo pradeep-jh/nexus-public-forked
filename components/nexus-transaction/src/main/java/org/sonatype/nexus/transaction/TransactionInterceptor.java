@@ -17,11 +17,9 @@ import java.lang.reflect.Method;
 
 import org.sonatype.goodies.common.ComponentSupport;
 
+import com.google.common.base.Supplier;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-
-import static org.sonatype.nexus.transaction.UnitOfWork.openSession;
-import static org.sonatype.nexus.transaction.UnitOfWork.peekTransaction;
 
 /**
  * Opens a transaction when entering a transactional method and closes it on exit.
@@ -35,35 +33,29 @@ final class TransactionInterceptor
 {
   @Override
   public Object invoke(final MethodInvocation mi) throws Throwable {
-    TransactionalStore<?> store = null;
-    if (mi.getThis() instanceof TransactionalStore<?>) {
-      store = (TransactionalStore<?>) mi.getThis();
-    }
 
-    Transaction tx = peekTransaction();
-    if (tx != null) { // nested transactional session
-      if (store != null) {
-        tx.capture(store);
-      }
-      if (tx.isActive()) {
-        return mi.proceed(); // no need to wrap active transaction
-      }
-      return proceedWithTransaction(mi, tx);
-    }
-
-    try (TransactionalSession<?> session = openSession(store, findSpec(mi.getMethod()).isolation())) {
-      return proceedWithTransaction(mi, session.getTransaction());
-    }
-  }
-
-  private Object proceedWithTransaction(final MethodInvocation mi, final Transaction tx) throws Throwable {
-
-    Method method = mi.getMethod();
-    Transactional spec = findSpec(method);
+    final Method method = mi.getMethod();
+    final Transactional spec = findSpec(method);
 
     log.trace("Invoking: {} -> {}", spec, method);
 
-    return new TransactionalWrapper(spec, mi).proceedWithTransaction(tx);
+    final UnitOfWork work = UnitOfWork.createWork();
+
+    if (work.isActive()) {
+      return mi.proceed(); // nested transaction, no need to wrap
+    }
+
+    Supplier<? extends Transaction> txSupplier = null;
+    if (mi.getThis() instanceof TransactionalAware) {
+      txSupplier = ((TransactionalAware) mi.getThis()).txSupplier();
+    }
+
+    try (final Transaction tx = work.acquireTransaction(txSupplier)) {
+      return new TransactionalWrapper(spec, mi).proceedWithTransaction(tx);
+    }
+    finally {
+      work.releaseTransaction();
+    }
   }
 
   private static final Transactional findSpec(final Method method) {

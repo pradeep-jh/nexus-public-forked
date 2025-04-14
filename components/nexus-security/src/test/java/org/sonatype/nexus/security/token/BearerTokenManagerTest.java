@@ -12,12 +12,9 @@
  */
 package org.sonatype.nexus.security.token;
 
-import java.util.Optional;
-
 import org.sonatype.goodies.testsupport.TestSupport;
 import org.sonatype.nexus.security.SecurityHelper;
-import org.sonatype.nexus.security.authc.apikey.ApiKey;
-import org.sonatype.nexus.security.authc.apikey.ApiKeyService;
+import org.sonatype.nexus.security.authc.apikey.ApiKeyStore;
 
 import org.apache.shiro.authc.AuthenticationInfo;
 import org.apache.shiro.mgt.SecurityManager;
@@ -32,8 +29,7 @@ import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,7 +45,7 @@ public class BearerTokenManagerTest
   private SecurityHelper securityHelper;
 
   @Mock
-  private ApiKeyService apiKeyService;
+  private ApiKeyStore apiKeyStore;
 
   @Mock
   private SecurityManager securityManager;
@@ -72,7 +68,7 @@ public class BearerTokenManagerTest
     when(authenticationInfo.getPrincipals()).thenReturn(principalCollection);
     when(securityHelper.subject()).thenReturn(subject);
     when(subject.getPrincipals()).thenReturn(principalCollection);
-    underTest = new BearerTokenManager(apiKeyService, securityHelper, FORMAT) { };
+    underTest = new BearerTokenManager(apiKeyStore, securityHelper, FORMAT) { };
   }
 
   @Test(expected = NullPointerException.class)
@@ -82,12 +78,12 @@ public class BearerTokenManagerTest
 
   @Test(expected = NullPointerException.class)
   public void failFastWhenSecurityHelperIsNull() throws Exception {
-    new BearerTokenManager(apiKeyService, null, FORMAT) { };
+    new BearerTokenManager(apiKeyStore, null, FORMAT) { };
   }
 
   @Test(expected = NullPointerException.class)
   public void failFastWhenFormatIsNull() throws Exception {
-    new BearerTokenManager(apiKeyService, securityHelper, null) { };
+    new BearerTokenManager(apiKeyStore, securityHelper, null) { };
   }
 
   @Test(expected = NullPointerException.class)
@@ -97,38 +93,30 @@ public class BearerTokenManagerTest
 
   @Test
   public void createNewKeyWhenOneDoesNotAlreadyExist() throws Exception {
-    when(apiKeyService.getApiKey(any(), any())).thenReturn(Optional.empty());
-    when(apiKeyService.createApiKey(FORMAT, principalCollection)).thenReturn(TOKEN.toCharArray());
+    when(apiKeyStore.getApiKey(any(), any())).thenReturn(null);
+    when(apiKeyStore.createApiKey(FORMAT, principalCollection)).thenReturn(TOKEN.toCharArray());
     assertThat(underTest.createToken(principalCollection), is(equalTo(FORMAT + "." + TOKEN)));
-    verify(apiKeyService).createApiKey(FORMAT, principalCollection);
+    verify(apiKeyStore).createApiKey(FORMAT, principalCollection);
   }
 
   @Test
   public void reuseTokenWhenExists() throws Exception {
-    Optional<ApiKey> apiKey = Optional.of(mockApiKey(TOKEN.toCharArray()));
-    when(apiKeyService.getApiKey(any(), any())).thenReturn(apiKey);
+    when(apiKeyStore.getApiKey(any(), any())).thenReturn(TOKEN.toCharArray());
     assertThat(underTest.createToken(principalCollection), is(equalTo(FORMAT + "." + TOKEN)));
-    verify(apiKeyService, never()).createApiKey(any(), any());
+    verify(apiKeyStore, never()).createApiKey(any(), any());
   }
 
   @Test
   public void deleteKey() throws Exception {
-    Optional<ApiKey> apiKey = Optional.of(mockApiKey(TOKEN.toCharArray()));
-    when(apiKeyService.getApiKey(any(), any())).thenReturn(apiKey);
+    when(apiKeyStore.getApiKey(any(), any())).thenReturn(TOKEN.toCharArray());
     assertTrue(underTest.deleteToken());
-    verify(apiKeyService).deleteApiKey(FORMAT, principalCollection);
+    verify(apiKeyStore).deleteApiKey(FORMAT, principalCollection);
   }
 
   @Test
   public void doNotDeleteKeyWhenNoKeyExists() throws Exception {
-    when(apiKeyService.getApiKey(any(), any())).thenReturn(Optional.empty());
+    when(apiKeyStore.getApiKey(any(), any())).thenReturn(null);
     assertFalse(underTest.deleteToken());
-    verify(apiKeyService, never()).deleteApiKey(FORMAT, principalCollection);
-  }
-
-  private ApiKey mockApiKey(final char[] token) {
-    ApiKey key = mock(ApiKey.class);
-    when(key.getApiKey()).thenReturn(token);
-    return key;
+    verify(apiKeyStore, never()).deleteApiKey(FORMAT, principalCollection);
   }
 }

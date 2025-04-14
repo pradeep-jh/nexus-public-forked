@@ -18,8 +18,10 @@ import java.util.stream.Collectors;
 
 import org.sonatype.nexus.common.event.EventManager;
 import org.sonatype.nexus.scheduling.TaskInfo;
+import org.sonatype.nexus.scheduling.TaskInfo.EndState;
+import org.sonatype.nexus.scheduling.TaskInfo.RunState;
+import org.sonatype.nexus.scheduling.TaskInfo.State;
 import org.sonatype.nexus.scheduling.TaskInterruptedException;
-import org.sonatype.nexus.scheduling.TaskState;
 import org.sonatype.nexus.scheduling.events.TaskBlockedEvent;
 import org.sonatype.nexus.scheduling.events.TaskEvent;
 import org.sonatype.nexus.scheduling.events.TaskEventCanceled;
@@ -33,10 +35,9 @@ import org.sonatype.nexus.scheduling.events.TaskStartedRunningEvent;
 import com.google.common.collect.Lists;
 import com.google.common.eventbus.Subscribe;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
-import static org.awaitility.Awaitility.await;
+import static com.jayway.awaitility.Awaitility.await;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -47,7 +48,6 @@ import static org.hamcrest.Matchers.instanceOf;
 /**
  * Tests for task eventing.
  */
-@Ignore("NEXUS-43375")
 public class ScheduledTaskEventsTest
     extends QuartzTestSupport
 {
@@ -82,8 +82,8 @@ public class ScheduledTaskEventsTest
     // done
     assertRunningTaskCount(0);
     assertExecutedTaskCount(1);
-    assertThat(taskInfo.getCurrentState().getState(), equalTo(TaskState.WAITING));
-    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(TaskState.OK));
+    assertThat(taskInfo.getCurrentState().getState(), equalTo(State.WAITING));
+    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(EndState.OK));
 
     // started, stoppedDone
     assertThat(listener.arrivedEvents, hasSize(4));
@@ -105,7 +105,7 @@ public class ScheduledTaskEventsTest
     final TaskInfo taskInfo = createTask(SleeperTaskDescriptor.TYPE_ID);
 
     // allow scheduler to start task and find it blocked
-    await().atMost(RUN_TIMEOUT, MILLISECONDS).until(() -> TaskState.RUNNING_BLOCKED.equals(taskInfo.getCurrentState().getRunState()));
+    await().atMost(RUN_TIMEOUT, MILLISECONDS).until(() -> RunState.BLOCKED.equals(taskInfo.getCurrentState().getRunState()));
 
     // signal tasks to complete
     SleeperTask.meWait.countDown();
@@ -114,8 +114,8 @@ public class ScheduledTaskEventsTest
     // done
     assertRunningTaskCount(0);
     assertExecutedTaskCount(2);
-    assertThat(taskInfo.getCurrentState().getState(), equalTo(TaskState.WAITING));
-    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(TaskState.OK));
+    assertThat(taskInfo.getCurrentState().getState(), equalTo(State.WAITING));
+    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(EndState.OK));
 
     // started, stoppedDone
     List<Class<?>> arrivedEvents = listener.arrivedEvents.stream()
@@ -143,8 +143,8 @@ public class ScheduledTaskEventsTest
     // done
     assertRunningTaskCount(0);
     assertExecutedTaskCount(1);
-    assertThat(taskInfo.getCurrentState().getState(), equalTo(TaskState.WAITING));
-    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(TaskState.FAILED));
+    assertThat(taskInfo.getCurrentState().getState(), equalTo(State.WAITING));
+    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(EndState.FAILED));
 
     // started, stoppedDone
     assertThat(listener.arrivedEvents, hasSize(4));
@@ -172,8 +172,8 @@ public class ScheduledTaskEventsTest
     // done
     assertRunningTaskCount(0);
     assertExecutedTaskCount(1);
-    assertThat(taskInfo.getCurrentState().getState(), equalTo(TaskState.WAITING));
-    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(TaskState.FAILED));
+    assertThat(taskInfo.getCurrentState().getState(), equalTo(State.WAITING));
+    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(EndState.FAILED));
 
     // started, stoppedFailed
     assertThat(listener.arrivedEvents, hasSize(4));
@@ -204,8 +204,8 @@ public class ScheduledTaskEventsTest
     // done
     assertRunningTaskCount(0);
     assertExecutedTaskCount(1);
-    assertThat(taskInfo.getCurrentState().getState(), equalTo(TaskState.WAITING));
-    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(TaskState.OK));
+    assertThat(taskInfo.getCurrentState().getState(), equalTo(State.WAITING));
+    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(EndState.OK));
 
     // started, stoppedDone: task is not cancelable, hence, is "unaware" it was
     // attempted to be canceled at all
@@ -225,8 +225,8 @@ public class ScheduledTaskEventsTest
     // done
     assertRunningTaskCount(0);
     assertExecutedTaskCount(1);
-    assertThat(taskInfo.getCurrentState().getState(), equalTo(TaskState.OK));
-    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(TaskState.CANCELED));
+    assertThat(taskInfo.getCurrentState().getState(), equalTo(State.DONE));
+    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(EndState.CANCELED));
 
     // started, stoppedDone: task is not cancelable, but it was canceled by framework
     // even before it was started
@@ -278,8 +278,8 @@ public class ScheduledTaskEventsTest
     // done
     assertRunningTaskCount(0);
     assertExecutedTaskCount(1);
-    assertThat(taskInfo.getCurrentState().getState(), equalTo(TaskState.WAITING));
-    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(TaskState.CANCELED));
+    assertThat(taskInfo.getCurrentState().getState(), equalTo(State.WAITING));
+    assertThat(taskInfo.getLastRunState().getEndState(), equalTo(EndState.CANCELED));
 
     // started, stoppedDone: task is not cancelable, hence, is "unaware" it was
     // attempted to be canceled at all (no canceled events), still, end state is canceled

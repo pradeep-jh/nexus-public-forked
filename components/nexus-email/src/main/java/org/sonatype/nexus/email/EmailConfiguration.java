@@ -12,62 +12,162 @@
  */
 package org.sonatype.nexus.email;
 
-import org.sonatype.nexus.crypto.secrets.Secret;
+import org.sonatype.nexus.common.entity.Entity;
+import org.sonatype.nexus.common.text.Strings2;
 
 /**
  * Email configuration.
  *
  * @since 3.0
  */
-public interface EmailConfiguration
+public class EmailConfiguration
+  extends Entity
+  implements Cloneable
 {
-  boolean isEnabled();
+  private boolean enabled;
 
-  void setEnabled(boolean enabled);
+  private String host;
 
-  String getHost();
+  private int port;
 
-  void setHost(String host);
+  private String username;
 
-  int getPort();
+  private String password;
 
-  void setPort(int port);
+  private String fromAddress;
 
-  String getUsername();
+  private String subjectPrefix;
 
-  void setUsername(String username);
+  private boolean startTlsEnabled;
 
-  Secret getPassword();
+  private boolean startTlsRequired;
 
-  void setPassword(Secret password);
+  private boolean sslOnConnectEnabled;
 
-  String getFromAddress();
+  private boolean sslCheckServerIdentityEnabled;
 
-  void setFromAddress(String fromAddress);
+  private boolean nexusTrustStoreEnabled;
 
-  String getSubjectPrefix();
+  public boolean isEnabled() {
+    return enabled;
+  }
 
-  void setSubjectPrefix(String subjectPrefix);
+  public void setEnabled(final boolean enabled) {
+    this.enabled = enabled;
+  }
 
-  boolean isStartTlsEnabled();
+  public String getHost() {
+    return host;
+  }
 
-  void setStartTlsEnabled(boolean startTlsEnabled);
+  public void setHost(final String host) {
+    this.host = host;
+  }
 
-  boolean isStartTlsRequired();
+  public int getPort() {
+    return port;
+  }
 
-  void setStartTlsRequired(boolean startTlsRequired);
+  public void setPort(final int port) {
+    this.port = port;
+  }
 
-  boolean isSslOnConnectEnabled();
+  public String getUsername() {
+    return username;
+  }
 
-  void setSslOnConnectEnabled(boolean sslOnConnectEnabled);
+  public void setUsername(final String username) {
+    this.username = username;
+  }
 
-  boolean isSslCheckServerIdentityEnabled();
+  public String getPassword() {
+    return password;
+  }
 
-  void setSslCheckServerIdentityEnabled(boolean sslCheckServerIdentityEnabled);
+  public void setPassword(final String password) {
+    this.password = password;
+  }
 
-  boolean isNexusTrustStoreEnabled();
+  public String getFromAddress() {
+    return fromAddress;
+  }
 
-  void setNexusTrustStoreEnabled(boolean nexusTrustStoreEnabled);
+  public void setFromAddress(final String fromAddress) {
+    this.fromAddress = fromAddress;
+  }
 
-  EmailConfiguration copy();
+  public String getSubjectPrefix() {
+    return subjectPrefix;
+  }
+
+  public void setSubjectPrefix(final String subjectPrefix) {
+    this.subjectPrefix = subjectPrefix;
+  }
+
+  public boolean isStartTlsEnabled() {
+    return startTlsEnabled;
+  }
+
+  public void setStartTlsEnabled(final boolean startTlsEnabled) {
+    this.startTlsEnabled = startTlsEnabled;
+  }
+
+  public boolean isStartTlsRequired() {
+    return startTlsRequired;
+  }
+
+  public void setStartTlsRequired(final boolean startTlsRequired) {
+    this.startTlsRequired = startTlsRequired;
+  }
+
+  public boolean isSslOnConnectEnabled() {
+    return sslOnConnectEnabled;
+  }
+
+  public void setSslOnConnectEnabled(final boolean sslOnConnectEnabled) {
+    this.sslOnConnectEnabled = sslOnConnectEnabled;
+  }
+
+  public boolean isSslCheckServerIdentityEnabled() {
+    return sslCheckServerIdentityEnabled;
+  }
+
+  public void setSslCheckServerIdentityEnabled(final boolean sslCheckServerIdentityEnabled) {
+    this.sslCheckServerIdentityEnabled = sslCheckServerIdentityEnabled;
+  }
+
+  public boolean isNexusTrustStoreEnabled() {
+    return nexusTrustStoreEnabled;
+  }
+
+  public void setNexusTrustStoreEnabled(final boolean nexusTrustStoreEnabled) {
+    this.nexusTrustStoreEnabled = nexusTrustStoreEnabled;
+  }
+
+  public EmailConfiguration copy() {
+    try {
+      return (EmailConfiguration)clone();
+    }
+    catch (CloneNotSupportedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + "{" +
+        "enabled=" + enabled +
+        ", host='" + host + '\'' +
+        ", port=" + port +
+        ", username='" + username + '\'' +
+        ", password='" + Strings2.mask(password) + '\'' +
+        ", fromAddress='" + fromAddress + '\'' +
+        ", subjectPrefix='" + subjectPrefix + '\'' +
+        ", startTlsEnabled=" + startTlsEnabled +
+        ", startTlsRequired=" + startTlsRequired +
+        ", sslOnConnectEnabled=" + sslOnConnectEnabled +
+        ", sslCheckServerIdentityEnabled=" + sslCheckServerIdentityEnabled +
+        ", nexusTrustStoreEnabled=" + nexusTrustStoreEnabled + 
+        '}';
+  }
 }

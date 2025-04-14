@@ -13,23 +13,32 @@
 package org.sonatype.nexus.coreui.internal;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import javax.servlet.http.HttpServletRequest;
 
-import org.sonatype.goodies.common.ComponentSupport;
+import org.sonatype.nexus.common.text.Strings2;
 import org.sonatype.nexus.repository.Repository;
-import org.sonatype.nexus.repository.cache.RepositoryCacheInvalidationService;
 import org.sonatype.nexus.repository.manager.RepositoryManager;
+import org.sonatype.nexus.repository.upload.AssetUpload;
+import org.sonatype.nexus.repository.upload.ComponentUpload;
 import org.sonatype.nexus.repository.upload.UploadDefinition;
+import org.sonatype.nexus.repository.upload.UploadFieldDefinition;
 import org.sonatype.nexus.repository.upload.UploadManager;
-import org.sonatype.nexus.repository.upload.UploadResponse;
+import org.sonatype.nexus.repository.upload.WithUploadField;
+import org.sonatype.nexus.repository.view.PartPayload;
+import org.sonatype.nexus.rest.ValidationErrorXO;
+import org.sonatype.nexus.rest.ValidationErrorsException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
+import org.apache.commons.fileupload.FileItem;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -39,24 +48,15 @@ import static com.google.common.base.Preconditions.checkNotNull;
 @Named
 @Singleton
 public class UploadService
-  extends ComponentSupport
 {
   private UploadManager uploadManager;
 
   private RepositoryManager repositoryManager;
 
-  private RepositoryCacheInvalidationService repositoryCacheInvalidationService;
-
-  private static final String NPM_FORMAT = "npm";
-
   @Inject
-  public UploadService(final RepositoryManager repositoryManager,
-                       final UploadManager uploadManager,
-                       final RepositoryCacheInvalidationService repositoryCacheInvalidationService)
-  {
+  public UploadService(final RepositoryManager repositoryManager, final UploadManager uploadManager) {
     this.uploadManager = checkNotNull(uploadManager);
     this.repositoryManager = checkNotNull(repositoryManager);
-    this.repositoryCacheInvalidationService = checkNotNull(repositoryCacheInvalidationService);
   }
 
   /**
@@ -69,28 +69,76 @@ public class UploadService
   /**
    * Perform an upload of assets
    *
-   * @since 3.16
-   *
-   * @param repositoryName the repository to upload to
-   * @param request a multipart form request
+   * @param params the form paramters
+   * @param files the files being uploaded
    * @return the query term for results in search (depending on upload could show additional results)
    * @throws IOException
    */
-  public String upload(final String repositoryName, final HttpServletRequest request) throws IOException {
-    checkNotNull(repositoryName);
-    checkNotNull(request);
+  public String upload(final Map<String, String> params, final Map<String, FileItem> files)
+      throws IOException
+  {
+    checkNotNull(params);
+    checkNotNull(files);
+
+    String repositoryName = checkNotNull(params.get("repositoryName"), "Missing repositoryName parameter");
 
     Repository repository = checkNotNull(repositoryManager.get(repositoryName), "Specified repository is missing");
 
-    UploadResponse uploadResponse = uploadManager.handle(repository, request);
+    return createSearchTerm(uploadManager.handle(repository, createAndValidate(repository, params, files)));
+  }
 
-    if (NPM_FORMAT.equals(repository.getFormat().getValue())) {
-      repositoryManager.findContainingGroups(repositoryName)
-          .forEach(groupRepoName -> repositoryCacheInvalidationService.processCachesInvalidation(
-              repositoryManager.get(groupRepoName)));
+  private ComponentUpload createAndValidate(final Repository repository,
+                                            final Map<String, String> params,
+                                            final Map<String, FileItem> files)
+  {
+    ValidationErrorsException validation = new ValidationErrorsException();
+
+    ComponentUpload uc = new ComponentUpload();
+    UploadDefinition ud = uploadManager.getByFormat(repository.getFormat().toString());
+
+    // create component fields
+    createFields(uc, ud.getComponentFields(), "", "component", validation, params);
+
+    if (files.isEmpty()) {
+      validation.withErrors(new ValidationErrorXO("No assets found in upload"));
     }
 
-    return createSearchTerm(uploadResponse.getAssetPaths());
+    // create assets
+    for (Entry<String, FileItem> file : files.entrySet()) {
+      String suffix = file.getKey().substring("file".length());
+      AssetUpload ua = new AssetUpload();
+
+      createFields(ua, ud.getAssetFields(), suffix, "asset", validation, params);
+      final FileItem fileItem = file.getValue();
+      ua.setPayload(new FileItemPayload(fileItem));
+
+      uc.getAssetUploads().add(ua);
+    }
+
+    if (validation.hasValidationErrors()) {
+      throw validation;
+    }
+
+    return uc;
+  }
+
+  private void createFields(final WithUploadField item,
+                            final List<UploadFieldDefinition> fields,
+                            final String suffix,
+                            final String type,
+                            final ValidationErrorsException validation,
+                            final Map<String, String> params)
+  {
+    for (UploadFieldDefinition assetField : fields) {
+      String formField = assetField.getName() + suffix;
+      String value = params.get(formField);
+      if (!Strings2.isEmpty(value)) {
+        item.getFields().put(assetField.getName(), value);
+      }
+      else if (!assetField.isOptional()) {
+        validation.withErrors(new ValidationErrorXO(formField, "Missing required " + type + " field " + formField));
+      }
+    }
   }
 
   @VisibleForTesting
@@ -105,7 +153,7 @@ public class UploadService
       prefix = longestPrefix(prefix, path);
     }
 
-    return prefix;
+    return elasticEscape(prefix);
   }
 
   private String removeLastSegment(final String path) {
@@ -116,11 +164,55 @@ public class UploadService
     return path;
   }
 
+  private String elasticEscape(final String query) {
+    return query.replace("/", "\\/").replace(".", "\\.").replace("-", "\\-");
+  }
+
   private String longestPrefix(final String prefix, final String path) {
     String result = prefix;
     while (result.length() > 0 && !path.startsWith(result)) {
       result = removeLastSegment(result);
     }
     return result;
+  }
+
+  private static class FileItemPayload implements PartPayload
+  {
+    private final FileItem fileItem;
+
+    FileItemPayload(final FileItem fileItem) {
+      this.fileItem = fileItem;
+    }
+
+    @Override
+    public InputStream openInputStream() throws IOException {
+      return fileItem.getInputStream();
+    }
+
+    @Override
+    public long getSize() {
+      return fileItem.getSize();
+    }
+
+    @Override
+    public String getContentType() {
+      return fileItem.getContentType();
+    }
+
+    @Override
+    public String getName() {
+      return fileItem.getName();
+    }
+
+    @Override
+    public String getFieldName() {
+      return fileItem.getFieldName();
+    }
+
+    @Override
+    public boolean isFormField() {
+      return true;
+    }
+
   }
 }

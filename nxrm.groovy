@@ -20,46 +20,42 @@
  * - Takari (optional but recommended. Much quicker builds.) - see http://takari.io/book/30-team-maven.html#takari-smart-builder
  *      To enable: Add 'takari=true' to .nxrm/nxrmrc.groovy
  */
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
+@Grab(group = 'ch.qos.logback', module = 'logback-classic', version = '1.2.3')
 @Grab(group = 'com.aestasit.infrastructure.sshoogr', module = 'sshoogr', version = '0.9.26')
 @Grab(group = 'com.caseyscarborough.colorizer', module = 'groovy-colorizer', version = '1.0.0')
 @Grab(group = 'jline', module = 'jline', version = '2.14.2')
-@Grab(group = 'org.ajoberstar', module = 'grgit', version = '2.2.1')
-@Grab(group = 'org.apache.commons', module = 'commons-compress', version = '1.24.0')
-@Grab(group = 'commons-io', module = 'commons-io', version = '2.13.0')
-@Grab(group = 'org.apache.maven', module = 'maven-model', version = '3.8.1')
-@Grab(group = 'org.rauschig', module = 'jarchivelib', version = '1.2.0')
-@Grab(group = 'com.google.guava', module = 'guava', version = '32.1.1-jre')
-
-import java.nio.file.Paths
-import java.time.ZonedDateTime
+@Grab(group = 'org.ajoberstar', module = 'grgit', version = '2.0.1')
+@Grab(group = 'org.apache.commons', module = 'commons-compress', version = '1.15')
+@Grab(group = 'org.apache.maven', module = 'maven-model', version = '3.5.0')
+@Grab(group = 'org.rauschig', module = 'jarchivelib', version = '0.7.1')
 
 import com.caseyscarborough.colorizer.Colorizer
-import com.google.common.base.Stopwatch
-import groovy.xml.XmlNodePrinter
 import org.ajoberstar.grgit.*
 import org.ajoberstar.grgit.operation.*
 import org.ajoberstar.grgit.service.*
-import org.apache.commons.io.FileUtils
 import org.apache.maven.model.Model
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader
 import org.rauschig.jarchivelib.ArchiveFormat
 import org.rauschig.jarchivelib.ArchiverFactory
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.Logger
+import java.nio.charset.StandardCharsets
 
-import static java.time.ZoneId.systemDefault
-import static java.time.format.DateTimeFormatter.ofPattern
+import static ch.qos.logback.classic.Level.*
+import static com.aestasit.infrastructure.ssh.DefaultSsh.*
+import static org.slf4j.Logger.ROOT_LOGGER_NAME as ROOT
+import static org.slf4j.LoggerFactory.getLogger
+
+// set default log level (jgit seems to have something on DEBUG by default)
+((Logger) getLogger(ROOT)).setLevel(INFO)
 
 ant = new AntBuilder()
 ant.project.buildListeners[0].messageOutputLevel = 0
 
 HR = "".padRight(jline.TerminalFactory.get().getWidth() - 7, '-') // terminal line width
-TARGET_DIR = "target"
-LOCK_FILE = "$TARGET_DIR/sonatype-work/nexus3/lock"
-SONATYPE_WORK = "$TARGET_DIR/sonatype-work"
-SONATYPE_WORK_BACKUP = System.getProperty("java.io.tmpdir") + "/nxrm-sonatype-work"
-TAKARI_SMART_BUILD_VERSION = "0.6.6"
-TAKARI_LOCAL_REPO_VERSION = "0.11.3"
+LOCK_FILE = "target/sonatype-work/nexus3/lock"
+TAKARI_SMART_BUILD_VERSION = "0.5.0"
+TAKARI_LOCAL_REPO_VERSION = "0.11.2"
 TAKARI_FILE_MANAGER_VERSION = "0.8.3"
 
 env = System.getenv()
@@ -69,49 +65,35 @@ cliOptions = null
 positionalOptions = null
 buildLog = new File("build.log")
 
-// test projects - generated with command: for i in `find -name pom.xml`; do cd `dirname $i`; xmllint --xpath "//*[local-name()='project']/*[local-name()='artifactId']/text()" pom.xml; cd -; done
-testProjects = [':functional-testsuite', ':nexus-analytics-testsupport', ':nexus-contributedhandler-testsupport', ':nexus-docker-testsupport-internal', ':nexus-ldap-testsupport', ':nexus-migration-testsupport', ':nexus-repository-testsupport-internal', ':nexus-saml-testsupport', ':nexus-stress-testsuite', ':nexus-testlm-edition', ':nexus-testsuite-data', ':nexus-upgrade-testsupport', ':nexuspro-fabric-testsuite', ':nexuspro-migration-testsuite', ':nexuspro-modern-testsuite', ':nexuspro-performance-testsuite', ':nexuspro-sql-fabric-testsuite', ':nexuspro-testsuite', ':nxrm-pro-image', ':pax-exam-spock', ':selenide-functional-tests' ]
+// test projects - generated with command: for i in `find -name pom.xml`; do cd `dirname $i`; xmllint --xpath "//*[local-name()='project']/*[local-name()='artifactId']/text()" pom.xml; cd -; done 
+testProjects = [':nexus-iq-testsupport', ':nexus-docker-testsupport', ':nexuspro-migration-testsuite', ':nexus-testlm-edition', ':nexus-stress-master-instance', ':nexuspro-testsuite', ':nexus-testsuite-data', ':testplugin', ':simple-it', ':nexuspro-fabric-testsuite', ':nexus-fabric-testsupport', ':functional-testsuite', ':pax-exam-spock', ':nexus-migration-testsupport', ':nexus-upgrade-testsupport', ':nexuspro-modern-testsuite', ':nexus-stress-testsuite', ':nexus-repository-testsupport', ':nexus-contributedhandler-testsupport', ':nexuspro-performance-testsuite' ]
 
 /**
  Customize these by creating a .nxrm/nxrmrc.groovy. Sample contents:
    javaMaxMem="4g"
    directMaxMem="4g"
-   vmOptions="-XX:-MaxFDLimit"
+   takari=true
    port=8082
    sslPort=8444
    karafSshPort=8023
    javaDebugPort=5006
-   ssl=true
-   elastic=false
-   takari=false
-   deploy=true
-   //backup=false
-   //restore=false
    //tests="custom Maven test arguments here"
    //assemblies="custom Maven assembly arguments here"
    //sources="custom Maven sources arguments here"
  */
 configDefaults = [
-    javaMinMem   : '2703m',
-    javaMaxMem   : '2703m',
-    directMaxMem : '2703m',
-    vmOptions    : '',
+    javaMaxMem   : "2g",
+    directMaxMem : "2g",
     port         : 8081,
     sslPort      : 8443,
     karafSshPort : 8022,
     javaDebugPort: 5005,
-    ssl          : true,   // SSL is enabled by default
-    elastic      : false,  // Elastic is disabled by default
-    takari       : false,  // Takari is disabled by default
-    deploy       : true,   // Deployment is performed by default
-    backup       : false,   // Backup sonatype-work disabled by default
-    restore      : false,   // Restore backup of sonatype-work disabled by default
-    builder      : '-T 1C', // default one thread per core
-    randomPassword: false,
-    // use the default maven property or change to "install" for faster but less stable build which also updates the lock file
-    npmInstall: '',
-    // default to building both debug and production builds with webpack - change to "build" to get the debug build copied as the "production" build (saves around 30s of build time)
-    npmBuild: ''
+    ssl          : true,
+    orient       : true,
+    elastic      : false,
+    takari       : false,
+    noDeploy     : false,
+    builder      : "-T 1C", // default one thread per core
 ]
 
 buildOptions = [
@@ -169,22 +151,18 @@ File searchUp(File directory) {
 
 def getChangedProjects() {
   def grgit = Grgit.open()
-  def projects = [] as Set
-  try {
-    def changes = grgit.status().staged.getAllChanges() + grgit.status().unstaged.getAllChanges()
+  def changes = grgit.status().staged.getAllChanges() + grgit.status().unstaged.getAllChanges()
 
-    // for all changes, search up for a pom.xml, and get artifactId out
-    MavenXpp3Reader reader = new MavenXpp3Reader()
-    changes.each {
-      File pom = searchUp(new File(it).getParentFile())
-      // note: this ignores files in the project root
-      if (pom) {
-        Model model = reader.read(new FileReader(pom))
-        projects.add(":" + model.getArtifactId())
-      }
+  // for all changes, search up for a pom.xml, and get artifactId out
+  MavenXpp3Reader reader = new MavenXpp3Reader()
+  def projects = [] as Set
+  changes.each {
+    File pom = searchUp(new File(it).getParentFile())
+    // note: this ignores files in the project root
+    if (pom) {
+      Model model = reader.read(new FileReader(pom))
+      projects.add(":" + model.getArtifactId())
     }
-  } catch (e) {
-    debug("Unable to determine changed projects: ${e}")
   }
   return projects
 }
@@ -212,33 +190,17 @@ ConfigObject processRcConfigFile() {
   // assign any CLI options
   config.port = cliOptions.'port' ?: config.port
   config.sslPort = cliOptions.'ssl-port' ?: config.sslPort
-  config.sslIp = cliOptions.'ssl-ip' ?: null
   config.karafSshPort = cliOptions.'karaf-ssh-port' ?: config.karafSshPort
   config.javaDebugPort = cliOptions.'java-debug-port' ?: config.javaDebugPort
 
-  config.ssl = assign('ssl', 'no-ssl', config.ssl)
-  config.elastic = assign('elastic', 'no-elastic', config.elastic)
-  config.takari = assign('takari', 'no-takari', config.takari)
-  config.deploy = assign('deploy', 'no-deploy', config.deploy)
-  config.backup = assign('backup', 'no-backup', config.backup)
-  config.restore = assign('restore', 'no-restore', config.restore)
-  config.randomPassword = assign('random-password', 'no-random-password', config.randomPassword)
-  config.npmInstall = assign('npm-install', 'npm-ci', config.npmInstall)
-  config.npmBuild = assign('npm-build-all', 'npm-build', config.npmBuild)
+  config.ssl = cliOptions.'no-ssl' ? false : true
+  config.orient = cliOptions.'no-orient' ? false : true
+  config.noDeploy = cliOptions.'no-deploy' ? false : true
+  config.elastic = cliOptions.'elastic' ? true : false // note Elastic is false by default
 
   debug("config read from RC and merged with defaults: ${config}")
 
   return config
-}
-
-def assign(def trueOption, def falseOption, def defaultValue){
-  debug("assign(${trueOption}, ${falseOption}, ${defaultValue})")
-  if(cliOptions[trueOption])
-    return true
-  else if(cliOptions[falseOption])
-    return false
-  else
-    return defaultValue
 }
 
 static ConfigObject processLastBuild() {
@@ -275,7 +237,7 @@ def processBuildMode() {
     return
   }
 
-  if (!new File("$TARGET_DIR").exists()) {
+  if (!new File("target").exists()) {
     warn("No root target folder present. Full build required.")
     buildOptions.buildMode = "full"
     return
@@ -334,7 +296,6 @@ def processCliOptions(args) {
     b longOpt: 'build', 'Build mode [default]. Intelligently does a full or incremental build.'
     r longOpt: 'run', args: 1, 'Run mode. Starts Nexus with the specified assembly. Add \'debug\' for Nexus debug mode (i.e. remote debugging).'
     _ longOpt: 'geb', '''Process dependencies for Geb test execution in your IDE.'''
-    _ longOpt: 'sass', '''Compile Sass files to CSS.'''
     e longOpt: 'extract', 'Re-run the assembly extraction'
     // build mode options
     f longOpt: 'full', 'Force full build'
@@ -350,35 +311,17 @@ def processCliOptions(args) {
     s longOpt: 'sources', args: 1, '''Control building of sources. Options:
                              skip: Skip all source creation [default]
                              all: Build all sources'''
-    n longOpt: 'deploy', 'Enable automatic deployment for incremental builds (if disabled by config). Note this will enable SSH on Karaf.'
-    n longOpt: 'no-deploy', 'Disable automatic deployment for incremental builds (enabled by default)'
-    _ longOpt: 'backup', "Enable backup of any existing target/sonatype-work folder to ${SONATYPE_WORK_BACKUP} (if disabled by config)"
-    _ longOpt: 'no-backup', "Disable backup (if enabled by config)"
+    n longOpt: 'no-deploy', 'Disable default of automatically deploying incremental builds. Note that default will enable SSH on Karaf.'
     // run mode options
     p longOpt: 'port', args: 1, 'Set NXRM port. Defaults to 8081'
     _ longOpt: 'ssl-port', args: 1, 'Set NXRM SSL port. Defaults to 8443'
     _ longOpt: 'karaf-ssh-port', args: 1, 'Set Karaf SSH port. Defaults to 8022'
     _ longOpt: 'java-debug-port', args: 1, 'Set JDWP debug port. Defaults to 5005'
-    _ longOpt: 'ssl', 'Enable SSL (if disabled by config)'
-    _ longOpt: 'no-ssl', 'Disable SSL (enabled by default)'
-    _ longOpt: 'ssl-ip', args: 1, 'Provide the ip address of this machine to generate an SSL certificate for use with Docker'
-    _ longOpt: 'elastic', 'Enable Elastic plugins (disabled by default)'
-    _ longOpt: 'no-elastic', 'Disable Elastic plugins (if enabled by config)'
-    _ longOpt: 'takari', 'Enable Takari (disabled by default)'
-    _ longOpt: 'no-takari', 'Disable Takari (if enabled by config)'
-    _ longOpt: 'restore', "Enable restore of backup from ${SONATYPE_WORK_BACKUP} to target/sonatype-work (disabled by default)"
-    _ longOpt: 'no-restore', "Disable restore of backup (if enabled by config)"
-    _ longOpt: 'random-password', "Enable generation of random password for admin user on initial start"
-    _ longOpt: 'no-random-password', "Disable generation of random password (default)"
-    _ longOpt: 'npm-install', "use `npm install` for npm dependencies (this results in a faster, but less stable build)"
-    _ longOpt: 'npm-ci', "use `npm ci` for npm dependencies (this results in a slower, but more stable build and is the default)"
-    o longOpt: 'overwrite-target', args: 1, "Overwrite target dir"
-
+    _ longOpt: 'no-ssl', 'Disable SSL. Enabled by default'
+    _ longOpt: 'no-orient', 'Disable Orient. Enabled by default'
+    _ longOpt: 'elastic', 'Enable Elastic plugins. Disabled by default'
     // general options
     d longOpt: 'dry-run', 'Dry run, don\'t actually execute anything'
-    _ longOpt: 'no-docker', 'Disable the docker build'
-    _ longOpt: 'single-threaded', "Don't build in parallel"
-
   }
 
   cliOptions = cli.parse(args)
@@ -404,8 +347,6 @@ Examples:
   ./nxrm.groovy -x -rf :nexus-main  Due to a limitation in the Groovy CliBuilder, any positional parameters you wish to pass into the maven build or run commands need to be after the '-x' parameter, and be last.
   ./nxrm.groovy -x -U               Example usage to force Maven snapshot updates.
   ./nxrm.groovy --geb               Enables Geb in your IDE. See https://docs.sonatype.com/display/Nexus/Nexus+Repository+Manager+Developer+Onboarding#NexusRepositoryManagerDeveloperOnboarding-TestingWithGeb
-  ./nxrm.groovy target-overwrite 
-                new-target-dir      Run script using artifacts from provided directory
 '''
     return false
   }
@@ -416,7 +357,7 @@ Examples:
 
   positionalOptions = cliOptions.arguments()
   positionalOptions.removeAll { it == '-x' }
-  if(!positionalOptions.isEmpty()) {
+  if(positionalOptions.size > 0) {
     debug("Positional options: " + positionalOptions.toString())
   }
   return true
@@ -486,7 +427,7 @@ def processTestArgs() {
 
   if (testsArg == "skipAll") {
     buildOptions.testsDesc = "Skipping all compiling & execution"
-    buildOptions.tests = "-DskipTests -Dmaven.test.skip=true"
+    buildOptions.tests = "-Dmaven.test.skip=true"
   }
   else if (testsArg == "skip") {
     buildOptions.testsDesc = "Compiling all (unit & integration) but skipping execution"
@@ -607,49 +548,45 @@ def processSourceArgs() {
 }
 
 def processBuilder() {
-  def mvnDir = Paths.get('.mvn/')
-  def extensionsPath = mvnDir.resolve('extensions.xml')
-
-  if (Files.notExists(mvnDir)) {
-    Files.createDirectories(mvnDir)
-  }
-
-  if (Files.notExists(extensionsPath)) {
-    Files.createFile(extensionsPath).write """<extensions
-  xmlns="http://maven.apache.org/EXTENSIONS/1.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/EXTENSIONS/1.0.0 http://maven.apache.org/xsd/core-extensions-1.0.0.xsd">
-</extensions>"""
-  }
-
-  def extensionsXml = new XmlParser(false, false).parse(extensionsPath.toFile())
-
   if (rcConfig.takari) {
     rcConfig.builder = "--builder smart -T 1C"
 
-    if (!extensionsXml.'**'.artifactId*.children()*.first()*.trim().contains('takari-smart-builder')) {
-      error('Takari enabled but not detected in .mvn/extensions.xml')
-      warn('Installing Takari now')
-
-      extensionsXml.children() << new NodeBuilder().extension {
-        groupId('io.takari.maven')
-        artifactId('takari-smart-builder')
-        version(TAKARI_SMART_BUILD_VERSION)
-      } << new NodeBuilder().extension {
-        groupId('io.takari.aether')
-        artifactId('takari-local-repository')
-        version(TAKARI_LOCAL_REPO_VERSION)
-      } << new NodeBuilder().extension {
-        groupId('io.takari')
-        artifactId('takari-filemanager')
-        version(TAKARI_FILE_MANAGER_VERSION)
-      }
-
-      new XmlNodePrinter(new PrintWriter(Files.newBufferedWriter(extensionsPath))).print(extensionsXml)
+    File file = new File('.mvn/extensions.xml')
+    if (file.exists() && file.text.contains("takari-smart-builder")) {
+      debug("Takari enabled and detected in .mvn/extensions.xml")
     }
-  }
-  else if (cliOptions['single-threaded']) {
-    rcConfig.builder = ''
+    else {
+      error("Takari enabled but not detected in .mvn/extensions.xml")
+      warn("Installing Takari now")
+      if (file.exists()) {
+        error(".mvn/extensions.xml already exists. Unable to install Takari")
+        rcConfig.builder = ""
+      }
+      else {
+        file.write """<extensions xmlns="http://maven.apache.org/EXTENSIONS/1.0.0" xmlns:xsi="http://www.w3
+.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/EXTENSIONS/1.0.0 http://maven.apache.org/xsd/core-extensions-1.0.0
+	.xsd">
+	<extension>
+		<groupId>io.takari.maven</groupId>
+		<artifactId>takari-smart-builder</artifactId>
+		<version>${TAKARI_SMART_BUILD_VERSION}</version>
+	</extension>
+	<extension>
+		<groupId>io.takari.aether</groupId>
+		<artifactId>takari-local-repository</artifactId>
+		<version>${TAKARI_LOCAL_REPO_VERSION}</version>
+	</extension>
+	<extension>
+		<groupId>io.takari</groupId>
+		<artifactId>takari-filemanager</artifactId>
+		<version>${TAKARI_FILE_MANAGER_VERSION}</version>
+	</extension>
+</extensions>"""
+        info("Takari enabled!")
+      }
+      sleep(3000)
+    }
   }
 }
 
@@ -665,7 +602,7 @@ def processMavenCommand() {
 
   // if tests are not built, don't care about changes on test projects
   if(buildOptions.tests == "-Dmaven.test.skip=true") {
-    projects -= testProjects
+	  projects -= testProjects 
   }
 
   // if there are no projects, then a full build is needed
@@ -690,17 +627,6 @@ def processMavenCommand() {
     buildOptions.buildModeDesc = "Full (Incremental mode, but no code changes detected)"
     buildOptions.mavenCommand = "${buildOptions.mavenGoalsAndPhases} ${rcConfig.builder} ${buildOptions.tests} " +
         "${buildOptions.sources} ${buildOptions.assemblies}"
-  }
-
-  if (cliOptions['no-docker']) {
-    buildOptions.mavenCommand += ' -Dno-docker'
-  }
-
-  if (rcConfig.npmInstall) {
-    buildOptions.mavenCommand += " -Dnpm.install=${rcConfig.npmInstall}"
-  }
-  if (rcConfig.npmBuild) {
-    buildOptions.mavenCommand += " -Dnpm.build=${rcConfig.npmBuild}"
   }
 
   buildOptions.mavenCommand += ' ' + positionalOptions.join(' ')
@@ -757,38 +683,27 @@ def runBuild() {
   if (buildOptions.buildMode == "full" && isNxrmRunning()) {
     // Full mode means Maven clean which nukes target folder which kills Nexus
     warn("Shutting down NXRM due to full build")
-    try {
-      remoteSession(getSshHost(), trustUnknownHosts = true) {
-        exec 'system:shutdown -f'
-      }
-    } catch (com.jcraft.jsch.JSchException e) {
-      e.printStackTrace()
-      error("Unable to connect to NXRM to shut it down. Attempting to continue.")
-    }
-  }
-
-  if (buildOptions.buildMode == "full" && rcConfig.backup) {
-    // perform backup (if enabled) on full build only due to 'clean'
-    File sonatypeWork = new File(SONATYPE_WORK)
-    if ((sonatypeWork).exists()) {
-      def backupFolder = new File(SONATYPE_WORK_BACKUP)
-      info("Backing up ${sonatypeWork.getCanonicalPath()} to ${backupFolder.getCanonicalPath()}")
-
-      if (backupFolder.exists()) {
-        def newName = new File(SONATYPE_WORK_BACKUP + new Date().format('-yyyyMMddHHmm'))
-        info("Moving existing backup to ${newName.getCanonicalPath()}")
-        FileUtils.moveDirectory(backupFolder, newName)
-      }
-
-      FileUtils.moveDirectory(sonatypeWork, backupFolder)
-    }
-    else {
-      info("No target/sonatype-work to backup!")
-    }
+	try {
+		remoteSession(getSshHost(), trustUnknownHosts = true) {
+		  exec 'system:shutdown -f'
+		}
+	} catch (com.jcraft.jsch.JSchException e) {
+		e.printStackTrace()
+		error("Unable to connect to NXRM to shut it down. Attempting to continue.")
+	}
   }
 
   // execute command
-  def exitValue = mvnw(buildOptions.mavenCommand).exitValue()
+  def process = new ProcessBuilder("unbuffer", "./mvnw", buildOptions.mavenCommand).redirectErrorStream(true).start()
+  process.inputStream.eachLine {
+    // print to console
+    println it
+    // dump to build.log (strip colour)
+    buildLog << it.replaceAll("\u001B\\[[;\\d]*m", "") + "\n"
+  }
+  process.waitFor()
+
+  def exitValue = process.exitValue()
 
   debug("Build process exit value: $exitValue")
 
@@ -811,8 +726,8 @@ def runDeploy() {
     // only extract the assemblies on full builds
     deploy()
   }
-  else if (!rcConfig.deploy) {
-    info("Skipping deployment (no-deploy=true)")
+  else if (cliOptions.n) {
+    info("Skipping deployment (noDeploy=true)")
   }
   else if (!((new File(LOCK_FILE)).exists())) {
     info("No lock file detected at $LOCK_FILE. Performing regular deployment.")
@@ -856,10 +771,11 @@ def runDeploy() {
 
 def deploy() {
   extract("./assemblies/nexus-base-template/target/", "nexus-base-template-*.zip")
-  extract("./private/assemblies/distributions/nexus-pro/target/", "nexus-professional-*-bundle.zip")
+  extract("./private/assemblies/nexus-oss/target/", "nexus-*-bundle.zip")
+  extract("./private/assemblies/nexus-pro/target/", "nexus-professional-*-bundle.zip")
 
   // Tell Karaf to load bundles from local .m2 folder
-  def files = new FileNameFinder().getFileNames("$TARGET_DIR", "nexus*/**/org.ops4j.pax.url.mvn.cfg")
+  def files = new FileNameFinder().getFileNames("target", "nexus*/**/org.ops4j.pax.url.mvn.cfg")
   files.each {
     // comment out localRepository
     ant.replace(file: it, token: "org.ops4j.pax.url.mvn.localRepository",
@@ -879,7 +795,7 @@ def extract(path, zipRegex) {
   else {
     File file = new File(files.get(0))
     info("Extracting: ${file.toString()}")
-    ArchiverFactory.createArchiver(ArchiveFormat.ZIP).extract(file, new File("$TARGET_DIR"))
+    ArchiverFactory.createArchiver(ArchiveFormat.ZIP).extract(file, new File("target"))
   }
 }
 
@@ -890,24 +806,13 @@ def checkSSL() {
 
     // see if keystore.jks is already created
     def keystore = new File(".nxrm/keystore.jks")
-
-    if (rcConfig.sslIp != null && keystore.exists()) {
-      // If we have an ssl ip address set, then we need to generate a new keystore
-      keystore.delete()
-    }
-
     if (!keystore.exists()) {
-      info "Generating .nxrm/keystore.jks"
-      def keytool = ["keytool", "-genkeypair", "-keystore", ".nxrm/keystore.jks", "-storepass",
+      info "Generating keystore.jks for the first time and storing in .nxrm/keystore.jks"
+      def process = new ProcessBuilder("keytool", "-genkeypair", "-keystore", ".nxrm/keystore.jks", "-storepass",
           "password", "-keypass", "password", "-alias", "self-signed-example", "-keyalg", "RSA", "-keysize", "2048",
           "-validity", "5000", "-dname", "CN=localhost, OU=Example, O=Example, L=Unspecified, ST=Unspecified, C=US",
-          "-ext", "BC=ca:true"]
-      if (rcConfig.sslIp) {
-        keytool << "-ext"
-        keytool << "SAN=IP:${rcConfig.sslIp},DNS:localhost"
-      }
-
-      def process = new ProcessBuilder(keytool as String[]).redirectErrorStream(true).start()
+          "-ext", "BC=ca:true"
+      ).redirectErrorStream(true).start()
       process.inputStream.eachLine {
         println it
       }
@@ -918,7 +823,7 @@ def checkSSL() {
     }
 
     // Copy to etc/ssl folder
-    List<String> files = new FileNameFinder().getFileNames("$TARGET_DIR", "nexus*/NOTICE.txt")
+    List<String> files = new FileNameFinder().getFileNames("target", "nexus*/LICENSE.txt")
     files.each {
       File dest = new File(new File(it).getParent(), "etc/ssl/")
       debug("SSL: Copying keystore.jks to $dest")
@@ -926,7 +831,7 @@ def checkSSL() {
     }
 
     // Update nexus.properties (and default files)
-    files = new FileNameFinder().getFileNames("$TARGET_DIR", "nexus*/**/nexus*.properties")
+    files = new FileNameFinder().getFileNames("target", "nexus*/**/nexus*.properties")
     files.each {
       ant.replace(file: it, token: '${jetty.etc}/jetty-http.xml,${jetty.etc}/jetty-requestlog.xml',
           value: '${jetty.etc}/jetty-http.xml,${jetty.etc}/jetty-https.xml,${jetty.etc}/jetty-requestlog.xml')
@@ -946,7 +851,7 @@ def ensurePresentInFile(File file, String line) {
 }
 
 def checkSSH() {
-  if (!rcConfig.'deploy') {
+  if (cliOptions.'no-deploy') {
     debug("TODO no deploy")
     return
   }
@@ -954,19 +859,42 @@ def checkSSH() {
   debug("Enabling SSH")
 
   // Add ssh option to all cfg files in target
-  List<String> files = new FileNameFinder().getFileNames("$TARGET_DIR", "nexus*/**/org.apache.karaf.features.cfg")
+  List<String> files = new FileNameFinder().getFileNames("target", "nexus*/**/org.apache.karaf.features.cfg")
   files.each {
     debug("Updating $it to enable SSH")
     ant.replaceregexp(file: it, match: "\\(wrap\\), ", replace: "\\(wrap\\),ssh,")
   }
 
   // Karaf ssh port
-  files = new FileNameFinder().getFileNames("$TARGET_DIR", "nexus*/**/org.apache.karaf.shell.cfg")
+  files = new FileNameFinder().getFileNames("target", "nexus*/**/org.apache.karaf.shell.cfg")
   files.each {
     debug("Updating $it to set Karaf SSH port")
     ant.replaceregexp(file: it, match: "sshPort = 8022", replace: "sshPort = ${rcConfig.karafSshPort}")
   }
 
+  // Add VM option
+  files = new FileNameFinder().getFileNames("target", "nexus*/bin/nexus")
+  files.each {
+    def file = new File(new File(it).getParent(), "nexus.vmoptions")
+    ensurePresentInFile(file, '-Dkaraf.startRemoteShell=true')
+  }
+}
+
+def checkOrient() {
+  if (rcConfig.orient) {
+    debug("Enabling Orient")
+
+    // Update nexus.properties (and default files)
+    List<String> files = new FileNameFinder().getFileNames("target", "nexus*/**/nexus*.properties")
+    files.each {
+      ensurePresentInFile(new File(it), "nexus.orient.binaryListenerEnabled=true")
+      ensurePresentInFile(new File(it), "nexus.orient.httpListenerEnabled=true")
+      ensurePresentInFile(new File(it), "nexus.orient.dynamicPlugins=true")
+    }
+  }
+  else {
+    debug('Skipping Orient config')
+  }
 }
 
 def checkElastic() {
@@ -974,14 +902,14 @@ def checkElastic() {
     debug("Enabling Elastic")
 
     // Update elasticsearch.yml (and default files)
-    List<String> files = new FileNameFinder().getFileNames("$TARGET_DIR", "nexus*/**/elasticsearch.yml")
+    List<String> files = new FileNameFinder().getFileNames("target", "nexus*/**/elasticsearch.yml")
     files.each {
       debug("Updating $it to set enable Elastic HTTP")
       ant.replace(file: it, token: "http.enabled: false", value: "http.enabled: true")
     }
 
     // Update nexus.properties (and default files)
-    files = new FileNameFinder().getFileNames("$TARGET_DIR", "nexus*/**/nexus*.properties")
+    files = new FileNameFinder().getFileNames("target", "nexus*/**/nexus*.properties")
     files.each {
       ensurePresentInFile(new File(it), 'nexus.elasticsearch.plugins=license,marvel-agent,mobz/elasticsearch-head,lmenezes/elasticsearch-kopf,xyu/elasticsearch-whatson')
     }
@@ -995,32 +923,10 @@ def checkPorts() {
   debug("Checking application ports")
 
   // Update nexus.properties (and default files)
-  List<String> files = new FileNameFinder().getFileNames("$TARGET_DIR", "nexus*/etc/nexus*.properties sonatype-work/nexus3/etc/nexus*properties")
+  List<String> files = new FileNameFinder().getFileNames("target", "**/nexus*.properties")
   files.each {
     ensurePresentInFile(new File(it), "application-port=${rcConfig.port}")
     ensurePresentInFile(new File(it), "application-port-ssl=${rcConfig.sslPort}")
-  }
-}
-
-def checkRestore() {
-  if (rcConfig.restore) {
-    def backupFolder = new File(SONATYPE_WORK_BACKUP)
-    if (backupFolder.exists()) {
-      def sonatypeWork = new File(SONATYPE_WORK)
-      info("Restoring from ${backupFolder.getCanonicalPath()} to ${sonatypeWork.getCanonicalPath()}")
-
-      // move any existing sonatype-work out of the way
-      if (sonatypeWork.exists()) {
-        def newName = new File(SONATYPE_WORK_BACKUP + new Date().format('-yyyyMMddHHmm'))
-        info("Moving existing sonatype-work to ${newName.getCanonicalPath()}")
-        FileUtils.moveDirectory(sonatypeWork, newName)
-      }
-
-      FileUtils.moveDirectory(backupFolder, sonatypeWork)
-    }
-    else {
-      info("No backup to restore in ${SONATYPE_WORK_BACKUP}!")
-    }
   }
 }
 
@@ -1028,9 +934,9 @@ def runNxrm() {
   info("Starting Nexus on ${rcConfig.port}/${rcConfig.sslPort} (JDWP debug port: ${rcConfig.javaDebugPort})")
 
   // pre-flight checks
-  checkRestore()
   checkSSL()
   checkSSH()
+  checkOrient()
   checkElastic()
   checkPorts()
 
@@ -1042,7 +948,7 @@ def runNxrm() {
     Model model = reader.read(new FileReader(new File('pom.xml')))
     def version = model.getVersion()
 
-    def nxrmCommand = ["$TARGET_DIR/${dir}${version}/bin/nexus".toString()]
+    def nxrmCommand = ["target/${dir}${version}/bin/nexus".toString()]
     nxrmCommand = nxrmCommand.plus(positionalOptions.join(' ')) // add remaining arguments (e.g. -rf :project)
     info("Executing NXRM command: ${nxrmCommand.join(' ')}")
 
@@ -1053,16 +959,9 @@ def runNxrm() {
 
     def processBuilder = new ProcessBuilder(nxrmCommand)
         .inheritIO()
-
-    processBuilder.environment().put('NEXUS_SECURITY_RANDOMPASSWORD', Boolean.toString(rcConfig.randomPassword))
-    processBuilder.environment().put('JAVA_MIN_MEM', rcConfig.javaMinMem)
     processBuilder.environment().put('JAVA_MAX_MEM', rcConfig.javaMaxMem)
     processBuilder.environment().put('DIRECT_MAX_MEM', rcConfig.directMaxMem)
-    processBuilder.environment().put('JAVA_DEBUG_PORT',
-        rcConfig.javaDebugPort instanceof String ? rcConfig.javaDebugPort : Integer.toString(rcConfig.javaDebugPort))
-    processBuilder.environment().put('EXTRA_JAVA_OPTS', rcConfig.vmOptions)
-    processBuilder.environment().put('NEXUS_RESOURCE_DIRS', evaluate(new File('buildsupport/scripts/nexusresourcedirs.groovy')))
-
+    processBuilder.environment().put('JAVA_DEBUG_PORT', Integer.toString(rcConfig.javaDebugPort))
     def process = processBuilder.start()
     process.inputStream.eachLine {
       // print to console
@@ -1074,14 +973,17 @@ def runNxrm() {
   }
 
   switch (assembly) {
+    case "oss":
+      run("nexus-")
+      break
     case "pro":
       run("nexus-professional-")
       break
-    case "core":
+    case "base":
       run("nexus-base-template-")
       break
     default:
-      error("Usage: ./nxrm.groovy -r { core | pro } [nexus-options]")
+      error("Usage: ./nxrm.groovy -r { base | oss | pro } [nexus-options]")
   }
 }
 
@@ -1089,25 +991,9 @@ def geb() {
   info('Enabling Geb tests for your IDE')
   info("Note: The default build options do NOT even compile tests. Before running '--geb' you should run './nxrm.groovy -f -t skip' to compile ALL test code.")
 
-  mvnw('dependency:properties process-test-resources -Dit -pl :functional-testsuite,:nexuspro-modern-testsuite,:nexuspro-fabric-testsuite')
-}
-
-def sass() {
-  info('Compiling Sass files')
-
-  mvnw('clean install -Pdriver -Dmode=build -pl :nexus-rapture')
-}
-
-/**
- * @param cmd a String with the entire command to execute
- * @return
- */
-def mvnw(String cmd) {
-  def stopwatch = Stopwatch.createStarted()
+  def cmd = 'dependency:properties process-test-resources -Dit -pl :functional-testsuite,:nexuspro-modern-testsuite,:nexuspro-fabric-testsuite'
   info("Running command: ./mvnw $cmd")
-  List<String> command = ["unbuffer", "./mvnw"]
-  command.addAll(cmd.split())
-  def process = new ProcessBuilder(command).redirectErrorStream(true).start()
+  def process = new ProcessBuilder("unbuffer", "./mvnw", cmd).redirectErrorStream(true).start()
   process.inputStream.eachLine {
     // print to console
     println it
@@ -1115,27 +1001,12 @@ def mvnw(String cmd) {
     buildLog << it.replaceAll("\u001B\\[[;\\d]*m", "") + "\n"
   }
   process.waitFor()
-  stopwatch.stop()
-
-  if (System.getenv().containsKey('NXRM_STATS')) {
-    def nxrmAndArgs = ['nxrm.groovy']
-    nxrmAndArgs.addAll(args as List<String>)
-    def (nxrmCmd, elapsed, exitValue, mvnwCmd) = [nxrmAndArgs.join(' '), stopwatch.elapsed().seconds,
-                                                  process.exitValue(), command.tail().join(' ')]
-    Paths.get(System.getProperty('user.home'), '.nxrm_build_times') <<
-        "${timestamp()}\t${elapsed}\t${exitValue}\t${nxrmCmd}\t${mvnwCmd}\n"
-  }
 
   info("Done")
-  return process
-}
-
-def String timestamp() {
-  ZonedDateTime.now(systemDefault())
-      .format(ofPattern('uuuu.MM.dd.HH.mm.ss'))
 }
 
 // SCRIPT STARTS HERE
+
 removeBuildLog()
 
 if (!processCliOptions(args)) {
@@ -1145,9 +1016,6 @@ if (!processCliOptions(args)) {
 rcConfig = processRcConfigFile()
 
 lastBuild = processLastBuild()
-
-if (cliOptions.'overwrite-target')
-  TARGET_DIR = cliOptions.'overwrite-target'
 
 // stand-alone options
 if (cliOptions.run) {
@@ -1160,10 +1028,6 @@ else if (cliOptions.extract) {
 }
 else if (cliOptions.geb) {
   geb()
-  return
-}
-else if (cliOptions.sass) {
-  sass()
   return
 }
 else {
@@ -1179,7 +1043,7 @@ processBuilder()
 processMavenCommand()
 
 hr()
-info("-- nxrm.groovy build script")
+info("-- nxrm.sh build script")
 hr()
 info("Build mode   | $buildOptions.buildModeDesc")
 info("Goals/phases | $buildOptions.mavenGoalsAndPhasesDesc")

@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -30,7 +26,6 @@ Ext.define('NX.coreui.controller.Search', {
     'NX.Conditions',
     'NX.Permissions',
     'NX.I18n',
-    'NX.State',
     'NX.coreui.util.BrowseableFormats'
   ],
   masters: [
@@ -61,20 +56,17 @@ Ext.define('NX.coreui.controller.Search', {
     { ref: 'searchResult', selector: 'nx-coreui-searchfeature nx-coreui-search-result-list' },
     { ref: 'componentDetails', selector: 'nx-coreui-searchfeature nx-coreui-component-details' },
     { ref: 'assetList', selector: 'nx-coreui-searchfeature nx-coreui-component-asset-list' },
-    { ref: 'quickSearch', selector: 'nx-header-panel #quicksearch' },
-    { ref: 'info', selector: 'nx-coreui-searchfeature #info' },
-    { ref: 'warning', selector: 'nx-coreui-searchfeature #warning' }
+    { ref: 'quickSearch', selector: 'nx-header-panel #quicksearch' }
   ],
-
-  timedOutMessage: null,
-  limitMessage: null,
 
   /**
    * @override
    */
   init: function() {
     var me = this;
+
     me.callParent();
+
     me.getApplication().getIconController().addIcons({
       'search-default': {
         file: 'magnifier.png',
@@ -95,18 +87,20 @@ Ext.define('NX.coreui.controller.Search', {
       'search-saved': {
         file: 'magnifier.png',
         variants: ['x16', 'x32']
-      },
-      'message-primary': {
-        file: 'information.png',
-        variants: ['x16', 'x32'],
-        preload: true
-      },
-      'message-danger': {
-        file: 'exclamation.png',
-        variants: ['x16', 'x32'],
-        preload: true
       }
     });
+
+    me.getApplication().getFeaturesController().registerFeature({
+      path: '/Search/Saved',
+      mode: 'browse',
+      group: true,
+      iconName: 'search-folder',
+      weight: 500,
+      visible: function() {
+        return NX.Permissions.check('nexus:search:read');
+      }
+    }, me);
+
     me.registerFilter([
       {
         id: 'keyword',
@@ -126,25 +120,20 @@ Ext.define('NX.coreui.controller.Search', {
         readOnly: true
       }
     ], me);
+
     me.getStore('SearchFilter').each(function(model) {
       me.registerFeature(model, me);
     });
+
     me.listen({
       controller: {
         '#Refresh': {
           refresh: me.loadStores
-        },
-        '#State': {
-          userchanged: me.onUserChanged
-        },
-        '#Permissions': {
-          changed: me.onPermissionsChange
         }
       },
       component: {
         'nx-coreui-searchfeature nx-coreui-search-result-list': {
-          beforerender: me.onBeforeRender,
-          render: me.showHideResponseMessage
+          beforerender: me.onBeforeRender
         },
         'nx-coreui-searchfeature': {
           afterrender: me.initCriterias
@@ -168,43 +157,12 @@ Ext.define('NX.coreui.controller.Search', {
           search: me.onQuickSearch,
           searchcleared: me.onQuickSearch
         }
-      },
-      store: {
-        '#SearchResult': {
-          load: me.setResponseMessage
-        }
       }
     });
-  },
 
-  /**
-   * Update search results after user changed.
-   *
-   * @private
-   */
-  onUserChanged: function (user, oldUser) {
-    var me = this,
-        searchResultStore = me.getSearchResultStore();
-    if (!user) {
-      if (searchResultStore !== null) {
-        searchResultStore.clearFilter(true);
-      }
-    }
-  },
-
-  /**
-   * Update search results after permissions changed.
-   *
-   * @private
-   */
-  onPermissionsChange: function () {
-    var me = this,
-        searchResultStore = me.getSearchResultStore();
-    if (NX.Permissions.check('nexus:search:read')
-        && searchResultStore !== undefined
-        && searchResultStore !== null) {
-      searchResultStore.load();
-    }
+    me.getStore('SearchResult').on('load', function() {
+      me.showHideLimitMessage();
+    });
   },
 
   /**
@@ -269,7 +227,7 @@ Ext.define('NX.coreui.controller.Search', {
         description: NX.I18n.get('Search_Description'),
         group: true,
         view: { xtype: 'nx-coreui-searchfeature', searchFilter: model, bookmarkEnding: '' },
-        iconCls: 'x-fa fa-search',
+        iconName: 'search-default',
         weight: 20,
         expanded: false,
         visible: function() {
@@ -282,7 +240,7 @@ Ext.define('NX.coreui.controller.Search', {
         mode: 'browse',
         path: '/Search/' + (model.get('readOnly') ? '' : 'Saved/') + model.get('name'),
         view: { xtype: 'nx-coreui-searchfeature', searchFilter: model, bookmarkEnding: '/' + model.getId() },
-        iconCls: 'x-fa fa-search',
+        iconName: 'search-default',
         text: model.get('text'),
         description: model.get('description'),
         authenticationRequired: false,
@@ -310,49 +268,16 @@ Ext.define('NX.coreui.controller.Search', {
 
   /**
    * @private
-   *
-   * Store a message to be displayed along with the store results
+   * Show or hide the results limited message.
    */
-  setResponseMessage: function() {
-    var rawData = this.getSearchResultStore().proxy.reader.rawData,
-        limited = rawData && rawData.limited,
+  showHideLimitMessage: function() {
+    var me = this,
+        rawData =  me.getStore('SearchResult').proxy.reader.rawData,
+        info = me.getFeature().down('#info'),
         format = Ext.util.Format.numberRenderer('0,000');
-
-    this.timedOutMessage = null;
-
-    if (limited) {
-      this.limitMessage = NX.I18n.format('Search_Results_Limit_Message', format(rawData.total), format(rawData.unlimitedTotal));
-    }
-    else {
-      this.limitMessage = null;
-    }
-
-    this.showHideResponseMessage();
-  },
-
-  /**
-   * @private
-   *
-   * Show/hide the response messages
-   */
-  showHideResponseMessage: function() {
-    var warning = this.getWarning(),
-        info = this.getInfo();
-
-    if (!warning || !info) {
-      return;
-    }
-
-    if (this.timedOutMessage && NX.State.isSqlSearchEnabled() && warning) {
-      warning.setTitle(this.timedOutMessage);
-      warning.show();
-    }
-    else {
-      warning.hide();
-    }
-
-    if (this.limitMessage && NX.State.isSqlSearchEnabled() && info) {
-      info.setTitle(this.limitMessage);
+    if (rawData.limited) {
+      info.setTitle(NX.I18n.format('Search_Results_Limit_Message',
+          format(rawData.total), format(rawData.unlimitedTotal)));
       info.show();
     }
     else {
@@ -372,22 +297,40 @@ Ext.define('NX.coreui.controller.Search', {
         searchResultStore = me.getSearchResultStore(),
         searchCriteriaStore = me.getSearchCriteriaStore(),
         addCriteriaMenu = [],
-        criterias = {}, criteriasPerGroup = {};
+        bookmarkSegments = NX.Bookmarks.getBookmark().getSegments(),
+        bookmarkValues = {},
+        filterSegments,
+        criterias = {}, criteriasPerGroup = {},
+        searchCriteria, queryIndex, pair;
+
+    // Extract the filter object from the URI
+    if (bookmarkSegments && bookmarkSegments.length) {
+      queryIndex = bookmarkSegments[0].indexOf('=');
+      if (queryIndex !== -1) {
+        filterSegments = decodeURIComponent(bookmarkSegments[0].slice(queryIndex + 1)).split(' AND ');
+        for (var i = 0; i < filterSegments.length; ++i) {
+          pair = filterSegments[i].split('=');
+          bookmarkValues[pair[0]] = pair[1];
+        }
+      }
+    }
 
     searchCriteriaPanel.removeAll();
+    searchResultStore.removeAll();
+    searchResultStore.clearFilter(true);
 
     if (searchFilter && searchFilter.get('criterias')) {
       Ext.Array.each(Ext.Array.from(searchFilter.get('criterias')), function(criteria) {
         criterias[criteria['id']] = { value: criteria['value'], hidden: criteria['hidden'] };
       });
     }
-    searchResultStore.getFilters().items.forEach(function(filter) {
-      var existingCriteria = criterias[filter.config.id];
+    Ext.Object.each(bookmarkValues, function(key, value) {
+      var existingCriteria = criterias[key];
       if (existingCriteria) {
-        existingCriteria['value'] = filter.config.value;
+        existingCriteria['value'] = value;
       }
       else {
-        criterias[filter.config.id] = { value: filter.config.value, removable: true };
+        criterias[key] = { value: value, removable: true };
       }
     });
 
@@ -399,21 +342,19 @@ Ext.define('NX.coreui.controller.Search', {
         if (!cmpClass) {
           cmpClass = Ext.ClassManager.getByAlias('widget.nx-coreui-searchcriteria-text');
         }
-        searchCriteriaPanel.add(cmpClass.create(Ext.apply(Ext.clone(criteriaModel.get('config')), {
+        searchCriteria = searchCriteriaPanel.add(cmpClass.create(Ext.apply(Ext.clone(criteriaModel.get('config')), {
           criteriaId: criteriaModel.getId(),
           value: criteria['value'],
           hidden: criteria['hidden'],
           removable: criteria['removable']
         })));
+        if (searchCriteria.value) {
+          me.applyFilter(searchCriteria, false);
+        }
       }
     });
 
     searchCriteriaStore.each(function(criteria) {
-      // skip tags entry if not running PRO
-      if (criteria.getId() === 'tags' && !me.isTaggingEnabled()) {
-        return;
-      }
-
       var addTo = addCriteriaMenu,
           group = criteria.get('group'),
           format = criteria.get('config').format;
@@ -446,83 +387,11 @@ Ext.define('NX.coreui.controller.Search', {
       cls: 'more-criteria',
       itemId: 'addButton',
       text: NX.I18n.get('Search_More_Text'),
-      iconCls: 'x-fa fa-plus-circle',
+      glyph: 'xf055@FontAwesome' /* fa-plus-circle */,
       menu: addCriteriaMenu
     });
-  },
 
-  /**
-   * @private
-   * Sets the store filters based on the Bookmark
-   */
-  loadBookmark: function() {
-    var me = this,
-        searchFilter = me.getFeature().searchFilter,
-        bookmarkSegments = NX.Bookmarks.getBookmark().getSegments(),
-        store = me.getStore('SearchResult'),
-        bookmarkValues = {},
-        criterias = {},
-        filterSegments,
-        queryIndex,
-        pair;
-
-    // Extract the filter object from the URI
-    if (bookmarkSegments && bookmarkSegments.length) {
-      queryIndex = bookmarkSegments[0].indexOf('=');
-      if (queryIndex !== -1) {
-        filterSegments = decodeURIComponent(bookmarkSegments[0].slice(queryIndex + 1)).split(' AND ');
-        for (var i = 0; i < filterSegments.length; ++i) {
-          pair = filterSegments[i].split('=');
-          bookmarkValues[pair[0]] = pair[1];
-        }
-      }
-    }
-
-    // From the search type (e.g. maven, nuget, custom)
-    if (searchFilter) {
-      if (searchFilter.id !== 'keyword' && searchFilter.id !== 'custom') {
-        store.proxy.setExtraParam('formatSearch', true);
-      } else {
-        store.proxy.setExtraParam('formatSearch', false);
-      }
-      if (searchFilter.get('criterias')) {
-        searchFilter.get('criterias').forEach(function(criteria) {
-          if (criteria.value) {
-            criterias[criteria.id] = {value: criteria.value, hidden: criteria.hidden};
-          }
-        });
-      }
-    }
-
-    Ext.Object.each(bookmarkValues, function(key, value) {
-      var existingCriteria = criterias[key];
-      if (existingCriteria) {
-        existingCriteria['value'] = value;
-      }
-      else {
-        criterias[key] = { value: value, removable: true };
-      }
-    });
-
-    const filters = Object.entries(criterias).map(function(criteriaEntry) {
-      return {
-        id: criteriaEntry[0],
-        property: criteriaEntry[0],
-        value: criteriaEntry[1].value
-      }
-    }).filter(function(criteria) {
-      return criteria.value;
-    });
-
-    me.applyFilters(filters, false);
-  },
-
-  /**
-   * @private
-   * @returns {boolean} whether tagging feature is available
-   */
-  isTaggingEnabled: function() {
-    return NX.State.getUser() && NX.Permissions.check('nexus:tags:read') && ('PRO' === NX.State.getEdition());
+    searchResultStore.load();
   },
 
   /**
@@ -541,7 +410,6 @@ Ext.define('NX.coreui.controller.Search', {
     var searchPanel = this.getFeature(),
         searchCriteriaPanel = searchPanel.down('#criteria'),
         addButton = searchCriteriaPanel.down('#addButton'),
-        searchInfo = searchPanel.down('#searchInfo'),
         criteria = menuitem.criteria,
         cmpClass = Ext.ClassManager.getByAlias('widget.nx-coreui-searchcriteria-' + criteria.getId()),
         cmp;
@@ -557,10 +425,6 @@ Ext.define('NX.coreui.controller.Search', {
     searchCriteriaPanel.add(cmp);
     cmp.focus();
     searchCriteriaPanel.add(addButton);
-
-    if (criteria.getId() === 'keyword' && NX.State.isSqlSearchEnabled() && searchInfo) {
-      searchInfo.setTitle(NX.I18n.get('Search_KeywordSearchRestrictions'));
-    }
   },
 
   /**
@@ -614,15 +478,12 @@ Ext.define('NX.coreui.controller.Search', {
         searchResultStore = me.getSearchResult().getStore(),
         componentModel;
 
-    searchResultStore.clearFilter(true);
-    me.loadBookmark();
+    // If no search filter has been specified, don't load any stores
+    if (!me.getStore('SearchResult').filters.length) {
+      return;
+    }
 
     searchResultStore.load(function() {
-      // If no search filter has been specified, don't load any stores
-      if (!searchResultStore.getFilters().length) {
-        return;
-      }
-
       // Load the asset detail view
       if (list_ids[1]) {
         componentModel = searchResultStore.getById(decodeURIComponent(list_ids[0]));
@@ -643,45 +504,39 @@ Ext.define('NX.coreui.controller.Search', {
    * @private
    * Synchronize store filters with search criteria.
    * @param searchCriteria criteria to be synced
-   * @param performSearchAfter if filter should be applied on store ( = remote call)
+   * @param apply if filter should be applied on store ( = remote call)
    */
-  applyFilter: function(searchCriteria, performSearchAfter) {
-    const allCriteria = this.getFeature().query('#criteria component[criteriaId]');
-    const filters = allCriteria.filter(function(criteria) {
-      return criteria.getValue();
-    }).map(function (criteria) {
-      return {
-        id: criteria.criteriaId,
-        property: criteria.criteriaId,
-        value: criteria.getValue()
-      };
-    });
+  applyFilter: function(searchCriteria, apply) {
+    var me = this,
+        store = me.getStore('SearchResult'),
+        filter = searchCriteria.filter;
 
-    this.applyFilters(filters, performSearchAfter)
-  },
+    me.getSearchResult().getSelectionModel().deselectAll();
 
-  /**
-   * @private
-   * Applies a set of filters to the SearchResult store.
-   * @param filters {[{property:string, value:string}]}
-   * @param performSearchAfter {boolean} if the filters should be applied to the store (performs a remote search)
-   */
-  applyFilters: function (filters, performSearchAfter) {
-    const SUPPRESS_EVENTS = true;
-    const searchResultStore = this.getStore('SearchResult');
-    this.getSearchResult().getSelectionModel().deselectAll();
+    if (filter && Ext.isFunction(filter) && !(filter instanceof Ext.util.Filter)) {
+      filter = searchCriteria.filter();
+    }
 
-    searchResultStore.clearFilter(SUPPRESS_EVENTS);
-    filters.forEach(function(filter) {
-      // Setting all filters all at once causes bugs.
-      // Fortunately, only one search is generated if we add all the filters and then apply them by loading the store.
-      searchResultStore.addFilter(filter, SUPPRESS_EVENTS);
-    });
+    if (filter) {
+      store.addFilter(Ext.apply(filter, { id: searchCriteria.criteriaId }), apply);
+    }
+    else {
+      // TODO code bellow is a workaround stores not removing filters when remoteFilter = true
+      store.removeFilter(searchCriteria.criteriaId);
+      if (store.filters.removeAtKey(searchCriteria.criteriaId) && apply) {
+        if (store.filters.length) {
+          store.filter();
+        }
+        else {
+          store.clearFilter();
+        }
+        store.fireEvent('filterchange', store, store.filters.items);
+      }
+    }
 
-    if (performSearchAfter) {
-      searchResultStore.load();
-      this.onSearchResultSelection(null);
-      this.bookmarkFilters();
+    if (apply) {
+      me.onSearchResultSelection(null);
+      me.bookmarkFilters();
     }
   },
 
@@ -819,7 +674,6 @@ Ext.define('NX.coreui.controller.Search', {
     else {
       me.showChild(0, true);
       searchFeature.down('#criteria component[criteriaId=keyword]').setValue(searchValue);
-      searchFeature.down('#criteria component[criteriaId=keyword]').search(searchValue);
     }
   }
 

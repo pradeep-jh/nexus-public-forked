@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -45,15 +41,12 @@ Ext.define('NX.app.PluginStrings', {
     Button_Next: 'Next',
     Button_Save: 'Save',
 
-    Column_No_Data: 'No data',
-
     // Header
-    Header_Panel_Logo_Text: 'Sonatype Nexus Repository',
+    Header_Panel_Logo_Text: 'Nexus Repository Manager',
     Header_BrowseMode_Title: 'Browse',
     Header_BrowseMode_Tooltip: 'Browse server contents',
     Header_AdminMode_Title: 'Administration',
     Header_AdminMode_Tooltip: 'Server administration and configuration',
-    Header_Health_Tooltip: 'System Status',
     Header_QuickSearch_Empty: 'Search components',
     Header_QuickSearch_Tooltip: 'Quick component keyword search',
     Header_Refresh_Tooltip: 'Refresh current view and data',
@@ -68,13 +61,11 @@ Ext.define('NX.app.PluginStrings', {
     Help_Feature_Text: 'Help for: ',
     Header_Help_Feature_Tooltip: 'Help and documentation for the currently selected feature',
     Header_Help_About_Text: 'About',
-    Header_Help_About_Tooltip: 'About Sonatype Nexus Repository',
+    Header_Help_About_Tooltip: 'About Nexus Repository Manager',
     Header_Help_Documentation_Text: 'Documentation',
     Header_Help_Documentation_Tooltip: 'Product documentation',
     Header_Help_KB_Text: 'Knowledge base',
     Header_Help_KB_Tooltip: 'Knowledge base',
-    Header_Help_Guides_Text: 'Sonatype guides',
-    Header_Help_Guides_Tooltip: 'Sonatype guides',
     Header_Help_Community_Text: 'Community',
     Header_Help_Community_Tooltip: 'Community information',
     Header_Help_Issues_Text: 'Issue tracker',
@@ -125,8 +116,8 @@ Ext.define('NX.app.PluginStrings', {
     State_License_Invalid_Message: 'Your license has been detected as missing or invalid. Upload a valid license to proceed.',
 
     // About modal
-    AboutWindow_Title: 'About Sonatype Nexus Repository',
-    AboutWindow_About_Title: 'Legal Terms and Copyright',
+    AboutWindow_Title: 'About Nexus Repository Manager',
+    AboutWindow_About_Title: 'Copyright',
     AboutWindow_License_Tab: 'License',
 
     // Authentication modal
@@ -175,29 +166,18 @@ Ext.define('NX.app.PluginStrings', {
 
     // Browse -> Welcome
     Dashboard_Title: 'Welcome',
+    Dashboard_Description: 'Welcome to Nexus Repository Manager!',
 
     // Field validation messages
     Util_Validator_Text: 'Only letters, digits, underscores(_), hyphens(-), and dots(.) are allowed and may not start with underscore or dot.',
     Util_Validator_Hostname: 'Hostname must be valid',
-    Util_Validator_Trim: 'This field may not start or end with a space',
-    Util_Validator_Url: 'This field should be a URL in the format "http://www.example.com"',
-    Util_Validator_Subdomain_Text: 'Subdomain field must be a minimum of 1 and maximum of 63 characters (letters, numbers, and dashes) and must start with a letter and end with a letter or digit',
+    Util_Validator_Trim: 'A Role ID may not start or end with a space.',
 
     // Wizard
     Wizard_Next: '@Button_Next',
     Wizard_Back: '@Button_Back',
     Wizard_Cancel: '@Button_Cancel',
-    Wizard_Screen_Progress: '{0} of {1}',
-
-    // SearchBoxTip
-    SearchBoxTip_ExactMatch: 'Use <b>""</b> for exact match - "example"',
-    SearchBoxTip_Wildcard: 'Use <b>*</b> or <b>?</b> for wildcards - ex?mpl*',
-    SearchBoxTip_LearnMore: 'Learn more...',
-
-    // DependencySnippet Panel
-    DependencySnippetPanel_Title: 'Usage',
-    DependencySnippetPanel_Copy_Button_Tooltip: 'Copy snippet to clipboard'
-
+    Wizard_Screen_Progress: '{0} of {1}'
   }
 }, function(obj) {
   NX.I18n.register(obj);

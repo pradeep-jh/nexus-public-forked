@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus</groupId>
     <artifactId>nexus-components</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-cache</artifactId>
@@ -33,9 +33,17 @@
       <artifactId>nexus-common</artifactId>
     </dependency>
 
+    <!--
+    NOTE: This has a non-standard license, prefer ASF spec instead.
+    -->
+    <!--<dependency>-->
+      <!--<groupId>javax.cache</groupId>-->
+      <!--<artifactId>cache-api</artifactId>-->
+    <!--</dependency>-->
+
     <dependency>
-      <groupId>javax.cache</groupId>
-      <artifactId>cache-api</artifactId>
+      <groupId>org.apache.geronimo.specs</groupId>
+      <artifactId>geronimo-jcache_1.0_spec</artifactId>
     </dependency>
 
     <dependency>
@@ -44,27 +52,8 @@
     </dependency>
 
     <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-testsupport</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <!-- We need this for support JDK 9+ -->
-    <dependency>
-      <groupId>jakarta.xml.bind</groupId>
-      <artifactId>jakarta.xml.bind-api</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>javax.activation</groupId>
-      <artifactId>activation</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.glassfish.jaxb</groupId>
-      <artifactId>jaxb-runtime</artifactId>
+      <groupId>org.sonatype.goodies</groupId>
+      <artifactId>goodies-testsupport</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

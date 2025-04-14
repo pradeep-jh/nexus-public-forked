@@ -34,7 +34,7 @@ public class Privilege
 
   private boolean readOnly;
 
-  private int version;
+  private String version;
 
   public Privilege() {
     // empty
@@ -111,11 +111,11 @@ public class Privilege
     return this.properties.get(key);
   }
 
-  public int getVersion() {
+  public String getVersion() {
     return version;
   }
 
-  public void setVersion(final int version) {
+  public void setVersion(final String version) {
     this.version = version;
   }
 

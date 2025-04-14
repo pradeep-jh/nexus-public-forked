@@ -84,8 +84,7 @@ public class ActivationConditionHandler
         activationCondition = conditions.logical().and(
             capabilityActivationCondition,
             conditions.nexus().active(),
-            conditions.capabilities().capabilityHasNoFailures(),
-            conditions.capabilities().capabilityHasNoDuplicates()
+            conditions.capabilities().capabilityHasNoFailures()
         );
         if (activationCondition instanceof CapabilityContextAware) {
           ((CapabilityContextAware) activationCondition).setContext(reference.context());

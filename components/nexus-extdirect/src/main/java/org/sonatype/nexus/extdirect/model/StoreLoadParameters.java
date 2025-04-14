@@ -34,41 +34,12 @@ public class StoreLoadParameters
 
   private List<Filter> filter;
 
-  private String query;
-
-  private boolean formatSearch;
-
   public Integer getPage() {
     return page;
   }
 
   public void setPage(final Integer page) {
     this.page = page;
-  }
-
-  public StoreLoadParameters filters(final List<Filter> filter) {
-    this.filter = filter;
-    return this;
-  }
-
-  public StoreLoadParameters limit(final Integer limit) {
-    this.limit = limit;
-    return this;
-  }
-
-  public StoreLoadParameters page(final Integer page) {
-    this.page = page;
-    return this;
-  }
-
-  public StoreLoadParameters sort(final List<Sort> sort) {
-    this.sort = sort;
-    return this;
-  }
-
-  public StoreLoadParameters start(final Integer start) {
-    this.start = start;
-    return this;
   }
 
   public Integer getStart() {
@@ -115,26 +86,6 @@ public class StoreLoadParameters
     this.sort = sort;
   }
 
-  public String getQuery() {
-    return query;
-  }
-
-  public void setQuery(final String query) {
-    this.query = query;
-  }
-
-  public List<Filter> getFilter() {
-    return filter;
-  }
-
-  public boolean isFormatSearch() {
-    return formatSearch;
-  }
-
-  public void setFormatSearch(final boolean formatSearch) {
-    this.formatSearch = formatSearch;
-  }
-
   @Override
   public String toString() {
     return "StoreLoadParameters{" +
@@ -143,10 +94,9 @@ public class StoreLoadParameters
         ", limit=" + limit +
         ", sort=" + sort +
         ", filter=" + filter +
-        ", formatSearch=" + formatSearch +
         '}';
   }
-
+  
   public static class Filter
   {
     private String property;
@@ -157,22 +107,12 @@ public class StoreLoadParameters
       return property;
     }
 
-    public Filter property(final String property) {
-      this.property = property;
-      return this;
-    }
-
     public void setProperty(final String property) {
       this.property = property;
     }
 
     public String getValue() {
       return value;
-    }
-
-    public Filter value(final String value) {
-      this.value = value;
-      return this;
     }
 
     public void setValue(final String value) {
@@ -193,14 +133,6 @@ public class StoreLoadParameters
     private String property;
 
     private String direction;
-
-    public Sort() {
-    }
-
-    public Sort(final String property, final String direction) {
-      this.property = property;
-      this.direction = direction;
-    }
 
     public String getProperty() {
       return property;

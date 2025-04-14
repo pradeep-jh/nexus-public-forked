@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -22,7 +18,7 @@
  */
 Ext.define('NX.util.condition.Condition', {
   mixins: {
-    observable: 'Ext.mixin.Observable',
+    observable: 'Ext.util.Observable',
     logAware: 'NX.LogAware'
   },
 
@@ -71,6 +67,24 @@ Ext.define('NX.util.condition.Condition', {
     me.id = me.self.getName() + '-' + NX.util.condition.Condition.counter++;
 
     me.mixins.observable.constructor.call(me, config);
+
+    me.addEvents(
+        /**
+         * Fires when condition is satisfied.
+         *
+         * @event satisfied
+         * @param {NX.util.condition.Condition} this
+         */
+        'satisfied',
+
+        /**
+         * Fires when condition is not satisfied.
+         *
+         * @event unsatisfied
+         * @param {NX.util.condition.Condition} this
+         */
+        'unsatisfied'
+    );
   },
 
   // HACK: comment the following lines to let debug messages flow
@@ -183,9 +197,9 @@ Ext.define('NX.util.condition.Condition', {
    *
    * @override
    */
-  doAddListener: function (ename, fn, scope, options, order, caller, manager) {
+  addListener: function (ename, fn, scope, options) {
     var me = this;
-    me.mixins.observable.doAddListener.call(me, ename, fn, scope, options, order, caller, manager);
+    me.mixins.observable.addListener.call(me, ename, fn, scope, options);
     me.listenerCounter++;
     if (me.listenerCounter === 1) {
       me.bind();
@@ -199,9 +213,9 @@ Ext.define('NX.util.condition.Condition', {
    *
    * @override
    */
-  doRemoveListener: function (ename, fn, scope) {
+  removeListener: function (ename, fn, scope) {
     var me = this;
-    me.mixins.observable.doRemoveListener.call(me, ename, fn, scope);
+    me.mixins.observable.removeListener.call(me, ename, fn, scope);
     me.listenerCounter--;
     if (me.listenerCounter === 0) {
       me.unbind();

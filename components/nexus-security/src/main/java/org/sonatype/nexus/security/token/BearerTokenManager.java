@@ -16,8 +16,7 @@ import javax.inject.Inject;
 
 import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.security.SecurityHelper;
-import org.sonatype.nexus.security.authc.apikey.ApiKey;
-import org.sonatype.nexus.security.authc.apikey.ApiKeyService;
+import org.sonatype.nexus.security.authc.apikey.ApiKeyStore;
 
 import org.apache.shiro.subject.PrincipalCollection;
 
@@ -32,18 +31,18 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public abstract class BearerTokenManager
     extends ComponentSupport
 {
-  protected final ApiKeyService apiKeyService;
+  protected final ApiKeyStore apiKeyStore;
 
   protected final SecurityHelper securityHelper;
 
   private final String format;
 
   @Inject
-  public BearerTokenManager(final ApiKeyService apiKeyService,
+  public BearerTokenManager(final ApiKeyStore apiKeyStore,
                             final SecurityHelper securityHelper,
                             final String format)
   {
-    this.apiKeyService = checkNotNull(apiKeyService);
+    this.apiKeyStore = checkNotNull(apiKeyStore);
     this.securityHelper = checkNotNull(securityHelper);
     this.format = checkNotNull(format);
   }
@@ -53,11 +52,11 @@ public abstract class BearerTokenManager
    */
   protected String createToken(final PrincipalCollection principals) {
     checkNotNull(principals);
-    char[] apiKey = apiKeyService.getApiKey(format, principals).map(ApiKey::getApiKey).orElse(null);
+    char[] apiKey = apiKeyStore.getApiKey(format, principals);
     if (apiKey != null) {
       return format + "." + new String(apiKey);
     }
-    return format + "." + new String(apiKeyService.createApiKey(format, principals));
+    return format + "." + new String(apiKeyStore.createApiKey(format, principals));
   }
 
   /**
@@ -65,8 +64,8 @@ public abstract class BearerTokenManager
    */
   public boolean deleteToken() {
     final PrincipalCollection principals = securityHelper.subject().getPrincipals();
-    if (apiKeyService.getApiKey(format, principals).isPresent()) {
-      apiKeyService.deleteApiKey(format, securityHelper.subject().getPrincipals());
+    if (apiKeyStore.getApiKey(format, principals) != null) {
+      apiKeyStore.deleteApiKey(format, securityHelper.subject().getPrincipals());
       return true;
     }
     return false;

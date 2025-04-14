@@ -30,7 +30,7 @@ public interface EmailManager
   /**
    * Installs new email configuration.
    */
-  void setConfiguration(EmailConfiguration configuration, String password);
+  void setConfiguration(EmailConfiguration configuration);
 
   /**
    * Send an email.
@@ -38,21 +38,7 @@ public interface EmailManager
   void send(Email mail) throws EmailException;
 
   /**
-   * Send verification email to given address using the provided password.
-   */
-  void sendVerification(EmailConfiguration configuration, String password, String address) throws EmailException;
-
-  /**
-   * Send verification email to given address using the existing password.
+   * Send verification email to given address.
    */
   void sendVerification(EmailConfiguration configuration, String address) throws EmailException;
-
-  /**
-   * Create a new and empty {@link EmailConfiguration}
-   *
-   * @since 3.20
-   */
-  EmailConfiguration newConfiguration();
-
-  String constructMessage(String message);
 }

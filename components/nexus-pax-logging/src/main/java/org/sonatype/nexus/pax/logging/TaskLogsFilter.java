@@ -21,7 +21,6 @@ import ch.qos.logback.core.spi.FilterReply;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.slf4j.Marker;
 
 import static ch.qos.logback.core.spi.FilterReply.DENY;
 import static ch.qos.logback.core.spi.FilterReply.NEUTRAL;
@@ -29,6 +28,7 @@ import static org.sonatype.nexus.logging.task.TaskLogger.LOGBACK_TASK_DISCRIMINA
 import static org.sonatype.nexus.logging.task.TaskLoggingMarkers.INTERNAL_PROGRESS;
 import static org.sonatype.nexus.logging.task.TaskLoggingMarkers.NEXUS_LOG_ONLY;
 import static org.sonatype.nexus.logging.task.TaskLoggingMarkers.PROGRESS;
+import static org.sonatype.nexus.pax.logging.NexusLogFilter.MDC_MARKER_ID;
 
 /**
  * Logback {@link Filter} for task logs (see tasklogfile in logback.xml). Ensures that the task logs get the appropriate
@@ -36,6 +36,7 @@ import static org.sonatype.nexus.logging.task.TaskLoggingMarkers.PROGRESS;
  * - Thread must be executing in a task (determined by presence of discriminator in MDC)
  * - Must NOT have the NEXUS_LOG marker. This prevents double entry for the progress update to the nexus.log
  * - Also sets progress entries into the TaskLoggerHelper
+ *
  * @since 3.5
  */
 public class TaskLogsFilter
@@ -43,18 +44,19 @@ public class TaskLogsFilter
 {
   @Override
   public FilterReply decide(final ILoggingEvent event) {
-    Marker marker = event.getMarker();
+    String marker = MDC.get(MDC_MARKER_ID);
 
-    if (PROGRESS.equals(marker)) {
+    if (PROGRESS.getName().equals(marker)) {
       // store the progress value in the threadlocal
       TaskLoggerHelper.progress(toTaskLoggerEvent(event));
     }
 
-    if (!isExecutingInTask()) {
+    if (MDC.get(LOGBACK_TASK_DISCRIMINATOR_ID) == null) {
+      // not executing in a task...
       return DENY;
     }
 
-    if (NEXUS_LOG_ONLY.equals(marker) || INTERNAL_PROGRESS.equals(marker)) {
+    if (NEXUS_LOG_ONLY.getName().equals(marker) || INTERNAL_PROGRESS.getName().equals(marker)) {
       // not meant for task log
       return DENY;
     }
@@ -62,12 +64,7 @@ public class TaskLogsFilter
     return NEUTRAL;
   }
 
-  protected boolean isExecutingInTask() {
-    // if null then not executing in a task...
-    return MDC.get(LOGBACK_TASK_DISCRIMINATOR_ID) != null;
-  }
-
-  protected TaskLoggingEvent toTaskLoggerEvent(final ILoggingEvent event) {
+  private TaskLoggingEvent toTaskLoggerEvent(final ILoggingEvent event) {
     Logger logger = LoggerFactory.getLogger(event.getLoggerName());
     return new TaskLoggingEvent(logger, event.getMessage(), event.getArgumentArray());
   }

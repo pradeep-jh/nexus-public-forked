@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus.plugins</groupId>
     <artifactId>nexus-plugins</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-script-plugin</artifactId>
@@ -36,7 +36,19 @@
 
     <dependency>
       <groupId>org.sonatype.nexus</groupId>
+      <artifactId>nexus-repository</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    
+    <dependency>
+      <groupId>org.sonatype.nexus</groupId>
       <artifactId>nexus-plugin-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    
+    <dependency>
+      <groupId>org.sonatype.nexus</groupId>
+      <artifactId>nexus-orient</artifactId>
       <scope>provided</scope>
     </dependency>
     
@@ -61,43 +73,18 @@
     <dependency>
       <groupId>org.sonatype.nexus.plugins</groupId>
       <artifactId>nexus-repository-maven</artifactId>
-      <optional>true</optional>
       <scope>provided</scope>
     </dependency>
 
     <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-testsupport</artifactId>
+      <groupId>org.sonatype.goodies</groupId>
+      <artifactId>goodies-testsupport</artifactId>
       <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-test-db</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-test-common</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-repository-config</artifactId>
-      <optional>true</optional>
-      <scope>provided</scope>
     </dependency>
 
     <dependency>
       <groupId>org.spockframework</groupId>
       <artifactId>spock-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.spockframework</groupId>
-      <artifactId>spock-junit4</artifactId>
       <scope>test</scope>
     </dependency>
 
@@ -120,24 +107,12 @@
         <groupId>org.apache.karaf.tooling</groupId>
         <artifactId>karaf-maven-plugin</artifactId>
       </plugin>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-javadoc-plugin</artifactId>
-        <configuration>
-          <excludePackageNames>org.sonatype.nexus.script.plugin.internal:org.sonatype.nexus.script.plugin.internal.security:org.sonatype.nexus.script.plugin.internal.rest</excludePackageNames>
-        </configuration>
-      </plugin>
-
       <plugin>
         <groupId>org.apache.felix</groupId>
         <artifactId>maven-bundle-plugin</artifactId>
         <configuration>
           <instructions>
-            <DynamicImport-Package>
-              groovy.*,
-              org.sonatype.nexus.repository.maven
-            </DynamicImport-Package>
+            <DynamicImport-Package>groovy.*</DynamicImport-Package>
           </instructions>
         </configuration>
       </plugin>

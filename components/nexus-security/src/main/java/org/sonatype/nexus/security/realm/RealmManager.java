@@ -12,8 +12,6 @@
  */
 package org.sonatype.nexus.security.realm;
 
-import java.util.List;
-
 import org.sonatype.goodies.lifecycle.Lifecycle;
 
 /**
@@ -24,6 +22,16 @@ import org.sonatype.goodies.lifecycle.Lifecycle;
 public interface RealmManager
   extends Lifecycle
 {
+  /**
+   * Returns copy of current realm configuration.
+   */
+  RealmConfiguration getConfiguration();
+
+  /**
+   * Installs new realm configuration.
+   */
+  void setConfiguration(RealmConfiguration configuration);
+
   /**
    * Check if given realm-name is enabled.
    */
@@ -43,44 +51,7 @@ public interface RealmManager
   void enableRealm(String realmName);
 
   /**
-   * Enable given realm-name at the desired zero-based index in realmList, if not already enabled.
-   * If the index isn't valid will simply be inserted at end of list.
-   */
-  void enableRealm(final String realmName, final int index);
-
-  /**
    * Disable given realm-name, if not already disabled.
    */
   void disableRealm(String realmName);
-
-  /**
-   * Get the list of known available realms.
-   *
-   * @since 3.20
-   */
-  List<SecurityRealm> getAvailableRealms();
-
-  /**
-   * Get the list of available realms
-   *
-   * @param includeHidden if true, include any "hidden" realms
-   * @return
-   */
-  List<SecurityRealm> getAvailableRealms(final boolean includeHidden);
-
-  /**
-   * Get the list of configured realm Ids
-   */
-  List<String> getConfiguredRealmIds();
-
-  /**
-   * Get the list of configured realm Ids
-   * @param includeHidden if true, include any "hidden" realms
-   */
-  List<String> getConfiguredRealmIds(final boolean includeHidden);
-
-  /**
-   * Set the list of configured realm Ids*
-   */
-  void setConfiguredRealmIds(final List<String> realmIds);
 }

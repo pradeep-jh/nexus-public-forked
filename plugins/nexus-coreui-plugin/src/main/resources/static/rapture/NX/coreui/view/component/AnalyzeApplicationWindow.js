@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -22,44 +18,84 @@
  * @since 3.1
  */
 Ext.define('NX.coreui.view.component.AnalyzeApplicationWindow', {
-  extend: 'Ext.container.Container',
+  extend: 'NX.view.ModalDialog',
   alias: 'widget.nx-coreui-component-analyze-window',
   requires: [
     'NX.I18n'
   ],
-
-  /**
-   * Configuration
-   */
-  component: undefined,
+  ui: 'nx-inset',
 
   /**
    * @override
    */
-  hide: function() {
-    const modalWindow = this.child('nx-secondary-container');
-    this.remove(modalWindow);
-    return this.callParent(arguments);
-  },
+  initComponent: function () {
+    var me = this;
 
-   /**
-   * @override
-   */
-  show: function () {
-    const me = this;
-    this.add({
-      xtype: 'nx-secondary-container',
-      reactView: window.ReactComponents.AnalyzeApplication,
-      reactViewProps: {
-        componentModel: me.component,
-        rerender: function() {
-          me.updateLayout();
+    me.setWidth(NX.view.ModalDialog.LARGE_MODAL);
+
+    me.title = NX.I18n.get('AnalyzeApplicationWindow_Title');
+
+    me.items = {
+      xtype: 'form',
+      items: [
+        {
+          xtype: 'label',
+          html: NX.I18n.get('AnalyzeApplicationWindow_Form_Html')
         },
-        onClose: function() {
-          me.hide();
+        {
+          xtype: 'nx-email',
+          fieldLabel: NX.I18n.get('AnalyzeApplicationWindow_Form_Email_FieldLabel'),
+          helpText: NX.I18n.get('AnalyzeApplicationWindow_Form_Email_HelpText'),
+          name: 'emailAddress',
+          allowBlank: false
+        },
+        {
+          xtype: 'textfield',
+          fieldLabel: NX.I18n.get('AnalyzeApplicationWindow_Form_Password_FieldLabel'),
+          helpText: NX.I18n.get('AnalyzeApplicationWindow_Form_Password_HelpText'),
+          name: 'password',
+          inputType: 'password',
+          allowBlank: false
+        },
+        {
+          xtype: 'textfield',
+          fieldLabel: NX.I18n.get('AnalyzeApplicationWindow_Form_ProprietaryPackages_FieldLabel'),
+          helpText: NX.I18n.get('AnalyzeApplicationWindow_Form_ProprietaryPackages_HelpText'),
+          name: 'proprietaryPackages'
+        },
+        {
+          xtype: 'textfield',
+          fieldLabel: NX.I18n.get('AnalyzeApplicationWindow_Form_Label_FieldLabel'),
+          helpText: NX.I18n.get('AnalyzeApplicationWindow_Form_Label_HelpText'),
+          name: 'reportLabel'
+        },
+        {
+          xtype: 'combo',
+          name: 'asset',
+          itemId: 'asset',
+          fieldLabel: NX.I18n.get('AnalyzeApplicationWindow_Form_Asset_FieldLabel'),
+          helpText: NX.I18n.get('AnalyzeApplicationWindow_Form_Asset_HelpText'),
+          emptyText: NX.I18n.get('AnalyzeApplicationWindow_Form_Asset_EmptyText'),
+          editable: false,
+          store: Ext.create('Ext.data.ArrayStore', {
+            fields: ['value', 'display']
+          }),
+          valueField: 'value',
+          displayField: 'display',
+          queryMode: 'local',
+          hidden: true
         }
-      }
-    });
-    return this.callParent(arguments);
-  },
+      ],
+      buttonAlign: 'left',
+      buttons: [
+        { text: NX.I18n.get('AnalyzeApplicationWindow_Analyze_Button'), action: 'analyze', formBind: true, ui: 'nx-primary' },
+        { text: NX.I18n.get('AnalyzeApplicationWindow_Cancel_Button'), handler: function () {
+          this.up('window').close();
+        }}
+      ]
+    };
+
+    me.callParent();
+  }
+
 });

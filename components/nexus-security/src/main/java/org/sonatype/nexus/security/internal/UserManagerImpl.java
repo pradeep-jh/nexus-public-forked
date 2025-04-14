@@ -44,13 +44,10 @@ import org.sonatype.nexus.security.user.UserSearchCriteria;
 import org.sonatype.nexus.security.user.UserStatus;
 import org.sonatype.nexus.security.user.UserUpdatedEvent;
 
-import com.google.common.collect.Sets;
 import org.apache.shiro.authc.credential.PasswordService;
 import org.eclipse.sisu.Description;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static org.sonatype.nexus.security.config.CUser.STATUS_ACTIVE;
-import static org.sonatype.nexus.security.config.CUser.STATUS_CHANGE_PASSWORD;
 
 /**
  * Default {@link UserManager}.
@@ -70,20 +67,16 @@ public class UserManagerImpl
 
   private final PasswordService passwordService;
 
-  private final PasswordValidator passwordValidator;
-
   @Inject
   public UserManagerImpl(final EventManager eventManager,
                          final SecurityConfigurationManager configuration,
                          final SecuritySystem securitySystem,
-                         final PasswordService passwordService,
-                         final PasswordValidator passwordValidator)
+                         final PasswordService passwordService)
   {
     this.eventManager = checkNotNull(eventManager);
     this.configuration = configuration;
     this.securitySystem = securitySystem;
     this.passwordService = passwordService;
-    this.passwordValidator = passwordValidator;
   }
 
   protected CUser toUser(User user) {
@@ -91,7 +84,7 @@ public class UserManagerImpl
       return null;
     }
 
-    CUser secUser = configuration.newUser();
+    CUser secUser = new CUser();
 
     secUser.setId(user.getUserId());
     secUser.setVersion(user.getVersion());
@@ -104,7 +97,7 @@ public class UserManagerImpl
     return secUser;
   }
 
-  protected User toUser(CUser cUser, Set<String> roleIds) {
+  protected User toUser(CUser cUser) {
     if (cUser == null) {
       return null;
     }
@@ -120,11 +113,7 @@ public class UserManagerImpl
     user.setStatus(UserStatus.valueOf(cUser.getStatus()));
 
     try {
-      if (roleIds != null) {
-        user.setRoles(getUsersRoles(roleIds));
-      } else {
-        user.setRoles(getUsersRoles(cUser.getId(), DEFAULT_SOURCE));
-      }
+      user.setRoles(this.getUsersRoles(cUser.getId(), DEFAULT_SOURCE));
     }
     catch (UserNotFoundException e) {
       // We should NEVER get here
@@ -135,7 +124,7 @@ public class UserManagerImpl
     return user;
   }
 
-  protected RoleIdentifier toRole(final String roleId, final String source) {
+  protected RoleIdentifier toRole(String roleId) {
     if (roleId == null) {
       return null;
     }
@@ -143,7 +132,7 @@ public class UserManagerImpl
     try {
       CRole role = configuration.readRole(roleId);
 
-      return new RoleIdentifier(source, role.getId());
+      return new RoleIdentifier(DEFAULT_SOURCE, role.getId());
     }
     catch (NoSuchRoleException e) {
       return null;
@@ -155,7 +144,7 @@ public class UserManagerImpl
     Set<User> users = new HashSet<User>();
 
     for (CUser user : configuration.listUsers()) {
-      users.add(toUser(user, null));
+      users.add(toUser(user));
     }
 
     return users;
@@ -174,12 +163,7 @@ public class UserManagerImpl
 
   @Override
   public User getUser(String userId) throws UserNotFoundException {
-    return getUser(userId, null);
-  }
-
-  @Override
-  public User getUser(final String userId, final Set<String> roleIds) throws UserNotFoundException {
-    return toUser(configuration.readUser(userId), roleIds);
+    return toUser(configuration.readUser(userId));
   }
 
   @Override
@@ -208,9 +192,6 @@ public class UserManagerImpl
   @Override
   public void changePassword(final String userId, final String newPassword) throws UserNotFoundException {
     final CUser secUser = configuration.readUser(userId);
-    if (STATUS_CHANGE_PASSWORD.equals(secUser.getStatus())) {
-      secUser.setStatus(STATUS_ACTIVE);
-    }
     secUser.setPassword(hashPassword(newPassword));
     configuration.updateUser(secUser);
 
@@ -242,12 +223,17 @@ public class UserManagerImpl
 
   @Override
   public Set<RoleIdentifier> getUsersRoles(final String userId, final String source) throws UserNotFoundException {
-    Set<RoleIdentifier> roles = new HashSet<>();
+    final Set<RoleIdentifier> roles = new HashSet<RoleIdentifier>();
 
     try {
       CUserRoleMapping roleMapping = configuration.readUserRoleMapping(userId, source);
       if (roleMapping != null) {
-        roles = getUsersRoles(roleMapping.getRoles());
+        for (String roleId : roleMapping.getRoles()) {
+          RoleIdentifier role = toRole(roleId);
+          if (role != null) {
+            roles.add(role);
+          }
+        }
       }
     }
     catch (NoSuchRoleMappingException e) {
@@ -257,48 +243,32 @@ public class UserManagerImpl
     return roles;
   }
 
-  private Set<RoleIdentifier> getUsersRoles(final Set<String> roleIds) {
-    final Set<RoleIdentifier> roles = new HashSet<>();
-    for (String roleId : roleIds) {
-      RoleIdentifier role = toRole(roleId, DEFAULT_SOURCE);
-      if (role != null) {
-        roles.add(role);
-      }
-    }
-    return roles;
-  }
-
-  /**
-   * Returns all users from the DEFAULT source that fit the criteria. If no source is specified in the source
-   * criteria then it will also add all external users that have role mappings.
-   */
   @Override
   public Set<User> searchUsers(final UserSearchCriteria criteria) {
     final Set<User> users = new HashSet<User>();
 
     users.addAll(filterListInMemeory(listUsers(), criteria));
 
-    if (criteria.getSource() == null) {
-      // we also need to search through the user role mappings.
-      List<CUserRoleMapping> roleMappings = configuration.listUserRoleMappings();
-      for (CUserRoleMapping roleMapping : roleMappings) {
-        if (!DEFAULT_SOURCE.equals(roleMapping.getSource())) {
-          if (matchesCriteria(roleMapping.getUserId(), roleMapping.getSource(), roleMapping.getRoles(),
-              criteria)) {
-            try {
-              User user = securitySystem.getUser(roleMapping.getUserId(), roleMapping.getSource());
-              users.add(user);
-            }
-            catch (UserNotFoundException e) {
-              log.debug("User: '{}' of source: '{}' could not be found.",
-                  roleMapping.getUserId(), roleMapping.getSource(), e);
-            }
-            catch (NoSuchUserManagerException e) {
-              log.warn("User: '{}' of source: '{}' could not be found.",
-                  roleMapping.getUserId(), roleMapping.getSource(), e);
-            }
+    // we also need to search through the user role mappings.
 
+    List<CUserRoleMapping> roleMappings = configuration.listUserRoleMappings();
+    for (CUserRoleMapping roleMapping : roleMappings) {
+      if (!DEFAULT_SOURCE.equals(roleMapping.getSource())) {
+        if (matchesCriteria(roleMapping.getUserId(), roleMapping.getSource(), roleMapping.getRoles(),
+            criteria)) {
+          try {
+            User user = getSecuritySystem().getUser(roleMapping.getUserId(), roleMapping.getSource());
+            users.add(user);
           }
+          catch (UserNotFoundException e) {
+            log.debug("User: '{}' of source: '{}' could not be found.",
+                roleMapping.getUserId(), roleMapping.getSource(), e);
+          }
+          catch (NoSuchUserManagerException e) {
+            log.warn("User: '{}' of source: '{}' could not be found.",
+                roleMapping.getUserId(), roleMapping.getSource(), e);
+          }
+
         }
       }
     }
@@ -306,13 +276,11 @@ public class UserManagerImpl
     return users;
   }
 
-  @Override
-  public boolean isConfigured() {
-    return true;
+  private SecuritySystem getSecuritySystem() {
+    return this.securitySystem;
   }
 
   private String hashPassword(String clearPassword) {
-    passwordValidator.validate(clearPassword);
     // set the password if its not null
     if (clearPassword != null && clearPassword.trim().length() > 0) {
       return this.passwordService.encryptPassword(clearPassword);
@@ -332,44 +300,37 @@ public class UserManagerImpl
 
         eventManager.post(new UserRoleMappingDeletedEvent(userId, userSource));
       }
-      catch (NoSuchRoleMappingException e) { // NOSONAR
+      catch (NoSuchRoleMappingException e) {
         log.debug("User role mapping for user: {} source: {} could not be deleted because it does not exist.",
             userId, userSource);
       }
     }
     else {
+      CUserRoleMapping roleMapping = new CUserRoleMapping();
+      roleMapping.setUserId(userId);
+      roleMapping.setSource(userSource);
+
+      for (RoleIdentifier roleIdentifier : roleIdentifiers) {
+        // make sure we only save roles that we manage
+        // TODO: although we shouldn't need to worry about this.
+        if (getSource().equals(roleIdentifier.getSource())) {
+          roleMapping.addRole(roleIdentifier.getRoleId());
+        }
+      }
+
       // try to update first
       try {
-        CUserRoleMapping roleMapping = configuration.readUserRoleMapping(userId, userSource).clone();
-        roleMapping.setRoles(Sets.newHashSet());
-
-        updateRoles(roleMapping, roleIdentifiers);
-
         configuration.updateUserRoleMapping(roleMapping);
 
         eventManager.post(new UserRoleMappingUpdatedEvent(userId, userSource, roleMapping.getRoles()));
       }
-      catch (NoSuchRoleMappingException e) { // NOSONAR
-        CUserRoleMapping roleMapping = configuration.newUserRoleMapping();
-        roleMapping.setUserId(userId);
-        roleMapping.setSource(userSource);
-
-        updateRoles(roleMapping, roleIdentifiers);
-
+      catch (NoSuchRoleMappingException e) {
         // update failed try create
         log.debug("Update of user role mapping for user: {} source: {} did not exist, creating new one.",
             userId, userSource);
         configuration.createUserRoleMapping(roleMapping);
 
         eventManager.post(new UserRoleMappingCreatedEvent(userId, userSource, roleMapping.getRoles()));
-      }
-    }
-  }
-
-  private void updateRoles(CUserRoleMapping roleMapping, final Set<RoleIdentifier> roleIdentifiers) {
-    for (RoleIdentifier roleIdentifier : roleIdentifiers) {
-      if (getSource().equals(roleIdentifier.getSource())) {
-        roleMapping.addRole(roleIdentifier.getRoleId());
       }
     }
   }

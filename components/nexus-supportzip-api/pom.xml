@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus</groupId>
     <artifactId>nexus-components</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-supportzip-api</artifactId>
@@ -33,27 +33,9 @@
       <artifactId>nexus-common</artifactId>
     </dependency>
 
-    <!-- serialize/deserialize Java 8 date time types e.g OffsetDateTime -->
     <dependency>
-      <groupId>com.fasterxml.jackson.datatype</groupId>
-      <artifactId>jackson-datatype-jsr310</artifactId>
-    </dependency>
-
-    <!-- serialize/deserialize Java 8 data types like Optional -->
-    <dependency>
-      <groupId>com.fasterxml.jackson.datatype</groupId>
-      <artifactId>jackson-datatype-jdk8</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-testsupport</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.xmlunit</groupId>
-      <artifactId>xmlunit-core</artifactId>
+      <groupId>org.sonatype.goodies</groupId>
+      <artifactId>goodies-testsupport</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

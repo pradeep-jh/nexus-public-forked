@@ -25,7 +25,6 @@ import org.sonatype.nexus.httpclient.SSLContextSelector;
 
 import org.apache.http.config.Registry;
 import org.apache.http.config.RegistryBuilder;
-import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.socket.ConnectionSocketFactory;
 import org.apache.http.conn.socket.PlainConnectionSocketFactory;
 import org.apache.http.impl.conn.DefaultHttpClientConnectionOperator;
@@ -34,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static org.sonatype.nexus.common.app.ManagedLifecycleManager.isShuttingDown;
 import static org.sonatype.nexus.httpclient.HttpSchemes.HTTP;
 import static org.sonatype.nexus.httpclient.HttpSchemes.HTTPS;
 
@@ -66,8 +64,7 @@ public class SharedHttpClientConnectionManager
       @Named("${nexus.httpclient.connectionpool.maxSize:-200}") final int connectionPoolMaxSize,
       @Named("${nexus.httpclient.connectionpool.idleTime:-30s}") final Time connectionPoolIdleTime,
       @Named("${nexus.httpclient.connectionpool.evictingDelayTime:-5s}") final Time connectionPoolEvictingDelayTime,
-      @Named("${nexus.httpclient.connectionpool.validateAfterInactivityTime:-2s}") final Time connectionPoolValidateAfterInactivityTime,
-      @Named("${nexus.httpclient.connectionpool.default.requestTimeout:-20s}") final Time defaultSocketTimeout)
+      @Named("${nexus.httpclient.connectionpool.validateAfterInactivityTime:-2s}") final Time connectionPoolValidateAfterInactivityTime)
   {
     super(
         new DefaultHttpClientConnectionOperator(createRegistry(sslContextSelectors), null, null),
@@ -87,9 +84,6 @@ public class SharedHttpClientConnectionManager
     setValidateAfterInactivity(connectionPoolValidateAfterInactivityTime.toMillisI());
     log.debug("Connection pool idle-time: {}, evicting delay: {}, validate after inactivity: {}",
         connectionPoolIdleTime, connectionPoolEvictingDelayTime, connectionPoolValidateAfterInactivityTime);
-
-    setDefaultSocketConfig(SocketConfig.custom().setSoTimeout(defaultSocketTimeout.toMillisI()).build());
-    log.debug("Default socket timeout {}", defaultSocketTimeout);
   }
 
   private static Registry<ConnectionSocketFactory> createRegistry(final List<SSLContextSelector> sslContextSelectors) {
@@ -126,9 +120,6 @@ public class SharedHttpClientConnectionManager
     evictionThread.interrupt();
     evictionThread = null;
 
-    // underlying pool cannot be restarted, so avoid shutting it down when bouncing the service
-    if (isShuttingDown()) {
-      super.shutdown();
-    }
+    super.shutdown();
   }
 }

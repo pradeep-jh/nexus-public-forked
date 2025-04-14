@@ -26,8 +26,8 @@ import org.sonatype.nexus.common.log.LoggerLevel;
  * In-memory {@link LoggerOverrides}.
  */
 public class MemoryLoggerOverrides
-    extends ComponentSupport
-    implements LoggerOverrides
+  extends ComponentSupport
+  implements LoggerOverrides
 {
   private final Map<String, LoggerLevel> backing = new HashMap<>();
 
@@ -75,10 +75,5 @@ public class MemoryLoggerOverrides
   @Override
   public Iterator<Entry<String, LoggerLevel>> iterator() {
     return backing.entrySet().iterator();
-  }
-
-  @Override
-  public Map<String, LoggerLevel> syncWithDBAndGet() {
-    return backing;
   }
 }

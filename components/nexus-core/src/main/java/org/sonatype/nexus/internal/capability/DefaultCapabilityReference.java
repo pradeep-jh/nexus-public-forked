@@ -65,8 +65,6 @@ public class DefaultCapabilityReference
 
   private final ReentrantReadWriteLock stateLock;
 
-  private Map<String, String> encryptedProperties;
-
   private Map<String, String> capabilityProperties;
 
   private State state;
@@ -101,7 +99,6 @@ public class DefaultCapabilityReference
     capability.init(this);
   }
 
-  @Override
   public Capability capability() {
     return capability;
   }
@@ -247,10 +244,10 @@ public class DefaultCapabilityReference
    *
    * @param properties capability configuration
    */
-  public void create(final Map<String, String> properties, final Map<String, String> encryptedProperties) {
+  public void create(final Map<String, String> properties) {
     try {
       stateLock.writeLock().lock();
-      state.create(properties, encryptedProperties);
+      state.create(properties);
     }
     finally {
       stateLock.writeLock().unlock();
@@ -262,10 +259,10 @@ public class DefaultCapabilityReference
    *
    * @param properties capability configuration
    */
-  public void load(final Map<String, String> properties, final Map<String, String> encryptedProperties) {
+  public void load(final Map<String, String> properties) {
     try {
       stateLock.writeLock().lock();
-      state.load(properties, encryptedProperties);
+      state.load(properties);
     }
     finally {
       stateLock.writeLock().unlock();
@@ -277,39 +274,12 @@ public class DefaultCapabilityReference
    *
    * @param properties         capability configuration
    * @param previousProperties previous capability configuration
-   * @param encryptedProperties capability configuration with encrypted properties
    */
-  public void update(
-      final Map<String, String> properties,
-      final Map<String, String> previousProperties,
-      final Map<String, String> encryptedProperties)
-  {
-    update(properties, previousProperties, encryptedProperties, false);
-  }
-
-  /**
-   * Updates encrypted properties.
-   *
-   * @param properties          capability configuration
-   * @param encryptedProperties encrypted capability configuration
-   */
-  public void updateEncrypted(
-      final Map<String, String> properties,
-      final Map<String, String> encryptedProperties)
-  {
-    update(properties, properties, encryptedProperties, true);
-  }
-
-  private void update(
-      final Map<String, String> properties,
-      final Map<String, String> previousProperties,
-      final Map<String, String> encryptedProperties,
-      final boolean force)
-  {
-    if (force || !sameProperties(previousProperties, properties)) {
+  public void update(final Map<String, String> properties, final Map<String, String> previousProperties) {
+    if (!sameProperties(previousProperties, properties)) {
       try {
         stateLock.writeLock().lock();
-        state.update(properties, previousProperties, encryptedProperties);
+        state.update(properties, previousProperties);
       }
       finally {
         stateLock.writeLock().unlock();
@@ -335,16 +305,6 @@ public class DefaultCapabilityReference
     try {
       stateLock.readLock().lock();
       return capabilityProperties;
-    }
-    finally {
-      stateLock.readLock().unlock();
-    }
-  }
-
-  public Map<String, String> encryptedProperties() {
-    try {
-      stateLock.readLock().lock();
-      return encryptedProperties;
     }
     finally {
       stateLock.readLock().unlock();
@@ -392,7 +352,7 @@ public class DefaultCapabilityReference
     }
   }
 
-  void setFailure(final String action, final Exception e) {
+  private void setFailure(final String action, final Exception e) {
     try {
       stateLock.writeLock().lock();
       failure = checkNotNull(e);
@@ -436,19 +396,15 @@ public class DefaultCapabilityReference
       throw new IllegalStateException("State '" + toString() + "' does not permit 'passivate' operation");
     }
 
-    public void create(final Map<String, String> properties, final Map<String, String> encryptedProperties) {
+    public void create(final Map<String, String> properties) {
       throw new IllegalStateException("State '" + toString() + "' does not permit 'create' operation");
     }
 
-    public void load(final Map<String, String> properties, final Map<String, String> encryptedProperties) {
+    public void load(final Map<String, String> properties) {
       throw new IllegalStateException("State '" + toString() + "' does not permit 'load' operation");
     }
 
-    public void update(
-        final Map<String, String> properties,
-        final Map<String, String> previousProperties,
-        final Map<String, String> encryptedProperties)
-    {
+    public void update(final Map<String, String> properties, final Map<String, String> previousProperties) {
       throw new IllegalStateException("State '" + toString() + "' does not permit 'update' operation");
     }
 
@@ -472,15 +428,11 @@ public class DefaultCapabilityReference
   {
 
     @Override
-    public void create(final Map<String, String> properties, final Map<String, String> encryptedProperties) {
+    public void create(final Map<String, String> properties) {
       try {
-        log.debug("Creating capability {} ({})", capability, id);
         capabilityProperties = properties == null ? EMPTY_MAP : unmodifiableMap(newHashMap(properties));
-        DefaultCapabilityReference.this.encryptedProperties = encryptedProperties == null ? EMPTY_MAP : unmodifiableMap(encryptedProperties);
-        eventManager.post(new CapabilityEvent.Created(capabilityRegistry, DefaultCapabilityReference.this));
         capability.onCreate();
         resetFailure();
-        log.debug("Created capability {} ({})", capability, id);
       }
       catch (Exception e) {
         setFailure("Create", e);
@@ -492,15 +444,11 @@ public class DefaultCapabilityReference
     }
 
     @Override
-    public void load(final Map<String, String> properties, final Map<String, String> encryptedProperties) {
+    public void load(final Map<String, String> properties) {
       try {
-        log.debug("Loading capability {} ({})", capability, id);
         capabilityProperties = properties == null ? EMPTY_MAP : unmodifiableMap(newHashMap(properties));
-        DefaultCapabilityReference.this.encryptedProperties = encryptedProperties == null ? EMPTY_MAP : unmodifiableMap(encryptedProperties);
-        eventManager.post(new CapabilityEvent.Created(capabilityRegistry, DefaultCapabilityReference.this));
         capability.onLoad();
         resetFailure();
-        log.debug("Loaded capability {} ({})", capability, id);
       }
       catch (Exception e) {
         setFailure("Load", e);
@@ -545,23 +493,16 @@ public class DefaultCapabilityReference
     }
 
     @Override
-    public void update(
-        final Map<String, String> properties,
-        final Map<String, String> previousProperties,
-        final Map<String, String> encryptedProperties)
-    {
+    public void update(final Map<String, String> properties, final Map<String, String> previousProperties) {
       try {
-        log.debug("Updating capability {} ({})", capability, id);
         eventManager.post(
             new CapabilityEvent.BeforeUpdate(
                 capabilityRegistry, DefaultCapabilityReference.this, properties, previousProperties
             )
         );
         capabilityProperties = properties == null ? EMPTY_MAP : unmodifiableMap(newHashMap(properties));
-        DefaultCapabilityReference.this.encryptedProperties = encryptedProperties == null ? EMPTY_MAP : unmodifiableMap(encryptedProperties);
         capability.onUpdate();
         resetFailure();
-        log.debug("Updated capability {} ({})", capability, id);
       }
       catch (Exception e) {
         setFailure("Update", e);
@@ -578,12 +519,10 @@ public class DefaultCapabilityReference
     @Override
     public void remove() {
       try {
-        log.debug("Removing capability {} ({})", capability, id);
         DefaultCapabilityReference.this.disable();
         validityHandler.release();
         capability.onRemove();
         resetFailure();
-        log.debug("Removed capability {} ({})", capability, id);
       }
       catch (Exception e) {
         setFailure("Remove", e);

@@ -13,15 +13,15 @@
 package org.sonatype.nexus.rapture.internal.security;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import javax.validation.constraints.NotEmpty;
 
 import org.sonatype.nexus.common.text.Strings2;
 import org.sonatype.nexus.common.wonderland.AuthTicketService;
@@ -43,6 +43,7 @@ import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.authc.UsernamePasswordToken;
 import org.apache.shiro.authz.Permission;
 import org.apache.shiro.subject.Subject;
+import org.hibernate.validator.constraints.NotEmpty;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -134,8 +135,7 @@ public class SecurityComponent
     }
 
     // At this point we should be authenticated, return a new ticket
-    Optional<String> realmName = subject.getPrincipals().getRealmNames().stream().findFirst();
-    return authTickets.createTicket(username, realmName.orElse(null));
+    return authTickets.createTicket();
   }
 
   @DirectMethod
@@ -145,10 +145,9 @@ public class SecurityComponent
     UserXO userXO = null;
 
     Subject subject = securitySystem.getSubject();
-    if (subject != null && subject.isAuthenticated()) {
+    if (isLoggedIn(subject)) {
       userXO = new UserXO();
       userXO.setAuthenticated(subject.isAuthenticated());
-      userXO.setAuthenticatedRealms(subject.getPrincipals().getRealmNames());
 
       // HACK: roles for the current user are not exposed to the UI.
       // HACK: but we need to know if user is admin or not for some things (like outreach)
@@ -159,6 +158,10 @@ public class SecurityComponent
       Object principal = subject.getPrincipal();
       if (principal != null) {
         userXO.setId(principal.toString());
+        AnonymousConfiguration anonymousConfiguration = anonymousManager.getConfiguration();
+        if (anonymousConfiguration.isEnabled() && userXO.getId().equals(anonymousConfiguration.getUserId())) {
+          userXO = null;
+        }
       }
     }
     return userXO;
@@ -170,7 +173,7 @@ public class SecurityComponent
   public List<PermissionXO> getPermissions() {
     List<PermissionXO> permissions = null;
     Subject subject = securitySystem.getSubject();
-    if (subject != null && (subject.isAuthenticated() || subject.isRemembered())) {
+    if (isLoggedIn(subject)) {
       permissions = calculatePermissions(subject);
     }
     return permissions;
@@ -180,11 +183,18 @@ public class SecurityComponent
   public Map<String, Object> getState() {
     Map<String, Object> state = new HashMap<>();
     state.put("user", getUser());
+    state.put("permissions", getPermissions());
 
     AnonymousConfiguration anonymousConfiguration = anonymousManager.getConfiguration();
     state.put("anonymousUsername", anonymousConfiguration.isEnabled() ? anonymousConfiguration.getUserId() : null);
     return state;
   }
+
+  private boolean isLoggedIn(final Subject subject) {
+    return subject != null && (subject.isRemembered() || subject.isAuthenticated());
+  }
+
+  // FIXME: Avoid calculating permissions for every poll request
 
   private List<PermissionXO> calculatePermissions(final Subject subject) {
     log.debug("Calculating permissions");
@@ -209,6 +219,15 @@ public class SecurityComponent
         result.add(entry);
       }
     }
+
+    // FIXME: Permissions must be sorted for state-hash calculation :-(
+    Collections.sort(result, new Comparator<PermissionXO>()
+    {
+      @Override
+      public int compare(final PermissionXO o1, final PermissionXO o2) {
+        return o1.getId().compareTo(o2.getId());
+      }
+    });
 
     return result;
   }

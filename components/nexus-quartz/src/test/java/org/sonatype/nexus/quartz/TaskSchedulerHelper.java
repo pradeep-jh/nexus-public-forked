@@ -13,7 +13,6 @@
 package org.sonatype.nexus.quartz;
 
 import java.io.File;
-import java.util.Optional;
 import java.util.Properties;
 
 import javax.annotation.Nullable;
@@ -22,21 +21,20 @@ import javax.inject.Inject;
 import org.sonatype.goodies.testsupport.TestUtil;
 import org.sonatype.nexus.common.app.ApplicationDirectories;
 import org.sonatype.nexus.common.app.BaseUrlManager;
-import org.sonatype.nexus.common.db.DatabaseCheck;
 import org.sonatype.nexus.common.event.EventManager;
-import org.sonatype.nexus.common.log.LastShutdownTimeService;
 import org.sonatype.nexus.common.node.NodeAccess;
 import org.sonatype.nexus.common.stateguard.StateGuardModule;
-import org.sonatype.nexus.quartz.internal.QuartzSchedulerProvider;
+import org.sonatype.nexus.orient.DatabaseInstance;
+import org.sonatype.nexus.quartz.internal.orient.JobStoreImpl;
 import org.sonatype.nexus.scheduling.TaskScheduler;
 import org.sonatype.nexus.scheduling.spi.SchedulerSPI;
 import org.sonatype.nexus.testcommon.event.SimpleEventManager;
-import org.sonatype.nexus.thread.DatabaseStatusDelayedExecutor;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
+import com.google.inject.name.Names;
 import org.eclipse.sisu.inject.MutableBeanLocator;
 import org.eclipse.sisu.space.BeanScanning;
 import org.eclipse.sisu.space.SpaceModule;
@@ -45,9 +43,8 @@ import org.eclipse.sisu.wire.ParameterKeys;
 import org.eclipse.sisu.wire.WireModule;
 import org.quartz.spi.JobFactory;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -70,11 +67,8 @@ public class TaskSchedulerHelper
   @Inject
   private SchedulerSPI scheduler;
 
-  //@Inject
-  //private JobStoreImpl jobStore;
-
   @Inject
-  private QuartzSchedulerProvider schedulerProvider;
+  private JobStoreImpl jobStore;
 
   private EventManager eventManager;
 
@@ -82,18 +76,12 @@ public class TaskSchedulerHelper
 
   private BaseUrlManager baseUrlManager;
 
-  private LastShutdownTimeService lastShutdownTimeService;
-
   private NodeAccess nodeAccess;
 
-  //private final DatabaseInstance databaseInstance;
+  private final DatabaseInstance databaseInstance;
 
-  private DatabaseStatusDelayedExecutor statusDelayedExecutor;
-
-  private DatabaseCheck databaseCheck;
-
-  public TaskSchedulerHelper(/*final DatabaseInstance databaseInstance*/) {
-    //this.databaseInstance = checkNotNull(databaseInstance);
+  public TaskSchedulerHelper(final DatabaseInstance databaseInstance) {
+    this.databaseInstance = checkNotNull(databaseInstance);
   }
 
   public void init(@Nullable final Integer poolSize, @Nullable final JobFactory factory) throws Exception {
@@ -101,9 +89,6 @@ public class TaskSchedulerHelper
     applicationDirectories = mock(ApplicationDirectories.class);
     baseUrlManager = mock(BaseUrlManager.class);
     nodeAccess = mock(NodeAccess.class);
-    lastShutdownTimeService = mock(LastShutdownTimeService.class);
-    statusDelayedExecutor = mock(DatabaseStatusDelayedExecutor.class);
-    databaseCheck = mock(DatabaseCheck.class);
 
     Module module = binder -> {
       Properties properties = new Properties();
@@ -124,16 +109,9 @@ public class TaskSchedulerHelper
       binder.bind(BaseUrlManager.class)
           .toInstance(baseUrlManager);
 
-      //binder.bind(DatabaseInstance.class)
-      //    .annotatedWith(Names.named("config"))
-      //    .toInstance(databaseInstance);
-
-      doAnswer(i  -> {
-        ((Runnable) i.getArguments()[0]).run();
-        return null;
-      }).when(statusDelayedExecutor).execute(any(Runnable.class));
-      binder.bind(DatabaseStatusDelayedExecutor.class)
-          .toInstance(statusDelayedExecutor);
+      binder.bind(DatabaseInstance.class)
+          .annotatedWith(Names.named("config"))
+          .toInstance(databaseInstance);
 
       when(nodeAccess.getId()).thenReturn("test-12345");
       when(nodeAccess.getMemberIds()).thenReturn(ImmutableSet.of("test-12345"));
@@ -142,15 +120,6 @@ public class TaskSchedulerHelper
       if (factory != null) {
         binder.bind(JobFactory.class).toInstance(factory);
       }
-
-      binder.bind(LastShutdownTimeService.class).toInstance(lastShutdownTimeService);
-      when(lastShutdownTimeService.estimateLastShutdownTime()).thenReturn(Optional.empty());
-
-      // filtering by feature flag is not supported here yet
-      //binder.bind(JobStore.class).to(JobStoreImpl.class);
-
-      when(databaseCheck.isAllowedByVersion(any())).thenReturn(true);
-      binder.bind(DatabaseCheck.class).toInstance(databaseCheck);
     };
 
     this.injector = Guice.createInjector(new WireModule(
@@ -161,8 +130,7 @@ public class TaskSchedulerHelper
   }
 
   public void start() throws Exception {
-//    jobStore.start();
-    schedulerProvider.start();
+    jobStore.start();
     scheduler.start();
     scheduler.resume();
   }
@@ -170,8 +138,7 @@ public class TaskSchedulerHelper
   public void stop() throws Exception {
     scheduler.pause();
     scheduler.stop();
-    schedulerProvider.stop();
-//    jobStore.stop();
+    jobStore.stop();
 
     locator.clear();
   }

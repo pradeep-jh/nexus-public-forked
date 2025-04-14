@@ -14,8 +14,6 @@ package org.sonatype.nexus.rapture;
 
 import javax.annotation.Nullable;
 
-import org.sonatype.nexus.crypto.secrets.Secret;
-
 import com.google.common.annotations.VisibleForTesting;
 
 /**
@@ -33,7 +31,7 @@ public class PasswordPlaceholder
    * Token used for passwords that are defined, but which are not transmitted.
    */
   @VisibleForTesting
-  static final String VALUE = "#~NXRM~PLACEHOLDER~PASSWORD~#";
+  static final String VALUE = "#~NEXUS~PLACEHOLDER~PASSWORD~#";
 
   /**
    * Returns password placeholder.
@@ -54,28 +52,9 @@ public class PasswordPlaceholder
   }
 
   /**
-   * Returns fake password placeholder unless value is {@code null}.
-   */
-  @Nullable
-  public static String get(@Nullable final Secret value) {
-    if (value != null) {
-      return VALUE;
-    }
-    return null;
-  }
-
-  /**
    * Determine if given value is a password placeholder.
    */
   public static boolean is(@Nullable final String value) {
     return VALUE.equals(value);
-  }
-
-  /**
-   * @param value
-   * @return true if the value is not the password placeholder
-   */
-  public static boolean isNot(@Nullable final String value) {
-    return !PasswordPlaceholder.is(value);
   }
 }

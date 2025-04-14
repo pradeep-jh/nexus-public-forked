@@ -16,11 +16,11 @@ import java.util.concurrent.Future;
 
 import org.sonatype.nexus.scheduling.TaskConfiguration;
 import org.sonatype.nexus.scheduling.TaskInfo;
-import org.sonatype.nexus.scheduling.CurrentState;
-import org.sonatype.nexus.scheduling.TaskState;
+import org.sonatype.nexus.scheduling.TaskInfo.CurrentState;
+import org.sonatype.nexus.scheduling.TaskInfo.RunState;
+import org.sonatype.nexus.scheduling.TaskInfo.State;
 
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -28,11 +28,11 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.lessThan;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.Assert.fail;
 
 /**
  * Tests for updating tasks.
  */
-@Ignore("NEXUS-43375")
 public class UpdatingTasksTest
     extends QuartzTestSupport
 {
@@ -58,7 +58,7 @@ public class UpdatingTasksTest
 
     final CurrentState currentState = taskInfo.getCurrentState();
     assertThat(currentState, notNullValue());
-    assertThat(currentState.getState(), equalTo(TaskState.WAITING));
+    assertThat(currentState.getState(), equalTo(State.WAITING));
     assertThat(currentState.getRunState(), nullValue());
     assertThat(currentState.getRunStarted(), nullValue());
     assertThat(currentState.getFuture(), nullValue());
@@ -67,12 +67,12 @@ public class UpdatingTasksTest
     taskConfiguration.setString(SleeperTask.RESULT_KEY, "second");
     taskInfo = taskScheduler().scheduleTask(taskConfiguration, taskScheduler().getScheduleFactory().manual());
 
-    assertThat(taskInfo.getCurrentState().getState(), equalTo(TaskState.WAITING));
+    assertThat(taskInfo.getCurrentState().getState(), equalTo(State.WAITING));
     assertThat(taskInfo.getConfiguration().getString(SleeperTask.RESULT_KEY), equalTo("second"));
 
     // see what scheduler has
     TaskInfo ti2 = taskScheduler().getTaskById(taskInfo.getId());
-    assertThat(ti2.getCurrentState().getState(), equalTo(TaskState.WAITING));
+    assertThat(ti2.getCurrentState().getState(), equalTo(State.WAITING));
     assertThat(ti2.getConfiguration().getString(SleeperTask.RESULT_KEY), equalTo("second"));
   }
 
@@ -98,8 +98,8 @@ public class UpdatingTasksTest
 
     final CurrentState currentState = taskInfo.getCurrentState();
     assertThat(currentState, notNullValue());
-    assertThat(currentState.getState(), equalTo(TaskState.RUNNING));
-    assertThat(currentState.getRunState(), equalTo(TaskState.RUNNING));
+    assertThat(currentState.getState(), equalTo(State.RUNNING));
+    assertThat(currentState.getRunState(), equalTo(RunState.RUNNING));
     assertThat(currentState.getRunStarted(), notNullValue());
     assertThat(currentState.getRunStarted().getTime(), lessThan(System.currentTimeMillis()));
     final Future<?> future = currentState.getFuture();
@@ -126,7 +126,7 @@ public class UpdatingTasksTest
     assertThat(result, equalTo(RESULT));
 
     // done
-    assertTaskState(taskInfo, TaskState.WAITING);
+    assertTaskState(taskInfo, State.WAITING);
     assertRunningTaskCount(0);
   }
 
@@ -146,7 +146,7 @@ public class UpdatingTasksTest
     SleeperTask.meWait.countDown();
     Thread.yield();
     assertThat(future.get(), notNullValue());
-    assertTaskState(taskInfo, TaskState.WAITING);
+    assertTaskState(taskInfo, State.WAITING);
 
     SleeperTask.reset();
 
@@ -154,8 +154,14 @@ public class UpdatingTasksTest
     taskConfiguration.setEnabled(false);
     taskInfo = taskScheduler().scheduleTask(taskConfiguration, taskScheduler().getScheduleFactory().manual());
 
-    assertThat("Disabled task should not produce a future result", taskInfo.runNow().getCurrentState().getFuture(),
-        nullValue());
+    // TODO: UI allows this: runNow disabled task, but backend should now forbid it
+    try {
+      taskInfo.runNow();
+      fail("Disabled task should not be runnable");
+    }
+    catch (IllegalStateException e) {
+      // good
+    }
 
     taskConfiguration.setEnabled(true);
     taskInfo = taskScheduler().scheduleTask(taskConfiguration, taskScheduler().getScheduleFactory().manual());

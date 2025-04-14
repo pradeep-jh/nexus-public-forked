@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -87,9 +83,8 @@ Ext.define('NX.coreui.controller.SslCertificates', {
         variants: ['x16', 'x32']
       },
       visible: function() {
-        return NX.Permissions.check('nexus:ssl-truststore:read') &&
-            !NX.State.getValue('nexus.react.sslCertificates', true);
-      },
+        return NX.Permissions.check('nexus:ssl-truststore:read');
+      }
     };
 
     me.callParent();
@@ -158,7 +153,7 @@ Ext.define('NX.coreui.controller.SslCertificates', {
 
     // Show the first panel in the create wizard, and set the breadcrumb
     me.setItemName(1, NX.I18n.get('SslCertificates_Load_Title'));
-    me.loadCreateWizard(1, Ext.create('widget.nx-coreui-sslcertificate-add-from-server'));
+    me.loadCreateWizard(1, true, Ext.create('widget.nx-coreui-sslcertificate-add-from-server'));
   },
 
   /**
@@ -169,7 +164,7 @@ Ext.define('NX.coreui.controller.SslCertificates', {
 
     // Show the first panel in the create wizard, and set the breadcrumb
     me.setItemName(1, NX.I18n.get('SslCertificates_Paste_Title'));
-    me.loadCreateWizard(1, Ext.create('widget.nx-coreui-sslcertificate-add-from-pem'));
+    me.loadCreateWizard(1, true, Ext.create('widget.nx-coreui-sslcertificate-add-from-pem'));
   },
 
   /**
@@ -189,7 +184,7 @@ Ext.define('NX.coreui.controller.SslCertificates', {
 
     // Show the second panel in the create wiard, and set the breadcrumb
     me.setItemName(2, NX.I18n.get('Ssl_SslCertificateDetailsWindow_Title'));
-    me.loadCreateWizard(2, panel);
+    me.loadCreateWizard(2, true, panel);
   },
 
   /**
@@ -244,13 +239,8 @@ Ext.define('NX.coreui.controller.SslCertificates', {
     me.getContent().getEl().mask(NX.I18n.get('SslTrustStore_Load_Mask'));
     NX.direct.ssl_Certificate.retrieveFromHost(parsed[0], parsed[1], protocolHint, function (response) {
       me.getContent().getEl().unmask();
-      if (Ext.isObject(response)) {
-        if (response.success) {
-          me.showCertificateDetailsPanel(response.data);
-        }
-        else if (response.errors) {
-          NX.Messages.error(Object.values(response.errors));
-        }
+      if (Ext.isObject(response) && response.success) {
+        me.showCertificateDetailsPanel(response.data);
       }
     });
   },
@@ -319,7 +309,7 @@ Ext.define('NX.coreui.controller.SslCertificates', {
     NX.direct.ssl_TrustStore.create(model.get('pem'), function (response) {
       me.getStore('SslCertificate').load();
       if (Ext.isObject(response) && response.success) {
-        NX.Messages.success(NX.I18n.format('SslCertificates_Load_Success', description));
+        NX.Messages.add({ text: NX.I18n.format('SslCertificates_Load_Success', description), type: 'success' });
         me.closeCertDetailsWindowIfExists(button);
       }
     });
@@ -350,7 +340,7 @@ Ext.define('NX.coreui.controller.SslCertificates', {
     NX.direct.ssl_TrustStore.remove(model.getId(), function (response) {
       me.getStore('SslCertificate').load();
       if (Ext.isObject(response) && response.success) {
-        NX.Messages.success(NX.I18n.format('SslCertificates_Delete_Success', description));
+        NX.Messages.add({ text: NX.I18n.format('SslCertificates_Delete_Success', description), type: 'success' });
         me.closeCertDetailsWindowIfExists(button);
       }
     });
@@ -375,18 +365,15 @@ Ext.define('NX.coreui.controller.SslCertificates', {
               formBind: true,
               disabled: true,
               ui: 'nx-primary',
-              iconCls: 'x-fa fa-trash'
+              glyph: 'xf056@FontAwesome' /* fa-minus-circle */
             });
             button = tbar.down('button[action=remove]');
             me.mon(
                 NX.Conditions.isPermitted('nexus:ssl-truststore:delete'),
                 {
-                  satisfied: function () {
-                    button.enable();
-                  },
-                  unsatisfied: function () {
-                    button.disable();
-                  }
+                  satisfied: button.enable,
+                  unsatisfied: button.disable,
+                  scope: button
                 }
             );
           }
@@ -397,18 +384,15 @@ Ext.define('NX.coreui.controller.SslCertificates', {
               formBind: true,
               disabled: true,
               ui: 'nx-primary',
-              iconCls: 'x-fa fa-plus-circle'
+              glyph: 'xf055@FontAwesome' /* fa-plus-circle */
             });
             button = tbar.down('button[action=add]');
             me.mon(
                 NX.Conditions.isPermitted('nexus:ssl-truststore:create'),
                 {
-                  satisfied: function () {
-                    button.enable();
-                  },
-                  unsatisfied: function () {
-                    button.disable();
-                  }
+                  satisfied: button.enable,
+                  unsatisfied: button.disable,
+                  scope: button
                 }
             );
           }

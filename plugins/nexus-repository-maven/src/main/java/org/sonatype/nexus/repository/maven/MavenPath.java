@@ -26,8 +26,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Maven repository path. Every item in repository may have hashes, stored on paths with proper suffixes, and artifact
- * paths have non-null coordinates.
+ * Maven repository path. Every item in repository may have hashes, stored on paths with proper
+ * suffixes, and artifact paths have non-null coordinates.
  *
  * @since 3.0
  */
@@ -37,15 +37,14 @@ public class MavenPath
   public enum HashType
   {
     SHA1("sha1", HashAlgorithm.SHA1),
-    SHA256("sha256", HashAlgorithm.SHA256),
-    SHA512("sha512", HashAlgorithm.SHA512),
+
     MD5("md5", HashAlgorithm.MD5);
 
     /**
      * {@link HashAlgorithm}s corresponding to {@link HashType}s.
      */
     public static final List<HashAlgorithm> ALGORITHMS = ImmutableList
-        .of(SHA1.getHashAlgorithm(), MD5.getHashAlgorithm(), SHA256.getHashAlgorithm(), SHA512.getHashAlgorithm());
+        .of(SHA1.getHashAlgorithm(), MD5.getHashAlgorithm());
 
     private final String ext;
 
@@ -102,17 +101,16 @@ public class MavenPath
 
     private final SignatureType signatureType;
 
-    public Coordinates(
-        final boolean snapshot,
-        final String groupId,
-        final String artifactId,
-        final String version,
-        @Nullable final Long timestamp,
-        @Nullable final Integer buildNumber,
-        final String baseVersion,
-        @Nullable final String classifier,
-        final String extension,
-        final SignatureType signatureType)
+    public Coordinates(final boolean snapshot,
+                       final String groupId,
+                       final String artifactId,
+                       final String version,
+                       @Nullable final Long timestamp,
+                       @Nullable final Integer buildNumber,
+                       final String baseVersion,
+                       @Nullable final String classifier,
+                       final String extension,
+                       final SignatureType signatureType)
     {
       this.snapshot = snapshot;
       this.groupId = checkNotNull(groupId);
@@ -323,24 +321,8 @@ public class MavenPath
    */
   @Nonnull
   public MavenPath hash(final HashType hashType) {
-    return hash(hashType.getExt());
-  }
-
-  /**
-   * Returns path of passed in hash type that is subordinate of this path. This path cannot be hash.
-   */
-  @Nonnull
-  public MavenPath hash(final HashAlgorithm hashType) {
-    return hash(hashType.name());
-  }
-
-  /**
-   * Returns path of passed in hash type that is subordinate of this path. This path cannot be hash.
-   */
-  @Nonnull
-  private MavenPath hash(final String hashExtension) {
-    checkNotNull(hashExtension);
-    checkArgument(hashType == null, "This path is already a hash: %s", this);
+    checkNotNull(hashType);
+    checkArgument(this.hashType == null, "This path is already a hash: %s", this);
     Coordinates hashCoordinates = null;
     if (coordinates != null) {
       hashCoordinates = new Coordinates(
@@ -352,18 +334,19 @@ public class MavenPath
           coordinates.getBuildNumber(),
           coordinates.getBaseVersion(),
           coordinates.getClassifier(),
-          coordinates.getExtension() + "." + hashExtension,
+          coordinates.getExtension() + "." + hashType.getExt(),
           coordinates.getSignatureType()
       );
     }
     return new MavenPath(
-        path + "." + hashExtension,
+        path + "." + hashType.getExt(),
         hashCoordinates
     );
   }
 
   /**
-   * Returns path of passed in signature type that is subordinate of this path. This path cannot be hash nor signature.
+   * Returns path of passed in signature type that is subordinate of this path. This path cannot be
+   * hash nor signature.
    */
   @Nonnull
   public MavenPath signature(final SignatureType signatureType) {
@@ -412,10 +395,10 @@ public class MavenPath
         null
     );
     // strip ".ext"
-    String newPath = origin.path.substring(0, origin.path.length() - origin.coordinates.extension.length() - 1);
+    String newPath = origin.path.substring(0, origin.path.length() - (origin.coordinates.extension.length() + 1));
     if (origin.coordinates.classifier != null) {
       // strip "-classifier"
-      newPath = newPath.substring(0, newPath.length() - origin.coordinates.classifier.length() - 1);
+      newPath = newPath.substring(0, newPath.length() - origin.coordinates.classifier.length() + 1);
     }
     if (classifier != null) {
       newPath += "-" + classifier;
@@ -428,8 +411,8 @@ public class MavenPath
   }
 
   /**
-   * Returns path pointing to POM within this same GAV. Only usable for artifact paths, those having non-null {@link
-   * #getCoordinates()}.
+   * Returns path pointing to POM within this same GAV. Only usable for artifact
+   * paths, those having non-null {@link #getCoordinates()}.
    */
   @Nonnull
   public MavenPath locatePom() {
@@ -437,8 +420,8 @@ public class MavenPath
   }
 
   /**
-   * Returns path pointing to non-classifier artifact within this same GAV. Only usable for artifact paths, those having
-   * non-null {@link #getCoordinates()}.
+   * Returns path pointing to non-classifier artifact within this same GAV. Only usable for artifact
+   * paths, those having non-null {@link #getCoordinates()}.
    */
   @Nonnull
   public MavenPath locateMainArtifact(final String extension) {
@@ -466,6 +449,7 @@ public class MavenPath
   public String toString() {
     return getClass().getSimpleName() + "{" +
         "path='" + path + '\'' +
+        ", fileName='" + fileName + '\'' +
         ", hashType=" + hashType +
         '}';
   }

@@ -49,7 +49,7 @@ public class MutableTestSecurityContributor
   public void setDirty(boolean dirty) {
     if (dirty) {
       setConfigRequested(false);
-      apply((model, configurationManager) -> {
+      apply((model) -> {
         // marks model as dirty
       });
     }

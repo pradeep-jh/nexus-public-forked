@@ -15,21 +15,13 @@ package org.sonatype.nexus.security.internal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
-import org.sonatype.goodies.common.ComponentSupport;
-import org.sonatype.nexus.common.event.EventAware;
-import org.sonatype.nexus.common.event.EventHelper;
 import org.sonatype.nexus.common.event.EventManager;
-import org.sonatype.nexus.distributed.event.service.api.EventType;
-import org.sonatype.nexus.distributed.event.service.api.common.AuthorizationChangedDistributedEvent;
-import org.sonatype.nexus.distributed.event.service.api.common.PrivilegeConfigurationEvent;
-import org.sonatype.nexus.distributed.event.service.api.common.RoleConfigurationEvent;
 import org.sonatype.nexus.security.authz.AuthorizationConfigurationChanged;
 import org.sonatype.nexus.security.authz.AuthorizationManager;
 import org.sonatype.nexus.security.config.CPrivilege;
@@ -49,25 +41,18 @@ import org.sonatype.nexus.security.role.RoleUpdatedEvent;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.common.eventbus.Subscribe;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static org.sonatype.nexus.distributed.event.service.api.EventType.CREATED;
-import static org.sonatype.nexus.distributed.event.service.api.EventType.DELETED;
-import static org.sonatype.nexus.distributed.event.service.api.EventType.UPDATED;
-import static org.sonatype.nexus.security.internal.DefaultRealmConstants.DEFAULT_REALM_NAME;
-import static org.sonatype.nexus.security.internal.DefaultRealmConstants.DEFAULT_USER_SOURCE;
 
 /**
  * Default {@link AuthorizationManager}.
  */
-@Named(DEFAULT_USER_SOURCE)
+@Named("default")
 @Singleton
 public class AuthorizationManagerImpl
-    extends ComponentSupport
-    implements AuthorizationManager, EventAware
+    implements AuthorizationManager
 {
-  public static final String SOURCE = DEFAULT_USER_SOURCE;
+  public static final String SOURCE = "default";
 
   private final SecurityConfigurationManager configuration;
 
@@ -76,10 +61,9 @@ public class AuthorizationManagerImpl
   private final List<PrivilegeDescriptor> privilegeDescriptors;
 
   @Inject
-  public AuthorizationManagerImpl(
-      final SecurityConfigurationManager configuration,
-      final EventManager eventManager,
-      final List<PrivilegeDescriptor> privilegeDescriptors)
+  public AuthorizationManagerImpl(final SecurityConfigurationManager configuration,
+                                  final EventManager eventManager,
+                                  final List<PrivilegeDescriptor> privilegeDescriptors)
   {
     this.configuration = configuration;
     this.eventManager = eventManager;
@@ -88,12 +72,7 @@ public class AuthorizationManagerImpl
 
   @Override
   public String getSource() {
-    return DEFAULT_USER_SOURCE;
-  }
-
-  @Override
-  public String getRealmName() {
-    return DEFAULT_REALM_NAME;
+    return SOURCE;
   }
 
   private Role convert(final CRole source) {
@@ -101,7 +80,7 @@ public class AuthorizationManagerImpl
     target.setRoleId(source.getId());
     target.setVersion(source.getVersion());
     target.setName(source.getName());
-    target.setSource(DEFAULT_USER_SOURCE);
+    target.setSource(SOURCE);
     target.setDescription(source.getDescription());
     target.setReadOnly(source.isReadOnly());
     target.setPrivileges(Sets.newHashSet(source.getPrivileges()));
@@ -110,7 +89,7 @@ public class AuthorizationManagerImpl
   }
 
   private CRole convert(final Role source) {
-    CRole target = configuration.newRole();
+    CRole target = new CRole();
     target.setId(source.getRoleId());
     target.setVersion(source.getVersion());
     target.setName(source.getName());
@@ -135,7 +114,7 @@ public class AuthorizationManagerImpl
   }
 
   private CPrivilege convert(final Privilege source) {
-    CPrivilege target = configuration.newPrivilege();
+    CPrivilege target = new CPrivilege();
     target.setId(source.getId());
     target.setVersion(source.getVersion());
     target.setName(source.getName());
@@ -168,6 +147,7 @@ public class AuthorizationManagerImpl
     return target;
   }
 
+
   @Nullable
   private PrivilegeDescriptor descriptor(final String type) {
     for (PrivilegeDescriptor descriptor : privilegeDescriptors) {
@@ -195,44 +175,35 @@ public class AuthorizationManagerImpl
   }
 
   @Override
-  public Role getRole(final String roleId) throws NoSuchRoleException {
+  public Role getRole(String roleId) throws NoSuchRoleException {
     return this.convert(this.configuration.readRole(roleId));
   }
 
   @Override
-  public Set<Role> searchRoles(final String query) {
-    return listRoles();
-  }
-
-  @Override
-  public Role addRole(final Role role) {
+  public Role addRole(Role role) {
     // the roleId of the secRole might change, so we need to keep the reference
-    CRole secRole = this.convert(role);
+    final CRole secRole = this.convert(role);
 
     configuration.createRole(secRole);
 
-    log.info("Added role {}", role.getName());
-
-    fireRoleCreatedEvent(role);
-    fireRoleConfigurationDistributedEvent(role.getRoleId(), CREATED);
+    eventManager.post(new RoleCreatedEvent(role));
 
     // notify any listeners that the config changed
-    fireAuthorizationChangedEvent();
+    this.fireAuthorizationChangedEvent();
 
     return this.convert(secRole);
   }
 
   @Override
-  public Role updateRole(final Role role) throws NoSuchRoleException {
-    CRole secRole = this.convert(role);
+  public Role updateRole(Role role) throws NoSuchRoleException {
+    final CRole secRole = this.convert(role);
 
     configuration.updateRole(secRole);
 
-    fireRoleUpdatedEvent(role);
-    fireRoleConfigurationDistributedEvent(role.getRoleId(), UPDATED);
+    eventManager.post(new RoleUpdatedEvent(role));
 
     // notify any listeners that the config changed
-    fireAuthorizationChangedEvent();
+    this.fireAuthorizationChangedEvent();
 
     return this.convert(secRole);
   }
@@ -242,12 +213,10 @@ public class AuthorizationManagerImpl
     Role role = getRole(roleId);
     configuration.deleteRole(roleId);
 
-    log.info("Removed role {}", role.getName());
-    fireRoleDeletedEvent(role);
-    fireRoleConfigurationDistributedEvent(roleId, DELETED);
+    eventManager.post(new RoleDeletedEvent(role));
 
     // notify any listeners that the config changed
-    fireAuthorizationChangedEvent();
+    this.fireAuthorizationChangedEvent();
   }
 
   // //
@@ -267,65 +236,35 @@ public class AuthorizationManagerImpl
   }
 
   @Override
-  public Privilege getPrivilege(final String privilegeId) throws NoSuchPrivilegeException {
+  public Privilege getPrivilege(String privilegeId) throws NoSuchPrivilegeException {
     return this.convert(this.configuration.readPrivilege(privilegeId));
   }
 
   @Override
-  public Privilege getPrivilegeByName(final String privilegeName) throws NoSuchPrivilegeException {
-    return this.convert(this.configuration.readPrivilegeByName(privilegeName));
-  }
-
-  @Override
-  public List<Privilege> getPrivileges(final Set<String> privilegeIds) {
-    List<CPrivilege> privileges = configuration.readPrivileges(privilegeIds);
-    return privileges.stream().map(this::convert).collect(Collectors.toList());
-  }
-
-  @Override
-  public Privilege addPrivilege(final Privilege privilege) {
+  public Privilege addPrivilege(Privilege privilege) {
     final CPrivilege secPriv = this.convert(privilege);
     configuration.createPrivilege(secPriv);
 
-    log.info("Added privilege {}", privilege.getName());
-
-    firePrivilegeCreatedEvent(privilege);
-    firePrivilegeConfigurationDistributedEvent(privilege.getId(), CREATED);
+    eventManager.post(new PrivilegeCreatedEvent(privilege));
 
     // notify any listeners that the config changed
-    fireAuthorizationChangedEvent();
+    this.fireAuthorizationChangedEvent();
 
     return this.convert(secPriv);
   }
 
   @Override
-  public Privilege updatePrivilege(final Privilege privilege) throws NoSuchPrivilegeException {
+  public Privilege updatePrivilege(Privilege privilege) throws NoSuchPrivilegeException {
     final CPrivilege secPriv = this.convert(privilege);
 
     configuration.updatePrivilege(secPriv);
 
-    firePrivilegeUpdatedEvent(privilege);
-    firePrivilegeConfigurationDistributedEvent(privilege.getId(), UPDATED);
+    eventManager.post(new PrivilegeUpdatedEvent(privilege));
 
     // notify any listeners that the config changed
-    fireAuthorizationChangedEvent();
+    this.fireAuthorizationChangedEvent();
 
     return this.convert(secPriv);
-  }
-
-  @Override
-  public Privilege updatePrivilegeByName(final Privilege privilege) throws NoSuchPrivilegeException {
-    final CPrivilege toUpdate = this.convert(privilege);
-
-    configuration.updatePrivilegeByName(toUpdate);
-
-    firePrivilegeUpdatedEvent(privilege);
-    firePrivilegeConfigurationDistributedEvent(privilege.getId(), UPDATED);
-
-    // notify any listeners that the config changed
-    fireAuthorizationChangedEvent();
-
-    return this.convert(toUpdate);
   }
 
   @Override
@@ -333,25 +272,10 @@ public class AuthorizationManagerImpl
     Privilege privilege = getPrivilege(privilegeId);
     configuration.deletePrivilege(privilegeId);
 
-    log.info("Removed privilege {}", privilege.getName());
-    firePrivilegeDeletedEvent(privilege);
-    firePrivilegeConfigurationDistributedEvent(privilegeId, DELETED);
+    eventManager.post(new PrivilegeDeletedEvent(privilege));
 
     // notify any listeners that the config changed
-    fireAuthorizationChangedEvent();
-  }
-
-  @Override
-  public void deletePrivilegeByName(final String privilegeName) throws NoSuchPrivilegeException {
-    Privilege privilege = getPrivilegeByName(privilegeName);
-    configuration.deletePrivilegeByName(privilegeName);
-
-    log.info("Removed privilege by name {}", privilegeName);
-    firePrivilegeDeletedEvent(privilege);
-    firePrivilegeConfigurationDistributedEvent(privilegeName, DELETED);
-
-    // notify any listeners that the config changed
-    fireAuthorizationChangedEvent();
+    this.fireAuthorizationChangedEvent();
   }
 
   @Override
@@ -359,156 +283,7 @@ public class AuthorizationManagerImpl
     return true;
   }
 
-  @Subscribe
-  public void onRoleConfigurationEvent(final RoleConfigurationEvent event) {
-    if (!EventHelper.isReplicating()) {
-      return;
-    }
-    checkNotNull(event);
-
-    String roleId = event.getRoleId();
-    EventType eventType = event.getEventType();
-
-    log.debug("Consume distributed RoleConfigurationEvent: roleId={}, type={}", roleId, eventType);
-
-    switch (eventType) {
-      case CREATED:
-        handleRoleCreatedDistributedEvent(roleId);
-        break;
-      case UPDATED:
-        handleRoleUpdatedDistributedEvent(roleId);
-        break;
-      case DELETED:
-        handleRoleDeletedDistributedEvent(roleId);
-        break;
-    }
-  }
-
-  @Subscribe
-  public void onPrivilegeConfigurationEvent(final PrivilegeConfigurationEvent event) {
-    if (!EventHelper.isReplicating()) {
-      return;
-    }
-    checkNotNull(event);
-
-    String privilegeId = event.getPrivilegeId();
-    EventType eventType = event.getEventType();
-
-    log.debug("Consume distributed PrivilegeConfigurationEvent: privilegeId={}, type={}", privilegeId, eventType);
-
-    switch (eventType) {
-      case CREATED:
-        handlePrivilegeCreatedDistributedEvent(privilegeId);
-        break;
-      case UPDATED:
-        handlePrivilegeUpdatedDistributedEvent(privilegeId);
-        break;
-      case DELETED:
-        handlePrivilegeDeletedDistributedEvent(privilegeId);
-        break;
-    }
-  }
-
-  // role DES events handlers
-  private void handleRoleCreatedDistributedEvent(final String roleId) {
-    try {
-      Role role = getRole(roleId);
-      fireRoleCreatedEvent(role);
-    }
-    catch (NoSuchRoleException e) {
-      log.error("Could not load role={} while handling distributed event", roleId, e);
-    }
-  }
-
-  private void handleRoleUpdatedDistributedEvent(final String roleId) {
-    try {
-      Role role = getRole(roleId);
-      fireRoleUpdatedEvent(role);
-    }
-    catch (NoSuchRoleException e) {
-      log.error("Could not load role={} while handling distributed event", roleId, e);
-    }
-  }
-
-  private void handleRoleDeletedDistributedEvent(final String roleId) {
-    try {
-      Role role = getRole(roleId);
-      fireRoleDeletedEvent(role);
-    }
-    catch (NoSuchRoleException e) {
-      log.error("Could not load role={} while handling distributed event", roleId);
-    }
-  }
-
-  // privilege DES event handlers
-  private void handlePrivilegeCreatedDistributedEvent(final String privilegeId) {
-    try {
-      Privilege privilege = getPrivilege(privilegeId);
-      firePrivilegeCreatedEvent(privilege);
-    }
-    catch (NoSuchPrivilegeException e) {
-      log.error("Could not load privilege={} while handling distributed event", privilegeId);
-    }
-  }
-
-  private void handlePrivilegeUpdatedDistributedEvent(final String privilegeId) {
-    try {
-      Privilege privilege = getPrivilege(privilegeId);
-      firePrivilegeUpdatedEvent(privilege);
-    }
-    catch (NoSuchPrivilegeException e) {
-      log.error("Could not load privilege={} while handling distributed event", privilegeId);
-    }
-  }
-
-  private void handlePrivilegeDeletedDistributedEvent(final String privilegeId) {
-    try {
-      Privilege privilege = getPrivilege(privilegeId);
-      firePrivilegeDeletedEvent(privilege);
-    }
-    catch (NoSuchPrivilegeException e) {
-      log.error("Could not load privilege={} while handling distributed event", privilegeId);
-    }
-  }
-
   private void fireAuthorizationChangedEvent() {
-    eventManager.post(new AuthorizationConfigurationChanged());
-    eventManager.post(new AuthorizationChangedDistributedEvent());
-  }
-
-  private void fireRoleCreatedEvent(final Role role) {
-    eventManager.post(new RoleCreatedEvent(role));
-  }
-
-  private void fireRoleUpdatedEvent(final Role role) {
-    eventManager.post(new RoleUpdatedEvent(role));
-  }
-
-  private void fireRoleDeletedEvent(final Role role) {
-    eventManager.post(new RoleDeletedEvent(role));
-  }
-
-  private void firePrivilegeCreatedEvent(final Privilege privilege) {
-    eventManager.post(new PrivilegeCreatedEvent(privilege));
-  }
-
-  private void firePrivilegeUpdatedEvent(final Privilege privilege) {
-    eventManager.post(new PrivilegeUpdatedEvent(privilege));
-  }
-
-  private void firePrivilegeDeletedEvent(final Privilege privilege) {
-    eventManager.post(new PrivilegeDeletedEvent(privilege));
-  }
-
-  private void fireRoleConfigurationDistributedEvent(final String roleId, final EventType eventType) {
-    log.debug("Distribute event: roleId={}, type={}", roleId, eventType);
-
-    eventManager.post(new RoleConfigurationEvent(roleId, eventType));
-  }
-
-  private void firePrivilegeConfigurationDistributedEvent(final String privilegeId, final EventType eventType) {
-    log.debug("Distribute event: privilegeId={}, type={}", privilegeId, eventType);
-
-    eventManager.post(new PrivilegeConfigurationEvent(privilegeId, eventType));
+    this.eventManager.post(new AuthorizationConfigurationChanged());
   }
 }

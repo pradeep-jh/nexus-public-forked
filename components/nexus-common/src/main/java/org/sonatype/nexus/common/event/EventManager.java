@@ -20,7 +20,6 @@ import com.google.common.annotations.VisibleForTesting;
  * @see EventAware
  * @since 3.0
  */
-@SuppressWarnings("deprecation")
 public interface EventManager
     extends EventBus
 {
@@ -59,11 +58,4 @@ public interface EventManager
    */
   @VisibleForTesting
   boolean isCalmPeriod();
-
-  /**
-   * Is {@link HasAffinity} support enabled?
-   *
-   * @since 3.11
-   */
-  boolean isAffinityEnabled();
 }

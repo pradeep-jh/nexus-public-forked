@@ -60,20 +60,6 @@ public interface FileOperations
   void moveAtomic(Path source, Path target) throws IOException;
 
   /**
-   * Overwrites a file without any guarantee of atomicity.
-   *
-   * @since 3.8
-   */
-  void overwrite(Path source, Path target) throws IOException;
-
-  /**
-   * Overwrites a file atomically, throwing <code>AtomicMoveNotSupportedException</code> if not supported.
-   *
-   * @since 3.8
-   */
-  void overwriteAtomic(Path source, Path target) throws IOException;
-
-  /**
    * Moves a file, falling back on copy/delete if a <code>FileSystemException</code> is thrown.
    *
    * @since 3.5
@@ -87,24 +73,12 @@ public interface FileOperations
 
   boolean exists(Path path);
 
-  boolean isBlobZeroLength(Path path);
-
   InputStream openInputStream(Path path) throws IOException;
 
   /**
    * Returns true if the file existed before deletion, false otherwise.
    */
   boolean delete(Path path) throws IOException;
-
-  /**
-   * Deletes the path and does not throw exceptions on failure
-   *
-   * @param path to be deleted
-   * @return {@code true} if the path was deleted, {@code false} otherwise
-   *
-   * @since 3.15
-   */
-  boolean deleteQuietly(Path path);
 
   /**
    * Recursively deletes all files and subdirectories, then the directory itself.
@@ -114,14 +88,13 @@ public interface FileOperations
   /**
    * Returns true if the directory was empty and could be removed, false otherwise.
    */
-  boolean deleteEmptyDirectory(Path directory);
+  boolean deleteEmptyDirectory(Path directory) throws IOException;
 
   /**
    * @since 3.5
    */
   @FunctionalInterface
-  interface Mover
-  {
+  interface Mover {
     void accept(Path source, Path destination) throws IOException;
   }
 }

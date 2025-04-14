@@ -43,9 +43,8 @@ public class AuthenticationEventSubscriber
   private final Provider<ClientInfoProvider> clientInfoProvider;
 
   @Inject
-  public AuthenticationEventSubscriber(
-      final Provider<EventManager> eventManager,
-      final Provider<ClientInfoProvider> clientInfoProvider)
+  public AuthenticationEventSubscriber(final Provider<EventManager> eventManager,
+                                       final Provider<ClientInfoProvider> clientInfoProvider)
   {
     this.eventManager = checkNotNull(eventManager);
     this.clientInfoProvider = checkNotNull(clientInfoProvider);
@@ -53,23 +52,12 @@ public class AuthenticationEventSubscriber
 
   @Subscribe
   public void on(final AuthenticationEvent event) {
-    final ClientInfo clientInfo = clientInfoProvider.get().getCurrentThreadClientInfo();
-
-    ClientInfo.Builder builder = ClientInfo
-        .builder()
-        .userId(event.getUserId());
-
-    if (clientInfo != null) {
-      builder
-          .remoteIP(clientInfo.getRemoteIP())
-          .userAgent(clientInfo.getUserAgent())
-          .path(clientInfo.getPath());
-    }
-
-    eventManager.get()
-        .post(new NexusAuthenticationEvent(
-            builder.build(),
-            event.isSuccessful(),
-            event.getAuthenticationFailureReasons()));
+    ClientInfo clientInfo = clientInfoProvider.get().getCurrentThreadClientInfo();
+    eventManager.get().post(new NexusAuthenticationEvent(
+        clientInfo == null
+            ? new ClientInfo(event.getUserId(), null, null)
+            : new ClientInfo(event.getUserId(), clientInfo.getRemoteIP(), clientInfo.getUserAgent()),
+        event.isSuccessful()
+    ));
   }
 }

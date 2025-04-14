@@ -20,15 +20,11 @@
   <parent>
     <groupId>org.sonatype.nexus.bundles</groupId>
     <artifactId>nexus-thirdparty-bundles</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>org.sonatype.nexus.bundles.elasticsearch</artifactId>
   <name>${project.groupId}:${project.artifactId}</name>
-
-  <properties>
-    <clm.skip>false</clm.skip>
-  </properties>
 
   <dependencies>
     <!--
@@ -56,10 +52,6 @@
       <artifactId>jackson-dataformat-yaml</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.fasterxml.jackson.dataformat</groupId>
-      <artifactId>jackson-dataformat-toml</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.hdrhistogram</groupId>
       <artifactId>HdrHistogram</artifactId>
     </dependency>
@@ -70,6 +62,10 @@
     <dependency>
       <groupId>com.ning</groupId>
       <artifactId>compress-lzf</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty</artifactId>
     </dependency>
   </dependencies>
 
@@ -97,10 +93,10 @@
               http://www.apache.org/licenses/LICENSE-2.0
             </Bundle-License>
             <Export-Package>
-              org.elasticsearch.*,
-              org.apache.lucene.*;-split-package:=merge-first,
+              org.elasticsearch.*
             </Export-Package>
             <Private-Package>
+              org.apache.lucene.*;-split-package:=merge-first,
               org.joda.time.*;-split-package:=merge-first,
               com.carrotsearch.hppc.*,
               com.spatial4j.core.*,

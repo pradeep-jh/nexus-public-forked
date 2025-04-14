@@ -26,8 +26,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.mockito.ArgumentMatchers.isNotNull;
+import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -74,7 +74,7 @@ public class LogMarkerImplTest
           verify(logManager).setLoggerLevel(LOG_NAME, LoggerLevel.INFO);
         }
         else {
-          verify(logManager, never()).setLoggerLevel(isNotNull(), isNotNull());
+          verify(logManager, never()).setLoggerLevel(anyObject(), anyObject());
         }
       }
       catch (AssertionError e) {

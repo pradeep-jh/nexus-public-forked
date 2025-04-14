@@ -56,7 +56,7 @@ public class UserRoleMappingAuditor
       data.setType(type(event.getClass()));
       data.setContext(event.getUserId());
 
-      Map<String, Object> attributes = data.getAttributes();
+      Map<String, String> attributes = data.getAttributes();
       attributes.put("id", event.getUserId());
       attributes.put("source", event.getUserSource());
       attributes.put("roles", string(event.getRoles()));

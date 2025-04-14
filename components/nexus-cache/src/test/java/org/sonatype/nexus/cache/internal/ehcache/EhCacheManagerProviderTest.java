@@ -25,7 +25,7 @@ import org.junit.Test;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
 /**
@@ -39,14 +39,13 @@ public class EhCacheManagerProviderTest
   @Before
   public void setUp() throws Exception {
     underTest = new EhCacheManagerProvider(getClass().getResource("ehcache-test.xml").toURI());
-    underTest.start();
   }
 
   @After
   public void tearDown() throws Exception {
     // safety check that we always cleanup
     if (underTest != null) {
-      underTest.stop();
+      underTest.destroy();
     }
   }
 
@@ -60,8 +59,8 @@ public class EhCacheManagerProviderTest
     CacheManager cacheManager2 = underTest.get();
     assertThat(cacheManager2, is(cacheManager));
 
-    // after stop get should fail
-    underTest.stop();
+    // after destroy get should fail
+    underTest.destroy();
     try {
       underTest.get();
       fail();
@@ -69,7 +68,6 @@ public class EhCacheManagerProviderTest
     catch (IllegalStateException e) {
       // expected
     }
-    underTest.start();
   }
 
   @Test
@@ -79,15 +77,15 @@ public class EhCacheManagerProviderTest
     log(cacheManager);
     assertThat(cacheManager, notNullValue());
 
-    Cache<Object, Object> cache = cacheManager.getCache("testEternalCache", Object.class, Object.class);
+    Cache<Object,Object> cache = cacheManager.getCache("testEternalCache", Object.class, Object.class);
     log(cache);
     assertThat(cache, notNullValue());
 
-    // log(JCacheConfiguration.class.getProtectionDomain().getCodeSource().getLocation());
-    // JCacheConfiguration config = (JCacheConfiguration) cache.getConfiguration(JCacheConfiguration.class);
-    // log(config.getExpiryPolicy().getExpiryForAccess());
-    // log(config.getExpiryPolicy().getExpiryForAccess().isEternal());
-    // log(config.getExpiryPolicy().getExpiryForAccess().isZero());
+    //log(JCacheConfiguration.class.getProtectionDomain().getCodeSource().getLocation());
+    //JCacheConfiguration config = (JCacheConfiguration) cache.getConfiguration(JCacheConfiguration.class);
+    //log(config.getExpiryPolicy().getExpiryForAccess());
+    //log(config.getExpiryPolicy().getExpiryForAccess().isEternal());
+    //log(config.getExpiryPolicy().getExpiryForAccess().isZero());
 
     Object key = "foo";
     Object value = "bar";

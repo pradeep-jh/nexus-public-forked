@@ -13,49 +13,86 @@
 package org.sonatype.nexus.httpclient.config;
 
 import javax.annotation.Nullable;
+import javax.validation.Valid;
 
-import org.apache.http.client.AuthenticationStrategy;
-import org.apache.http.client.RedirectStrategy;
+import org.sonatype.nexus.common.entity.Entity;
 
 /**
  * HTTP-client configuration.
  *
  * @since 3.0
  */
-public interface HttpClientConfiguration
+public class HttpClientConfiguration
+    extends Entity
+    implements Cloneable
 {
+  @Valid
   @Nullable
-  ConnectionConfiguration getConnection();
+  private ConnectionConfiguration connection;
 
-  void setConnection(@Nullable final ConnectionConfiguration connection);
-
+  @Valid
   @Nullable
-  ProxyConfiguration getProxy();
+  private ProxyConfiguration proxy;
 
-  void setProxy(@Nullable final ProxyConfiguration proxy);
-
+  /**
+   * @see AuthenticationConfigurationDeserializer
+   */
+  @Valid
   @Nullable
-  AuthenticationConfiguration getAuthentication();
-
-  void setAuthentication(@Nullable final AuthenticationConfiguration authentication);
-
-  @Nullable
-  RedirectStrategy getRedirectStrategy();
-
-  void setRedirectStrategy(@Nullable final RedirectStrategy redirectStrategy);
+  private AuthenticationConfiguration authentication;
 
   @Nullable
-  AuthenticationStrategy getAuthenticationStrategy();
+  public ConnectionConfiguration getConnection() {
+    return connection;
+  }
 
-  void setAuthenticationStrategy(@Nullable final AuthenticationStrategy authenticationStrategy);
+  public void setConnection(@Nullable final ConnectionConfiguration connection) {
+    this.connection = connection;
+  }
 
-  Boolean getNormalizeUri();
+  @Nullable
+  public ProxyConfiguration getProxy() {
+    return proxy;
+  }
 
-  void setNormalizeUri(final Boolean normalizeUri);
+  public void setProxy(@Nullable final ProxyConfiguration proxy) {
+    this.proxy = proxy;
+  }
 
-  Boolean getDisableContentCompression();
+  @Nullable
+  public AuthenticationConfiguration getAuthentication() {
+    return authentication;
+  }
 
-  void setDisableContentCompression(final Boolean disableContentCompression);
+  public void setAuthentication(@Nullable final AuthenticationConfiguration authentication) {
+    this.authentication = authentication;
+  }
 
-  HttpClientConfiguration copy();
+  public HttpClientConfiguration copy() {
+    try {
+      HttpClientConfiguration copy = (HttpClientConfiguration) clone();
+      if (connection != null) {
+        copy.connection = connection.copy();
+      }
+      if (proxy != null) {
+        copy.proxy = proxy.copy();
+      }
+      if (authentication != null) {
+        copy.authentication = authentication.copy();
+      }
+      return copy;
+    }
+    catch (CloneNotSupportedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + "{" +
+        "connection=" + connection +
+        ", proxy=" + proxy +
+        ", authentication=" + authentication +
+        '}';
+  }
 }

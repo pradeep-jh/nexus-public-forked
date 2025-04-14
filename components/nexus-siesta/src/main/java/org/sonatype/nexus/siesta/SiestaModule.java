@@ -14,21 +14,16 @@ package org.sonatype.nexus.siesta;
 
 import javax.inject.Named;
 
-import org.sonatype.nexus.common.app.FeatureFlag;
 import org.sonatype.nexus.security.FilterChainModule;
 import org.sonatype.nexus.security.SecurityFilter;
 import org.sonatype.nexus.security.anonymous.AnonymousFilter;
-import org.sonatype.nexus.security.authc.AntiCsrfFilter;
 import org.sonatype.nexus.security.authc.NexusAuthenticationFilter;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.AbstractModule;
-import com.google.inject.Module;
 import com.google.inject.servlet.ServletModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.sonatype.nexus.common.app.FeatureFlags.SESSION_ENABLED;
 
 /**
  * Siesta plugin module.
@@ -36,13 +31,14 @@ import static org.sonatype.nexus.common.app.FeatureFlags.SESSION_ENABLED;
  * @since 2.4
  */
 @Named
-@FeatureFlag(name = SESSION_ENABLED)
 public class SiestaModule
     extends AbstractModule
 {
-  public static final String MOUNT_POINT = "/service/rest";
-
   private static final Logger log = LoggerFactory.getLogger(SiestaModule.class);
+
+  private static final String SERVICE_NAME = "siesta";
+
+  private static final String MOUNT_POINT = "/service/" + SERVICE_NAME;
 
   public static final String SKIP_MODULE_CONFIGURATION = SiestaModule.class.getName() + ".skip";
 
@@ -57,13 +53,7 @@ public class SiestaModule
   private void doConfigure() {
     install(new ResteasyModule());
 
-    install(configureServletModule());
-
-    install(configureFilterChainModule());
-  }
-
-  protected ServletModule configureServletModule() {
-    return new ServletModule()
+    install(new ServletModule()
     {
       @Override
       protected void configureServlets() {
@@ -75,19 +65,14 @@ public class SiestaModule
         ));
         filter(MOUNT_POINT + "/*").through(SecurityFilter.class);
       }
-    };
-  }
+    });
 
-  protected Module configureFilterChainModule() {
-    return new FilterChainModule()
+    install(new FilterChainModule()
     {
       @Override
       protected void configure() {
-        addFilterChain(MOUNT_POINT + "/**",
-            NexusAuthenticationFilter.NAME,
-            AnonymousFilter.NAME,
-            AntiCsrfFilter.NAME);
+        addFilterChain(MOUNT_POINT + "/**", NexusAuthenticationFilter.NAME, AnonymousFilter.NAME);
       }
-    };
+    });
   }
 }

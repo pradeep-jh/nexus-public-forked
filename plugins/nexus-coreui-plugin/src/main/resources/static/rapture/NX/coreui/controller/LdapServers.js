@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -52,8 +48,7 @@ Ext.define('NX.coreui.controller.LdapServers', {
     'ldap.LdapServerUserAndGroupLoginCredentials',
     'ldap.LdapServerUserAndGroupMappingTestResults',
     'ldap.LdapServerConnectionAdd',
-    'ldap.LdapServerUserAndGroupAdd',
-    'ldap.LdapSystemPasswordModal'
+    'ldap.LdapServerUserAndGroupAdd'
   ],
   refs: [
     { ref: 'main', selector: 'nx-main' },
@@ -93,8 +88,7 @@ Ext.define('NX.coreui.controller.LdapServers', {
         variants: ['x16', 'x32']
       },
       visible: function() {
-        return NX.Permissions.check('nexus:ldap:read') &&
-            !NX.State.getValue('nexus.react.ldap', false);
+        return NX.Permissions.check('nexus:ldap:read');
       }
     };
 
@@ -147,9 +141,6 @@ Ext.define('NX.coreui.controller.LdapServers', {
         'nx-coreui-ldapserver-connection button[action=verifyconnection]': {
           click: me.verifyConnection
         },
-        'nx-coreui-ldapserver-connection-fieldset button[action=setpassword]': {
-          click: me.updatePass
-        },
         'nx-coreui-ldapserver-userandgroup-add button[action=verifyusermapping]': {
           click: me.verifyUserMapping
         },
@@ -164,9 +155,6 @@ Ext.define('NX.coreui.controller.LdapServers', {
         },
         'nx-coreui-ldapserver-userandgroup-login-credentials button[action=verifylogin]': {
           click: me.verifyLogin
-        },
-        'nx-coreui-ldapserver-systempassword-modal button[action=ok]': {
-          click: me.ldapSystemPasswordCollected
         }
       }
     });
@@ -188,7 +176,6 @@ Ext.define('NX.coreui.controller.LdapServers', {
     if (Ext.isDefined(model)) {
       Ext.suspendLayouts();
 
-      me.connectionInfo = model.getData();
       me.getConnection().loadRecord(model);
       me.getUserAndGroup().loadRecord(model);
       me.getUserAndGroup().down('#template').setValue(null);
@@ -203,11 +190,9 @@ Ext.define('NX.coreui.controller.LdapServers', {
   showConnectionPanel: function() {
     var me = this;
 
-    me.connectionInfo = {};
-
     // Show the first panel in the create wizard, and set the breadcrumb
     me.setItemName(1, NX.I18n.get('LdapServers_CreateConnection_Title'));
-    me.loadCreateWizard(1, Ext.widget({
+    me.loadCreateWizard(1, true, Ext.widget({
       xtype: 'panel',
       layout: {
         type: 'vbox',
@@ -229,11 +214,9 @@ Ext.define('NX.coreui.controller.LdapServers', {
   showUserAndGroupPanel: function() {
     var me = this;
 
-    me.connectionInfo = me.getFeature().down('nx-coreui-ldapserver-connection-add').down('nx-coreui-ldapserver-connection-form').getForm().getValues();
-
     // Show the first panel in the create wizard, and set the breadcrumb
     me.setItemName(2, NX.I18n.get('LdapServers_CreateUsersAndGroups_Title'));
-    me.loadCreateWizard(2, Ext.widget({
+    me.loadCreateWizard(2, true, Ext.widget({
       xtype: 'panel',
       layout: {
         type: 'vbox',
@@ -258,60 +241,20 @@ Ext.define('NX.coreui.controller.LdapServers', {
 
   /**
    * @private
-   * Update an existing LDAP entry with new pass
-   */
-  updatePass: function() {
-    const me = this,
-        values = me.getValues();
-
-    //all options except anonymous (none) require a password, so throw up the dialog if not set in form
-    if (values.authScheme !== 'none') {
-      Ext.create('NX.coreui.view.ldap.LdapSystemPasswordModal', {
-        onSuccess: function(pass) {
-          me.doVerifyConnection(true, pass);
-        }
-      });
-    }
-    else {
-      this.doVerifyConnection(true);
-    }
-  },
-
-  /**
-   * @private
    * Update an existing LDAP entry
    */
   updateServer: function() {
-    const me = this,
-          values = me.getValues();
-
-    //all options except anonymous (none) require a password, so throw up the dialog if not set in form
-    if (values.authScheme !== 'none' && !values.authPassword) {
-      Ext.create('NX.coreui.view.ldap.LdapSystemPasswordModal', {
-        onSuccess: function(pass) {
-          me.doVerifyConnection(true, pass);
-        }
-      });
-    }
-    else {
-      this.doVerifyConnection(true);
-    }
-  },
-
-  doUpdateServer: function(ldapSystemPassword) {
-    const me = this,
-          feature = me.getFeature(),
-          connectionForm = feature.down('nx-coreui-ldapserver-connection').down('nx-coreui-ldapserver-connection-form'),
-          userGroupForm = feature.down('nx-coreui-ldapserver-userandgroup').down('nx-coreui-ldapserver-userandgroup-form'),
-          values = {};
+    var me = this,
+      feature = me.getFeature(),
+      connectionForm = feature.down('nx-coreui-ldapserver-connection').down('nx-coreui-ldapserver-connection-form'),
+      userGroupForm = feature.down('nx-coreui-ldapserver-userandgroup').down('nx-coreui-ldapserver-userandgroup-form'),
+      values = {};
 
     // Get fields from all relevant forms
     Ext.apply(values, connectionForm.getForm().getFieldValues());
     Ext.apply(values, userGroupForm.getForm().getFieldValues());
-    if (ldapSystemPassword) {
-      values.authPassword = ldapSystemPassword;
-    }
-    const modelData = connectionForm.getForm().getRecord().getData(false);
+
+    var modelData = connectionForm.getForm().getRecord().getData(false);
 
     Object.keys(values).forEach(function(field) {
       delete modelData[field];
@@ -324,8 +267,11 @@ Ext.define('NX.coreui.controller.LdapServers', {
       me.getContent().getEl().unmask();
       if (Ext.isObject(response)) {
         if (response.success) {
-          NX.Messages.success(NX.I18n.format('LdapServers_Update_Success',
-              me.getDescription(me.getLdapServerModel().create(response.data))));
+          NX.Messages.add({
+            text: NX.I18n.format('LdapServers_Update_Success',
+              me.getDescription(me.getLdapServerModel().create(response.data))),
+            type: 'success'
+          });
           me.getStore('LdapServer').load();
         }
       }
@@ -339,10 +285,12 @@ Ext.define('NX.coreui.controller.LdapServers', {
   createServer: function() {
     var me = this,
       feature = me.getFeature(),
+      connectionForm = feature.down('nx-coreui-ldapserver-connection-add').down('nx-coreui-ldapserver-connection-form'),
       userGroupForm = feature.down('nx-coreui-ldapserver-userandgroup-add').down('nx-coreui-ldapserver-userandgroup-form'),
-      values = me.connectionInfo;
+      values = {};
 
     // Get fields from all relevant forms
+    Ext.apply(values, connectionForm.getForm().getFieldValues());
     Ext.apply(values, userGroupForm.getForm().getFieldValues());
 
     me.getContent().getEl().mask(NX.I18n.get('LdapServers_Create_Mask'));
@@ -350,8 +298,11 @@ Ext.define('NX.coreui.controller.LdapServers', {
       me.getContent().getEl().unmask();
       if (Ext.isObject(response)) {
         if (response.success) {
-          NX.Messages.success(NX.I18n.format('LdapServers_Create_Success',
-              me.getDescription(me.getLdapServerModel().create(response.data))));
+          NX.Messages.add({
+            text: NX.I18n.format('LdapServers_Create_Success',
+              me.getDescription(me.getLdapServerModel().create(response.data))),
+            type: 'success'
+          });
           me.getStore('LdapServer').load();
         }
       }
@@ -366,12 +317,9 @@ Ext.define('NX.coreui.controller.LdapServers', {
     button.mon(
         NX.Conditions.isPermitted(this.permission + ':update'),
         {
-          satisfied: function() {
-            button.enable();
-          },
-          unsatisfied: function() {
-            button.disable();
-          }
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
         }
     );
   },
@@ -387,12 +335,9 @@ Ext.define('NX.coreui.controller.LdapServers', {
             NX.Conditions.storeHasRecords('LdapServer')
         ),
         {
-          satisfied: function () {
-            button.enable();
-          },
-          unsatisfied: function () {
-            button.disable();
-          }
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
         }
     );
   },
@@ -410,7 +355,7 @@ Ext.define('NX.coreui.controller.LdapServers', {
     NX.direct.ldap_LdapServer.remove(model.getId(), function(response) {
       me.getStore('LdapServer').load();
       if (Ext.isObject(response) && response.success) {
-        NX.Messages.success(NX.I18n.format('LdapServers_Delete_Success', description));
+        NX.Messages.add({ text: NX.I18n.format('LdapServers_Delete_Success', description), type: 'success' });
       }
     });
   },
@@ -427,7 +372,7 @@ Ext.define('NX.coreui.controller.LdapServers', {
     NX.direct.ldap_LdapServer.changeOrder(order, function(response) {
       if (Ext.isObject(response) && response.success) {
         win.close();
-        NX.Messages.success(NX.I18n.get('LdapServers_ChangeOrder_Success'));
+        NX.Messages.add({ text: NX.I18n.get('LdapServers_ChangeOrder_Success'), type: 'success' });
         me.getStore('LdapServer').load();
       }
     });
@@ -440,7 +385,7 @@ Ext.define('NX.coreui.controller.LdapServers', {
   clearCache: function(button) {
     NX.direct.ldap_LdapServer.clearCache(function(response) {
       if (Ext.isObject(response) && response.success) {
-        NX.Messages.success(NX.I18n.get('LdapServers_ClearCache_Success'));
+        NX.Messages.add({ text: NX.I18n.get('LdapServers_ClearCache_Success'), type: 'success' });
       }
     });
   },
@@ -450,36 +395,18 @@ Ext.define('NX.coreui.controller.LdapServers', {
    * Verify LDAP server connection.
    */
   verifyConnection: function(button) {
-    const me = this,
-        form = button.up('form'),
-        values = form.getForm().getFieldValues();
+    var form = button.up('form'),
+        values = form.getForm().getFieldValues(),
+        url = values.protocol + '://' + values.host + ':' + values.port;
 
-    //all options except anonymous (none) require a password, so throw up the dialog if not set in form
-    if (values.authScheme !== 'none' && !values.authPassword) {
-      Ext.create('NX.coreui.view.ldap.LdapSystemPasswordModal', {
-        onSuccess: function(pass) {
-          me.doVerifyConnection(false, pass);
-        }
-      });
-    }
-    else {
-      this.doVerifyConnection(false);
-    }
-  },
+    form.getEl().mask(NX.I18n.format('LdapServers_VerifyConnection_Mask', url));
 
-  /**
-   * @private
-   * Update the ldap system password in the form so it will be used in requests
-   */
-  ldapSystemPasswordCollected: function(button) {
-    const modal = button.up('nx-coreui-ldapserver-systempassword-modal'),
-        ldapSystemPassword = modal.down('nx-password').getValue();
-
-    modal.close();
-
-    if (modal.onSuccess) {
-      modal.onSuccess.call(this, ldapSystemPassword);
-    }
+    NX.direct.ldap_LdapServer.verifyConnection(values, function(response) {
+      form.getEl().unmask();
+      if (Ext.isObject(response) && response.success) {
+        NX.Messages.add({ text: NX.I18n.format('LdapServers_VerifyConnection_Success', url), type: 'success' });
+      }
+    });
   },
 
   /**
@@ -487,89 +414,26 @@ Ext.define('NX.coreui.controller.LdapServers', {
    * Verify LDAP user mapping.
    */
   verifyUserMapping: function() {
-    const me = this,
-        values = me.getValues();
-
-    //all options except anonymous (none) require a password, so throw up the dialog if not set in form
-    if (values.authScheme !== 'none' && !values.authPassword) {
-      Ext.create('NX.coreui.view.ldap.LdapSystemPasswordModal', {
-        onSuccess: me.doVerifyUserMapping
-      });
-    }
-    else {
-      me.doVerifyUserMapping();
-    }
-  },
-
-  doVerifyUserMapping: function(ldapSystemPassword) {
-    const me = this,
+    var me = this,
         values = me.getValues(),
         url = values.protocol + '://' + values.host + ':' + values.port;
-
-    if (ldapSystemPassword) {
-      values.authPassword = ldapSystemPassword;
-    }
 
     me.getMain().getEl().mask(NX.I18n.format('LdapServers_VerifyMapping_Mask', url));
 
     NX.direct.ldap_LdapServer.verifyUserMapping(values, function(response) {
       me.getMain().getEl().unmask();
       if (Ext.isObject(response) && response.success) {
-        NX.Messages.success(NX.I18n.format('LdapServers_VerifyMapping_Success', url));
+        NX.Messages.add({text: NX.I18n.format('LdapServers_VerifyMapping_Success', url), type: 'success'});
         Ext.widget('nx-coreui-ldapserver-userandgroup-testresults', {mappedUsers: response.data});
       }
     });
   },
 
-  doVerifyConnection: function(shouldUpdate, ldapSystemPassword) {
-    const me = this,
-          values = me.getValues(),
-          url = values.protocol + '://' + values.host + ':' + values.port;
-
-    if (ldapSystemPassword) {
-      values.authPassword = ldapSystemPassword;
-    }
-    me.getMain().getEl().mask(NX.I18n.format('LdapServers_VerifyConnection_Mask', url));
-
-    NX.direct.ldap_LdapServer.verifyConnection(values, function(response) {
-      me.getMain().getEl().unmask();
-      if (Ext.isObject(response) && response.success) {
-        NX.Messages.success(NX.I18n.format('LdapServers_VerifyConnection_Success', url));
-        if (shouldUpdate) {
-          me.doUpdateServer(values.authPassword);
-        }
-      }
-      else if (Ext.isObject(response) && Ext.isDefined(response.errors)) {
-        NX.Messages.error(response.errors['*']);
-      }
-    });
-  },
-
   /**
    * @private
    */
-  showLoginCredentialsWindow: function() {
-    const me = this,
-        values = me.getValues();
-
-    //all options except anonymous (none) require a password, so throw up the dialog if not set in form
-    if (values.authScheme !== 'none' && !values.authPassword) {
-      Ext.create('NX.coreui.view.ldap.LdapSystemPasswordModal', {
-        onSuccess: me.doShowLoginCredentialsWindow
-      });
-    }
-    else {
-      me.doShowLoginCredentialsWindow();
-    }
-  },
-
-  /**
-   * @private
-   */
-  doShowLoginCredentialsWindow: function(ldapSystemPassword) {
-    Ext.widget('nx-coreui-ldapserver-userandgroup-login-credentials', {
-      ldapSystemPassword: ldapSystemPassword
-    });
+  showLoginCredentialsWindow: function(button) {
+    Ext.widget('nx-coreui-ldapserver-userandgroup-login-credentials');
   },
 
   /**
@@ -579,16 +443,11 @@ Ext.define('NX.coreui.controller.LdapServers', {
   verifyLogin: function(button) {
     var win = button.up('window'),
         form = button.up('form'),
-        cmp = button.up('nx-coreui-ldapserver-userandgroup-login-credentials'),
         loginValues = form.getForm().getFieldValues(),
         userName = NX.util.Base64.encode(loginValues.username),
         userPass = NX.util.Base64.encode(loginValues.password),
         values = this.getValues(),
         url = values.protocol + '://' + values.host + ':' + values.port;
-
-    if (cmp.ldapSystemPassword) {
-      values.authPassword = cmp.ldapSystemPassword;
-    }
 
     form.getEl().mask(NX.I18n.format('LdapServers_VerifyLogin_Mask', url));
 
@@ -596,7 +455,7 @@ Ext.define('NX.coreui.controller.LdapServers', {
       form.getEl().unmask();
       if (Ext.isObject(response) && response.success) {
         win.close();
-        NX.Messages.success(NX.I18n.format('LdapServers_VerifyLogin_Success', url));
+        NX.Messages.add({ text: NX.I18n.format('LdapServers_VerifyLogin_Success', url), type: 'success' });
       }
     });
   },
@@ -607,8 +466,7 @@ Ext.define('NX.coreui.controller.LdapServers', {
    */
   getValues: function() {
     var feature = this.getFeature(),
-        values = this.connectionInfo,
-        url, connectionForm, userGroupForm;
+        values = {}, url, connectionForm, userGroupForm;
 
     if (feature.down('nx-coreui-ldapserver-connection-add')) {
       connectionForm = feature.down('nx-coreui-ldapserver-connection-add').down('nx-coreui-ldapserver-connection-form');

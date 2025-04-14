@@ -20,8 +20,7 @@ import com.google.inject.Key;
 /**
  * Helper to lookup components in global context.
  *
- * In a few places, components need to be looked up by class-name and need to use the uber class-loader to resolve
- * classes.
+ * In a few places, components need to be looked up by class-name and need to use the uber class-loader to resolve classes.
  * This helper contains this logic in one place for re-use.
  *
  * @since 3.0
@@ -60,7 +59,7 @@ public interface GlobalComponentLookupHelper
    */
   Object lookup(Key key);
 
-  /**
+ /**
    * Lookup a type by class-name.
    *
    * @return Type reference, or {@code null} if the type was not found.

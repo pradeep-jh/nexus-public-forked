@@ -24,5 +24,5 @@ public interface SystemInformationGenerator
   /**
    * Generates a tree-structured report of critical system information details.
    */
-  Map<String, Object> report();
+  Map report();
 }

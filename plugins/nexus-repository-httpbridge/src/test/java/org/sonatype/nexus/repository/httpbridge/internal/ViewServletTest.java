@@ -31,7 +31,6 @@ import org.sonatype.nexus.repository.view.Request;
 import org.sonatype.nexus.repository.view.Response;
 import org.sonatype.nexus.repository.view.ViewFacet;
 
-import com.google.common.net.HttpHeaders;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -39,8 +38,8 @@ import org.mockito.Mock;
 
 import static javax.servlet.http.HttpServletResponse.SC_BAD_REQUEST;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -90,7 +89,7 @@ public class ViewServletTest
     underTest = spy(new ViewServlet(mock(RepositoryManager.class),
         new HttpResponseSenderSelector(Collections.<String, HttpResponseSender>emptyMap(), defaultResponseSender),
         mock(DescriptionHelper.class),
-        descriptionRenderer, true
+        descriptionRenderer
     ));
 
     when(request.getPath()).thenReturn("/test");
@@ -98,7 +97,7 @@ public class ViewServletTest
     parameters = new Parameters();
     when(request.getParameters()).thenReturn(parameters);
 
-    BaseUrlHolder.set("http://placebo", "");
+    BaseUrlHolder.set("http://placebo");
   }
 
   private void descriptionRequested(final String describe) {
@@ -176,22 +175,7 @@ public class ViewServletTest
     String message = "message";
     when(httpServletRequest.getPathInfo()).thenThrow(new BadRequestException(message));
     underTest.service(httpServletRequest, servletResponse);
-    verify(servletResponse).setStatus(SC_BAD_REQUEST, message);
-  }
-
-  @Test
-  public void responseHasContentSecurityPolicy() throws Exception {
-    underTest.service(httpServletRequest, servletResponse);
-
-    verify(servletResponse).setHeader(HttpHeaders.CONTENT_SECURITY_POLICY,
-        "sandbox allow-forms allow-modals allow-popups allow-presentation allow-scripts allow-top-navigation");
-  }
-
-  @Test
-  public void responseHasXssProtection() throws Exception {
-    underTest.service(httpServletRequest, servletResponse);
-
-    verify(servletResponse).setHeader(HttpHeaders.X_XSS_PROTECTION, "1; mode=block");
+    verify(servletResponse).sendError(SC_BAD_REQUEST, message);
   }
 
   private void facetThrowsException(final boolean facetThrowsException) throws Exception {

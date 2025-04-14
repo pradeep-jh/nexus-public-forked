@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -38,8 +34,7 @@ Ext.define('NX.coreui.view.formfield.factory.FormfieldItemselectFactory', {
   /**
    * Create control.
    */
-  create: function (formField, disableSort) {
-    const me = this;
+  create: function (formField) {
     var filters,
         attributes = formField['attributes'] || {},
         idMapping = formField['idMapping'] || 'id',
@@ -51,7 +46,6 @@ Ext.define('NX.coreui.view.formfield.factory.FormfieldItemselectFactory', {
           name: formField.id,
           valueField: idMapping,
           displayField: nameMapping,
-          width:600,
 
           itemCls: formField.required ? 'required-field' : '',
           allowBlank: !formField.required,
@@ -80,27 +74,6 @@ Ext.define('NX.coreui.view.formfield.factory.FormfieldItemselectFactory', {
     if (attributes['toTitle']) {
       itemConfig.toTitle = attributes['toTitle'];
     }
-    if (attributes['valueAsString']) {
-      itemConfig.valueAsString = attributes['valueAsString'];
-    }
-    if (attributes['selectionPlaceholderText']) {
-      const placeholder = {};
-
-      placeholder[idMapping] = attributes['selectionPlaceholderText'];
-      placeholder[nameMapping] = attributes['selectionPlaceholderText'];
-      itemConfig.selectionPlaceholder = placeholder;
-      itemConfig.listeners = {
-        afterrender: function (itemSelector) {
-          const settings = itemSelector.up('nx-coreui-formfield-settingsfieldset');
-
-          itemSelector.on('change', me.selectionPlaceholderUpdater);
-          if(settings) {
-            settings.on('propertiesimported', function() { me.selectionPlaceholderUpdater(itemSelector) });
-          }
-          me.selectionPlaceholderUpdater(itemSelector);
-        }
-      };
-    }
 
     if (formField['storeApi']) {
       if (formField['storeFilters']) {
@@ -110,7 +83,7 @@ Ext.define('NX.coreui.view.formfield.factory.FormfieldItemselectFactory', {
         });
       }
 
-      var args = {
+      itemConfig.store = Ext.create('Ext.data.Store', {
         proxy: {
           type: 'direct',
           api: {
@@ -118,7 +91,7 @@ Ext.define('NX.coreui.view.formfield.factory.FormfieldItemselectFactory', {
           },
           reader: {
             type: 'json',
-            rootProperty: 'data',
+            root: 'data',
             idProperty: idMapping,
             successProperty: 'success'
           }
@@ -134,40 +107,10 @@ Ext.define('NX.coreui.view.formfield.factory.FormfieldItemselectFactory', {
         sorters: { property: nameMapping, direction: 'ASC' },
         remoteFilter: true,
         autoLoad: true
-      };
-
-      if (disableSort) {
-        delete args.sortOnLoad;
-        delete args.sorters;
-      }
-      itemConfig.store = Ext.create('Ext.data.Store', args);
+      });
     }
 
     return Ext.create('NX.ext.form.field.ItemSelector', itemConfig);
-  },
-
-  selectionPlaceholderUpdater: function (itemSelector) {
-    const placeholderRecord = itemSelector.selectionPlaceholder;
-
-    if(placeholderRecord) {
-      const toField = itemSelector.toField, store = toField.getStore(), valueField = itemSelector.valueField;
-      const selectedValues = Ext.Array.filter(itemSelector.getValue().split(','), function(selection) {
-        return selection !== "" && selection !== placeholderRecord[valueField];
-      });
-      if (selectedValues.length === 0) {
-        if (!store.findRecord(valueField, placeholderRecord[valueField])) {
-          store.add(placeholderRecord);
-          toField.setStore(store);
-        }
-      }
-      else {
-        const placeholder = store.findRecord(valueField, placeholderRecord[valueField]);
-        if (placeholder) {
-          store.remove(placeholder);
-          toField.setStore(store);
-        }
-      }
-    }
   }
 
 });

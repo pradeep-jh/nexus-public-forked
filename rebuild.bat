@@ -11,48 +11,14 @@
 @REM Eclipse Foundation. All other trademarks are the property of their respective owners.
 @REM
 
-@REM keep track of what folder we're currently in so we can return there later
-set here=%cd%
+call mvn clean install -Dmaven.test.skip=true -T 4
 
-@REM Backup nexus.properties
-copy private\assemblies\distributions\nexus-pro\target\sonatype-work\nexus3\etc\nexus.properties .
-copy private\assemblies\distributions\nexus-pro\target\sonatype-work\nexus3\etc\fabric\nexus-store.properties .
-
-@REM Detect docker
-if not defined DOCKER_HOST (set docker="-Dno-docker=true")
-
-@REM allow user to specify custom thread count on the command line
-@REM The maven build defaults to using `npm ci`, force it to use `npm install` which is faster on dev machines
-if "%~1"=="-T" goto :customThreads
-
-call mvnw clean install -Dclm.skip=true -DskipTests -Dnpm.build=build -T 1C %docker%
-goto :continue
-
-:customThreads
-call mvnw clean install -Dclm.skip=true -DskipTests -Dnpm.build=build -T %~2 %docker%
-
-:continue
-@REM Exit if maven did not build successfully
-IF %ERRORLEVEL% NEQ 0 (
-   EXIT /B %ERRORLEVEL%
-)
-
-call mvnw dependency:properties process-test-resources -Dit -pl :functional-testsuite,:nexuspro-modern-testsuite,:nexuspro-sql-fabric-testsuite
-
-@REM Enable Debug mode
 set KARAF_DEBUG=true
 
-@REM Set NEXUS_RESOURCE_DIRS for UI development
+REM Set NEXUS_RESOURCE_DIRS for UI development
 for /f "usebackq tokens=*" %%a in (`powershell "(Get-ChildItem -Recurse |  Where-Object { $_.FullName -match '((src\\main\\resources\\static)|(src\\test\\ft-resources))$' } | ForEach-Object { $_.parent.FullName }) -join ','"`) do set NEXUS_RESOURCE_DIRS=%%a
 
-@REM Restore nexus.properties
-mkdir private\assemblies\distributions\nexus-pro\target\sonatype-work\nexus3\etc\
-move nexus.properties private\assemblies\distributions\nexus-pro\target\sonatype-work\nexus3\etc\nexus.properties
-
-mkdir private\assemblies\distributions\nexus-pro\target\sonatype-work\nexus3\etc\fabric
-move nexus-store.properties private\assemblies\distributions\nexus-pro\target\sonatype-work\nexus3\etc\fabric\nexus-store.properties
-
-cd private\assemblies\distributions\nexus-pro\target
+cd private\assemblies\nexus-pro\target
 
 @REM Prefer 7-zip if present for perf
 if exist "C:\Program Files\7-Zip\7z.exe" (
@@ -63,7 +29,5 @@ if exist "C:\Program Files\7-Zip\7z.exe" (
 )
 
 cd nexus*\bin
-set JAVA_DEBUG_PORT=5005
-nexus /run
 
-cd %here%
+nexus /run

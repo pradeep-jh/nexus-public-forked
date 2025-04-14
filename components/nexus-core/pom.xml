@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus</groupId>
     <artifactId>nexus-components</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-core</artifactId>
@@ -41,26 +41,8 @@
     </dependency>
 
     <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
+      <groupId>com.codahale.metrics</groupId>
       <artifactId>metrics-servlets</artifactId>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
-      <artifactId>metrics-annotation</artifactId>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>io.prometheus</groupId>
-      <artifactId>simpleclient_dropwizard</artifactId>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>io.prometheus</groupId>
-      <artifactId>simpleclient_servlet</artifactId>
       <scope>provided</scope>
     </dependency>
 
@@ -71,31 +53,7 @@
 
     <dependency>
       <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-datastore-mybatis</artifactId>
-      <optional>true</optional>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-upgrade</artifactId>
-      <optional>true</optional>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
       <artifactId>nexus-supportzip-api</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-capability</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-commands</artifactId>
     </dependency>
 
     <dependency>
@@ -105,22 +63,12 @@
 
     <dependency>
       <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-base</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-repository-services</artifactId>
+      <artifactId>nexus-repository</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.sonatype.nexus</groupId>
       <artifactId>nexus-script</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-selector</artifactId>
     </dependency>
 
     <dependency>
@@ -140,12 +88,6 @@
     </dependency>
 
     <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-test-db</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>jul-to-slf4j</artifactId>
       <scope>test</scope>
@@ -156,12 +98,6 @@
       <artifactId>spock-core</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.spockframework</groupId>
-      <artifactId>spock-junit4</artifactId>
-      <scope>test</scope>
-    </dependency>
-
 
     <dependency>
       <groupId>cglib</groupId>
@@ -178,12 +114,6 @@
     <dependency>
       <groupId>org.xmlunit</groupId>
       <artifactId>xmlunit-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.assertj</groupId>
-      <artifactId>assertj-db</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

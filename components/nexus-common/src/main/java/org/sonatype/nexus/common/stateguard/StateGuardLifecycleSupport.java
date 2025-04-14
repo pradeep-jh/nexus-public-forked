@@ -47,8 +47,6 @@ public class StateGuardLifecycleSupport
     public static final String STOPPED = "STOPPED";
 
     public static final String FAILED = "FAILED";
-
-    public static final String SHUTDOWN = "SHUTDOWN";
   }
 
   protected final StateGuard states = new StateGuard.Builder()
@@ -64,7 +62,7 @@ public class StateGuardLifecycleSupport
   }
 
   @Override
-  @Transitions(from = {NEW, STOPPED, FAILED}, to = STARTED)
+  @Transitions(from = {NEW, STOPPED}, to = STARTED)
   public void start() throws Exception {
     doStart();
   }
@@ -76,7 +74,7 @@ public class StateGuardLifecycleSupport
   /**
    * @since 3.2.1
    */
-  public boolean isStarted() {
+  protected boolean isStarted() {
     return getStateGuard().is(STARTED);
   }
 

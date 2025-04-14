@@ -16,8 +16,8 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
-import org.sonatype.nexus.common.upgrade.AvailabilityVersion;
 import org.sonatype.nexus.formfields.ComboboxFormField;
+import org.sonatype.nexus.scheduling.TaskConfiguration;
 import org.sonatype.nexus.scheduling.TaskDescriptorSupport;
 
 import static org.sonatype.nexus.formfields.FormField.MANDATORY;
@@ -27,7 +27,6 @@ import static org.sonatype.nexus.formfields.FormField.MANDATORY;
  *
  * @since 3.0
  */
-@AvailabilityVersion(from = "1.0")
 @Named
 @Singleton
 public class CompactBlobStoreTaskDescriptor
@@ -41,7 +40,7 @@ public class CompactBlobStoreTaskDescriptor
   public CompactBlobStoreTaskDescriptor() {
     super(TYPE_ID,
         CompactBlobStoreTask.class,
-        "Admin - Compact blob store",
+        "Compact blob store",
         VISIBLE,
         EXPOSED,
         new ComboboxFormField<String>(
@@ -51,5 +50,10 @@ public class CompactBlobStoreTaskDescriptor
             MANDATORY
         ).withStoreApi("coreui_Blobstore.read").withIdMapping("name")
     );
+  }
+
+  @Override
+  public void initializeConfiguration(final TaskConfiguration configuration) {
+    configuration.setBoolean(MULTINODE_KEY, true);
   }
 }

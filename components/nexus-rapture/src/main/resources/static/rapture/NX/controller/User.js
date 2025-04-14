@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -28,10 +24,7 @@ Ext.define('NX.controller.User', {
     'NX.Messages',
     'NX.State',
     'NX.I18n',
-    'NX.view.header.Mode',
-    'NX.util.Window',
-    'Ext.Deferred',
-    'Ext.Array'
+    'NX.view.header.Mode'
   ],
 
   views: [
@@ -89,10 +82,10 @@ Ext.define('NX.controller.User', {
           afterrender: me.manageButtons
         },
         'nx-header-signin': {
-          click: me.askToAuthenticate
+          click: me.showSignInWindow
         },
         'nx-expire-session button[action=signin]': {
-          click: me.askToAuthenticate
+          click: me.showSignInWindow
         },
         'nx-header-signout': {
           click: me.onClickSignOut
@@ -105,6 +98,30 @@ Ext.define('NX.controller.User', {
         }
       }
     });
+
+    me.addEvents(
+        /**
+         * Fires when a user had been successfully signed-in.
+         *
+         * @event signin
+         * @param {Object} user
+         */
+        'signin',
+
+        /**
+         * Fires before a user is signed out.
+         *
+         * @event beforesignout
+         */
+        'beforesignout',
+
+        /**
+         * Fires when a user had been successfully signed-out.
+         *
+         * @event signout
+         */
+        'signout'
+    );
   },
 
   /**
@@ -114,22 +131,12 @@ Ext.define('NX.controller.User', {
     var me = this;
 
     if (user && !oldUser) {
-      NX.Messages.info(NX.I18n.format('User_SignedIn_Message', user.id));
+      NX.Messages.add({text: NX.I18n.format('User_SignedIn_Message', user.id), type: 'default'});
       me.fireEvent('signin', user);
-      if (typeof window.initializeTelemetry == 'function') {
-        window.initializeTelemetry();
-      }
     }
     else if (!user && oldUser) {
-      NX.Messages.info(NX.I18n.get('User_SignedOut_Message'));
+      NX.Messages.add({text: NX.I18n.get('User_SignedOut_Message'), type: 'default'});
       me.fireEvent('signout');
-      if (typeof window.initializeTelemetry == 'function') {
-        window.initializeTelemetry();
-      }
-    }
-
-    if (!user) {
-      NX.util.Window.closeWindows();
     }
 
     me.manageButtons();
@@ -146,114 +153,36 @@ Ext.define('NX.controller.User', {
   },
 
   /**
-   * Requests authentication of the user with the {@code authRequest} event. If no listeners are registered or none
-   * perform authentication {@code showSignInWindow} will be called.
+   * Shows sign-in or authentication window based on the fact that we have an user or not.
    *
-   * The {@code authRequest} event is sent with an array argument; listeners are expected to push a
-   * {@code Ext.Deferred} that is resolved when the listener has completed its attempt at authentication; the deferred
-   * objects are expected to resolve with the authenticated user object if they handled authentication, or null
-   * otherwise. If any handlers fails via {@code Ext.Deferred.reject} the default path of showing the sign-in window
-   * will occur.
-   *
-   * If no user is found after all listeners deferred operations are complete the sign in window will be shown.
-   *
-   * @param message
-   * @param options
+   * @public
+   * @param {String} [message] Message to be shown in authentication window
+   * @param {Object} [options] TODO
    */
   askToAuthenticate: function (message, options) {
-    var me = this,
-        authedUser = null,
-        currentUser = NX.State.getUser(),
-        handlers = [];
+    var me = this;
 
-    me.fireEvent('authRequest', handlers);
-
-    Ext.Deferred.all(handlers).then(function(authedUsers) {
-      if (Ext.isArray(authedUsers)) {
-        // take the first authenticated user
-        authedUser = Ext.Array.findBy(authedUsers, function(item) {
-          return Ext.isObject(item);
-        });
-      }
-    }, function() {
-      // one of the handlers finished via reject; assume new sign-in
-      currentUser = null;
-      authedUser = null;
-    }).always(function() {
-      function showSignInWindow() {
-        me.showSignInWindow(options);
-      }
-
-      if (authedUser) {
-        NX.State.setUser(authedUser);
-      }
-      else if (currentUser) {
-        if (me.fireEvent('beforereauthenticate') !== false) {
-          me.showAuthenticateWindow(
-              message,
-              Ext.apply(options || {}, {authenticateAction: me.authenticate}),
-              currentUser
-          );
-        }
-      }
-      else {
-        if (me.fireEvent('beforeauthenticate', showSignInWindow) !== false) {
-          showSignInWindow();
-        }
-      }
-    });
+    if (me.hasUser()) {
+      me.showAuthenticateWindow(message, Ext.apply(options || {}, {authenticateAction: me.authenticate}));
+    }
+    else {
+      me.showSignInWindow(options);
+    }
   },
 
   /**
-   * Begins the process of retrieving an authentication token that will be used for a subsequent action. The auth token
-   * is requested thru the {@code authTokenRequest} event; if no listeners provide a token the user will be prompted
-   * for their credentials in order to obtain one.
-   *
-   * The {@code authTokenRequest} event is sent with an array argument and string argument:
-   *    - array: listeners are expected to push a {@code Ext.Deferred} that is resolved with a token or null once
-   *        completed. If a listener fails via {@code Ext.Deferred.reject} this will be treated as cancelling the
-   *        action.
-   *    - string: the message that would be shown in the authentication window
+   * Shows authentication window in order to retrieve an authentication token.
    *
    * @public
    * @param {String} [message] Message to be shown in authentication window
    * @param {Object} [options] TODO
    */
   doWithAuthenticationToken: function (message, options) {
-    var me = this,
-        token = null,
-        handlers = [];
+    var me = this;
 
-    me.fireEvent('authTokenRequest', handlers, message);
-
-    Ext.Deferred.all(handlers).then(function(tokens) {
-      if (Ext.isArray(tokens)) {
-        // take the first defined token
-        token = Ext.Array.findBy(tokens, function(item) {
-          return !!item;
-        });
-      }
-    }, function() {
-      token = 'cancel';
-    }).always(function() {
-      if (token !== 'cancel') {
-        if (!token) {
-          options = Ext.apply(options || {}, {authenticateAction: me.retrieveAuthenticationToken});
-
-          me.showAuthenticateWindow(message, options);
-        }
-        else {
-          if (Ext.isFunction(options.success)) {
-            options.success.call(options.scope, token, options);
-          }
-        }
-      }
-      else {
-        if (Ext.isFunction(options.failure)) {
-          options.failure.call(options.failure, options);
-        }
-      }
-    });
+    me.showAuthenticateWindow(message,
+        Ext.apply(options || {}, {authenticateAction: me.retrieveAuthenticationToken})
+    );
   },
 
   /**
@@ -276,22 +205,17 @@ Ext.define('NX.controller.User', {
    * @private
    * @param {String} [message] Message to be shown in authentication window
    * @param {Object} [options] TODO
-   * @param {Object} [user] Optional user object that represents the current user
    */
-  showAuthenticateWindow: function (message, options, user) {
+  showAuthenticateWindow: function (message, options) {
     var me = this,
-        username = user ? user.id : (NX.State.getUser().id || null),
+        user = NX.State.getUser(),
         win;
 
     if (!me.getAuthenticate()) {
       win = me.getAuthenticateView().create({message: message, options: options});
-      if (username) {
-        win.down('form').getForm().setValues({username: username});
+      if (me.hasUser()) {
+        win.down('form').getForm().setValues({username: user.id});
         win.down('#password').focus();
-      }
-    } else {
-      if (Ext.isFunction(options.failure)) {
-        options.failure.call(options.failure, options);
       }
     }
   },
@@ -361,7 +285,10 @@ Ext.define('NX.controller.User', {
           message = NX.I18n.get('User_ConnectFailure_Message');
         }
         win.getEl().unmask();
-        NX.Messages.warning(message);
+        NX.Messages.add({
+          text: message,
+          type: 'warning'
+        });
       }
     });
   },
@@ -460,8 +387,8 @@ Ext.define('NX.controller.User', {
       if (user) {
         signInButton.hide();
         userMode.show();
-        userMode.getViewModel().set('text', user.id);
-        userMode.getViewModel().set('tooltip', NX.I18n.format('User_Tooltip', user.id));
+        userMode.setText(user.id);
+        userMode.setTooltip(NX.I18n.format('User_Tooltip', user.id));
         signOutButton.show();
       }
       else {

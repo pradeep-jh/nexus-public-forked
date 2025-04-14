@@ -24,6 +24,7 @@ import org.sonatype.nexus.security.internal.AuthenticatingRealmImpl;
 import org.sonatype.nexus.security.internal.AuthorizingRealmImpl;
 import org.sonatype.nexus.security.internal.SecurityConfigurationManagerImpl;
 import org.sonatype.nexus.security.privilege.WildcardPrivilegeDescriptor;
+import org.sonatype.nexus.security.realm.RealmConfiguration;
 import org.sonatype.nexus.security.realm.RealmManager;
 import org.sonatype.nexus.security.user.User;
 import org.sonatype.nexus.security.user.UserSearchCriteria;
@@ -34,9 +35,6 @@ import org.apache.shiro.authc.UsernamePasswordToken;
 import org.apache.shiro.subject.Subject;
 import org.junit.Assert;
 import org.junit.Test;
-
-import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.MatcherAssert.assertThat;
 
 /**
  * Tests adding, updating, searching, authc, and authz a user that has an empty role (a role that does not contain any
@@ -54,18 +52,18 @@ public class EmptyRoleTest
     Role emptyRole = this.buildEmptyRole();
 
     // this should work fine
-    assertThat(authManager.addRole(emptyRole), notNullValue());
+    authManager.addRole(emptyRole);
 
     // now create a user and add it to the user
     User user = this.buildTestUser();
     user.setRoles(Collections.singleton(new RoleIdentifier(emptyRole.getSource(), emptyRole.getRoleId())));
 
     // create the user, this user only has an empty role
-    assertThat(securitySystem.addUser(user, "test123"), notNullValue());
+    securitySystem.addUser(user, "test123");
 
     Set<RoleIdentifier> emptyRoleSet = Collections.emptySet();
     user.setRoles(emptyRoleSet);
-    assertThat(securitySystem.updateUser(user), notNullValue());
+    securitySystem.updateUser(user);
 
     // delete the empty role
     authManager.deleteRole(emptyRole.getRoleId());
@@ -94,7 +92,9 @@ public class EmptyRoleTest
     SecuritySystem securitySystem = this.lookup(SecuritySystem.class);
 
     RealmManager realmManager = lookup(RealmManager.class);
-    realmManager.setConfiguredRealmIds(ImmutableList.of(AuthenticatingRealmImpl.NAME, AuthorizingRealmImpl.NAME));
+    RealmConfiguration realmConfiguration = new RealmConfiguration();
+    realmConfiguration.setRealmNames(ImmutableList.of(AuthenticatingRealmImpl.NAME, AuthorizingRealmImpl.NAME));
+    realmManager.setConfiguration(realmConfiguration);
 
     AuthorizationManager authManager = securitySystem.getAuthorizationManager("default");
 

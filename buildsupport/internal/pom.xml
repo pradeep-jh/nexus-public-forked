@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus.buildsupport</groupId>
     <artifactId>nexus-buildsupport</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-buildsupport-internal</artifactId>
@@ -28,10 +28,10 @@
   <packaging>pom</packaging>
 
   <properties>
-    <sonatype-licensing.version>1.6.0</sonatype-licensing.version>
-    <clm.dto.model.version>1.58.21-01</clm.dto.model.version>
-    <insight-brain.version>1.170.0-01</insight-brain.version>
-    <insight-scanner.version>2.36.66-01</insight-scanner.version>
+    <sonatype-licensing.version>1.4.3</sonatype-licensing.version>
+    <clm.dto.model.version>1.7.1-01</clm.dto.model.version>
+    <insight-brain.version>1.35.0-02</insight-brain.version>
+    <insight-scanner.version>2.8.0-01</insight-scanner.version>
   </properties>
 
   <dependencyManagement>
@@ -60,10 +60,6 @@
             <groupId>xpp3</groupId>
             <artifactId>xpp3_min</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>com.thoughtworks.xstream</groupId>
-            <artifactId>xstream</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
 
@@ -77,12 +73,6 @@
         <groupId>com.sonatype.licensing</groupId>
         <artifactId>license-extension</artifactId>
         <version>${sonatype-licensing.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>com.thoughtworks.xstream</groupId>
-            <artifactId>xstream</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
 
       <!-- CLM/insight -->
@@ -97,18 +87,6 @@
         <groupId>com.sonatype.insight.scan</groupId>
         <artifactId>insight-scanner-archive</artifactId>
         <version>${insight-scanner.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>com.sonatype.insight.scan</groupId>
-            <artifactId>insight-scanner-tools</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-
-      <dependency>
-        <groupId>org.json</groupId>
-        <artifactId>json</artifactId>
-        <version>20231013</version>
       </dependency>
 
       <dependency>
@@ -130,20 +108,84 @@
       </dependency>
 
       <dependency>
+        <groupId>com.sonatype.insight.scan</groupId>
+        <artifactId>insight-test-reverse-proxy</artifactId>
+        <version>${insight-scanner.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.sonatype.insight.brain</groupId>
+        <artifactId>hds-mock-server</artifactId>
+        <version>${insight-brain.version}</version>
+      </dependency>
+
+      <dependency>
         <groupId>com.sonatype.insight.brain</groupId>
         <artifactId>insight-rm-common</artifactId>
         <version>${insight-brain.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.sonatype.insight.brain</groupId>
+        <artifactId>insight-brain-data</artifactId>
+        <version>${insight-brain.version}</version>
+        <classifier>tests</classifier>
         <exclusions>
           <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.sonatype.clm</groupId>
-            <artifactId>com.sonatype.clm.dto.model</artifactId>
+            <groupId>*</groupId>
+            <artifactId>*</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
+
+      <dependency>
+        <groupId>com.sonatype.insight.brain</groupId>
+        <artifactId>insight-brain-service</artifactId>
+        <version>${insight-brain.version}</version>
+        <exclusions>
+          <!--
+          Banned dependencies are excluded at the nexus-iq-testsupport module!
+          -->
+          <exclusion>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.sonatype.licensing</groupId>
+            <artifactId>license-bundle</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+
+      <dependency>
+        <groupId>com.sonatype.insight.brain</groupId>
+        <artifactId>insight-brain-service</artifactId>
+        <version>${insight-brain.version}</version>
+        <classifier>tests</classifier>
+        <exclusions>
+          <exclusion>
+            <groupId>*</groupId>
+            <artifactId>*</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+
+      <!-- analytics -->
+
+      <dependency>
+        <groupId>com.sonatype.analytics</groupId>
+        <artifactId>analytics-client</artifactId>
+        <version>1.1.0</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.sonatype.analytics</groupId>
+        <artifactId>analytics-assembly</artifactId>
+        <classifier>bundle</classifier>
+        <type>zip</type>
+        <version>1.1.0</version>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
 

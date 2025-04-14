@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.TreeSet;
 
 import javax.annotation.Nullable;
@@ -175,7 +174,7 @@ public class MetadataBuilder
         }));
   }
 
-  public void addBaseVersion(final String baseVersion) {
+  private void addBaseVersion(final String baseVersion) {
     checkNotNull(baseVersion);
     try {
       if (baseVersions.add(versionScheme.parseVersion(baseVersion))) {
@@ -225,18 +224,10 @@ public class MetadataBuilder
   public Maven2Metadata onExitBaseVersion() {
     checkState(baseVersion != null);
     log.debug("<- GAbV: {}:{}:{}", groupId, artifactId, baseVersion);
-    if (!baseVersion.endsWith(Constants.SNAPSHOT_VERSION_SUFFIX)) {
+    if (!baseVersion.endsWith(Constants.SNAPSHOT_VERSION_SUFFIX) || latestVersionCoordinates == null) {
       // release version does not have version-level metadata
       log.debug("Not a snapshot or nothing to generate: {}:{}:{}", groupId, artifactId, baseVersion);
       return null;
-    }
-    //this would be the case where unique timestamp snapshots are disabled
-    else if (latestVersionCoordinates == null) {
-      return Maven2Metadata.newNonUniqueVersionLevel(
-          groupId,
-          artifactId,
-          baseVersion
-      );
     }
     final List<Snapshot> snapshots = new ArrayList<>();
     for (VersionCoordinates versionCoordinates : latestVersionCoordinatesMap.values()) {
@@ -249,63 +240,48 @@ public class MetadataBuilder
       );
       snapshots.add(snapshotVersion);
     }
-
-    Optional<Long> timestamp = Optional.ofNullable(latestVersionCoordinates.coordinates.getTimestamp());
-    Optional<Integer> buildNumber = Optional.ofNullable(latestVersionCoordinates.coordinates.getBuildNumber());
-
-    if (!timestamp.isPresent()) {
-      log.warn("Unique timestamp snapshot {}:{}:{} is missing the timestamp and cannot be processed, " +
-              "consider removing it manually.", groupId, artifactId, baseVersion);
-      log.warn("Missing timestamps might be caused by an invalid version," +
-              " check the timestamp in the version {}.", latestVersionCoordinates.version);
-      return null;
-    }
-
     return Maven2Metadata.newVersionLevel(
         DateTime.now(),
         groupId,
         artifactId,
         baseVersion,
-        timestamp.get(),
-        buildNumber.orElse(0),
+        latestVersionCoordinates.coordinates.getTimestamp(),
+        latestVersionCoordinates.coordinates.getBuildNumber(),
         snapshots
     );
   }
 
   public void addArtifactVersion(final MavenPath mavenPath) {
     checkNotNull(mavenPath);
-    Coordinates coordinates = mavenPath.getCoordinates();
-    if (mavenPath.isSubordinate() || coordinates == null) {
+    if (mavenPath.isSubordinate() || mavenPath.getCoordinates() == null) {
       return;
     }
-
-    String path = mavenPath.getPath();
-    checkState(Objects.equals(groupId, coordinates.getGroupId()), "GroupId:%s Path:%s", groupId, path);
-    checkState(Objects.equals(artifactId, coordinates.getArtifactId()), "ArtifactId:%s Path:%s", artifactId, path);
-    checkState(Objects.equals(baseVersion, coordinates.getBaseVersion()), "Version:%s Path:%s", baseVersion, path);
+    checkState(Objects.equals(groupId, mavenPath.getCoordinates().getGroupId()));
+    checkState(Objects.equals(artifactId, mavenPath.getCoordinates().getArtifactId()));
+    checkState(Objects.equals(baseVersion, mavenPath.getCoordinates().getBaseVersion()));
 
     log.debug("Discovered {}:{}:{}:{}:{}",
-        coordinates.getGroupId(),
-        coordinates.getArtifactId(),
-        coordinates.getVersion(),
-        coordinates.getClassifier(),
-        coordinates.getExtension());
+        mavenPath.getCoordinates().getGroupId(),
+        mavenPath.getCoordinates().getArtifactId(),
+        mavenPath.getCoordinates().getVersion(),
+        mavenPath.getCoordinates().getClassifier(),
+        mavenPath.getCoordinates().getExtension());
 
-    addBaseVersion(coordinates.getBaseVersion());
+    addBaseVersion(mavenPath.getCoordinates().getBaseVersion());
 
-    if (!coordinates.isSnapshot()) {
+    if (!mavenPath.getCoordinates().isSnapshot()) {
       return;
     }
-    if (Objects.equals(coordinates.getBaseVersion(), coordinates.getVersion())) {
-      log.debug("Non-timestamped snapshot, ignoring it: {}", mavenPath);
+    if (Objects.equals(mavenPath.getCoordinates().getBaseVersion(), mavenPath.getCoordinates().getVersion())) {
+      log.warn("Non-timestamped snapshot, ignoring it: {}", mavenPath);
       return;
     }
 
-    final Version version = parseVersion(coordinates.getVersion());
+    final Version version = parseVersion(mavenPath.getCoordinates().getVersion());
     if (version == null) {
       return; // could not parse, omit it from "latest" maintenance
     }
-    final VersionCoordinates versionCoordinates = new VersionCoordinates(version, coordinates);
+    final VersionCoordinates versionCoordinates = new VersionCoordinates(version, mavenPath.getCoordinates());
 
     // maintain latestVersionCoordinates
     if (latestVersionCoordinates == null || latestVersionCoordinates.version.compareTo(version) < 0) {
@@ -313,7 +289,7 @@ public class MetadataBuilder
     }
 
     // maintain latestVersionCoordinatesMap
-    final String key = key(coordinates);
+    final String key = key(mavenPath.getCoordinates());
     final VersionCoordinates other = latestVersionCoordinatesMap.get(key);
     // add if contained version is less than version
     if (other == null || other.version.compareTo(versionCoordinates.version) < 0) {

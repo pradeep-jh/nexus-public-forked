@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -29,28 +25,12 @@ Ext.define('NX.ext.form.field.ItemSelector', {
     'NX.I18n'
   ],
 
-  plugins: {
-    responsive: true
-  },
-  responsiveConfig: {
-    'width <= 1366': {
-      maxWidth: 600
-    },
-    'width <= 1600': {
-      maxWidth: 800
-    },
-    'width > 1600' : {
-      maxWidth: 1000
-    }
-  },
-  height: 300,
-  width: '100%',
+  // FIXME: This is not the best way to ensure that forms are limited width
+  width: 600,
+  height: 253,
 
   disabledCls: 'nx-itemselector-disabled',
   invalidCls: 'nx-invalid',
-
-  maskOnDisable: false,
-  selectionPlaceholder: null,
 
   /**
    * Override super *private* impl so we can control the button configuration.
@@ -81,31 +61,40 @@ Ext.define('NX.ext.form.field.ItemSelector', {
    * @param button
    */
   customizeButton: function (name, button) {
-    var icons = {
-      top: 'x-fa fa-angle-double-up',
-      up: 'x-fa fa-angle-up',
-      add: 'x-fa fa-angle-right',
-      remove: 'x-fa fa-angle-left',
-      addAll: 'x-fa fa-angle-double-right',
-      removeAll: 'x-fa fa-angle-double-left',
-      down: 'x-fa fa-angle-down',
-      bottom: 'x-fa fa-angle-double-down'
-    };
+    // remove icon
+    delete button.iconCls;
 
-    button.iconCls = icons[name];
+    // replace with glyph
+    switch (name) {
+      case 'top':
+        button.glyph = 'xf102@FontAwesome'; // fa-angle-double-up
+        break;
+      case 'up':
+        button.glyph = 'xf106@FontAwesome'; // fa-angle-up
+        break;
+      case 'add':
+        button.glyph = 'xf105@FontAwesome'; // fa-angle-right
+        break;
+      case 'remove':
+        button.glyph = 'xf104@FontAwesome'; // fa-angle-left
+        break;
+      case 'down':
+        button.glyph = 'xf107@FontAwesome'; // fa-angle-down
+        break;
+      case 'bottom':
+        button.glyph = 'xf103@FontAwesome'; // fa-angle-double-down
+        break;
+    }
   },
 
   createList: function (title) {
     var me = this,
-        store = Ext.getStore(me.store),
-        tbar, listener;
+        tbar;
 
     // only create filter box for from field
     if (!me.fromField) {
       tbar = {
         xtype: 'nx-searchbox',
-        cls: ['nx-searchbox', 'nx-filterbox'],
-        iconClass: 'fa-filter',
         emptyText: NX.I18n.get('Form_Field_ItemSelector_Empty'),
         searchDelay: 200,
         listeners: {
@@ -115,17 +104,6 @@ Ext.define('NX.ext.form.field.ItemSelector', {
         }
       };
     }
-
-    listener = store.onAfter('load', function() {
-      if (me.fromField && me.fromField.boundList && me.fromField.boundList.getMaskTarget()) {
-        me.fromField.boundList.mask();
-        if (!me.fromField.boundList.disabled) {
-          me.fromField.boundList.unmask();
-        }
-      }
-    }, me, { destroyable: true });
-
-    me.on('destroy', listener.destroy, listener);
 
     return Ext.create('Ext.ux.form.MultiSelect', {
       // We don't want the multiselects themselves to act like fields,
@@ -145,8 +123,8 @@ Ext.define('NX.ext.form.field.ItemSelector', {
       dropGroup: me.ddGroup,
       title: title,
       store: {
-        model: store.model,
-        sorters: store.getSorters().items,
+        model: me.store.model,
+        sorters: me.store.getSorters(),
         data: []
       },
       displayField: me.displayField,
@@ -163,20 +141,6 @@ Ext.define('NX.ext.form.field.ItemSelector', {
     });
   },
 
-  onAddAllBtnClick:function() {
-    var me = this, items = me.fromField.getStore().getData().items;
-    while (items.length > 0) {
-      me.moveRec(true, items[0])
-    }
-  },
-
-  onRemoveAllBtnClick:function() {
-    var me = this, items = me.toField.getStore().getData().items;
-    while (items.length > 0) {
-      me.moveRec(false, items[0])
-    }
-  },
-
   /**
    * Ext.ux.form.ItemSelector defers setting value if store is not loaded,
    * which messes up the logic in Ext.form.Basic.setValues()
@@ -185,45 +149,10 @@ Ext.define('NX.ext.form.field.ItemSelector', {
    * @override
    */
   setValue: function(value) {
-    if (this.store) {
-      if (this.valueAsString) {
-        if (Array.isArray(value)) {
-          this.callParent(arguments);
-        }
-        else {
-          this.callParent(value ? [value.split(',')] : undefined);
-        }
-      }
-      else {
-        this.callParent(arguments);
-      }
-    }
+    this.callParent(arguments);
 
     // HACK: force original value to reset, to prevent always dirty forms when store has not loaded when form initially sets values.
     this.resetOriginalValue();
-  },
-
-  getValue: function() {
-    const me = this,
-        valueField = me.valueField,
-        parentValue = this.callParent();
-    var result = parentValue;
-
-    if(Array.isArray(parentValue)) {
-      result = Ext.Array.filter(parentValue, function(item) {
-        if (me.selectionPlaceholder) {
-          return me.selectionPlaceholder[valueField] !== item;
-        }
-        return true
-      });
-    }
-
-    if (this.valueAsString) {
-      return result.toString();
-    }
-    else {
-      return result;
-    }
   },
 
   // HACK: avoid exceptions when the store is reloaded
@@ -268,40 +197,6 @@ Ext.define('NX.ext.form.field.ItemSelector', {
       me.store.un('load', me.populateFromStore, me);
     }
     this.callParent();
-  },
-
-  getRecordsForValue: function () {
-    var me = this;
-    if (!me.store) {
-      return [];
-    }
-    return this.callParent(arguments);
-  },
-
-  onEnable: function() {
-    this.callParent(arguments);
-    Ext.each(this.query('boundlist'), function(list) {
-      list.unmask();
-    });
-  },
-
-  onDisable: function() {
-    this.callParent(arguments);
-    Ext.each(this.query('boundlist'), function(list) {
-      list.mask();
-    });
-  },
-  getSelections: function(list) {
-    const me = this,
-        valueField = me.valueField,
-        selected = this.callParent(arguments);
-
-    if(list === me.toField.boundList && me.selectionPlaceholder) {
-      return Ext.Array.filter(selected, function (item) {
-        return item.data[valueField] !== me.selectionPlaceholder[valueField];
-      });
-    } else {
-      return selected;
-    }
   }
+
 });

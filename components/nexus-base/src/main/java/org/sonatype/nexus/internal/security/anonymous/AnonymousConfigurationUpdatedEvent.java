@@ -12,29 +12,20 @@
  */
 package org.sonatype.nexus.internal.security.anonymous;
 
-import org.sonatype.nexus.common.event.EventWithSource;
+import org.sonatype.nexus.common.entity.EntityMetadata;
+import org.sonatype.nexus.common.entity.EntityUpdatedEvent;
 import org.sonatype.nexus.security.anonymous.AnonymousConfiguration;
 
+/**
+ * {@link AnonymousConfiguration} updated event.
+ *
+ * @since 3.2
+ */
 public class AnonymousConfigurationUpdatedEvent
-    extends EventWithSource
+    extends EntityUpdatedEvent
     implements AnonymousConfigurationEvent
 {
-  private AnonymousConfigurationData anonymousConfiguration;
-
-  public AnonymousConfigurationUpdatedEvent() {
-    // deserialization
-  }
-
-  public AnonymousConfigurationUpdatedEvent(final AnonymousConfigurationData anonymousConfiguration) {
-    this.anonymousConfiguration = anonymousConfiguration;
-  }
-
-  @Override
-  public AnonymousConfiguration getAnonymousConfiguration() {
-    return anonymousConfiguration;
-  }
-
-  public void setAnonymousConfiguration(final AnonymousConfigurationData anonymousConfiguration) {
-    this.anonymousConfiguration = anonymousConfiguration;
+  public AnonymousConfigurationUpdatedEvent(final EntityMetadata metadata) {
+    super(metadata);
   }
 }

@@ -14,10 +14,31 @@ package org.sonatype.nexus.repository.maven.internal.hosted;
 
 import java.io.IOException;
 
-import org.sonatype.nexus.repository.maven.MavenIndexFacet;
+import javax.inject.Named;
 
-public interface MavenHostedIndexFacet
-    extends MavenIndexFacet
+import org.sonatype.nexus.repository.maven.MavenIndexFacet;
+import org.sonatype.nexus.repository.maven.internal.MavenIndexFacetSupport;
+import org.sonatype.nexus.repository.maven.internal.MavenIndexPublisher;
+import org.sonatype.nexus.repository.storage.StorageFacet;
+import org.sonatype.nexus.transaction.UnitOfWork;
+
+/**
+ * Hosted implementation of {@link MavenIndexFacet}.
+ *
+ * @since 3.0
+ */
+@Named
+public class MavenHostedIndexFacet
+    extends MavenIndexFacetSupport
 {
-  void publishIndex() throws IOException;
+  @Override
+  public void publishIndex() throws IOException {
+    UnitOfWork.begin(getRepository().facet(StorageFacet.class).txSupplier());
+    try {
+      MavenIndexPublisher.publishHostedIndex(getRepository());
+    }
+    finally {
+      UnitOfWork.end();
+    }
+  }
 }

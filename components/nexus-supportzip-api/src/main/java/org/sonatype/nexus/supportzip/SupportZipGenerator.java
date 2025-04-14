@@ -12,10 +12,8 @@
  */
 package org.sonatype.nexus.supportzip;
 
+import java.io.File;
 import java.io.OutputStream;
-import java.io.Serializable;
-
-import org.sonatype.nexus.common.log.SupportZipGeneratorRequest;
 
 /**
  * Generates a support ZIP file.
@@ -25,62 +23,193 @@ import org.sonatype.nexus.common.log.SupportZipGeneratorRequest;
 public interface SupportZipGenerator
 {
   /**
-   * Result of support ZIP generate request.
+   * Request to generate a support ZIP file.
    */
-  class Result implements Serializable
+  class Request
   {
-    private static final long serialVersionUID = -3253827134366752809L;
+    /**
+     * Include system information report.
+     */
+    private boolean systemInformation;
 
-    private boolean truncated;
+    /**
+     * Include thread dump.
+     */
+    private boolean threadDump;
 
-    private String filename;
+    /**
+     * Include metrics.
+     */
+    private boolean metrics;
 
-    private String localPath;
+    /**
+     * Include configuration files.
+     */
+    private boolean configuration;
 
-    private long size;
+    /**
+     * Include security files.
+     */
+    private boolean security;
 
-    public Result(final boolean truncated, final String filename, final String localPath, final long size) {
-      this.truncated = truncated;
-      this.filename = filename;
-      this.localPath = localPath;
-      this.size = size;
+    /**
+     * Include log files.
+     */
+    private boolean log;
+
+    /**
+     * Include task log files.
+     */
+    private boolean taskLog;
+
+    /**
+     * Include JMX information.
+     */
+    private boolean jmx;
+
+    /**
+     * Limit the size of files included in the ZIP.
+     */
+    private boolean limitFileSizes;
+
+    /**
+     * Limit the total size of the generated ZIP file.
+     */
+    private boolean limitZipSize;
+
+    public boolean isSystemInformation() {
+      return systemInformation;
     }
 
+    public void setSystemInformation(final boolean systemInformation) {
+      this.systemInformation = systemInformation;
+    }
+
+    public boolean isThreadDump() {
+      return threadDump;
+    }
+
+    public void setThreadDump(final boolean threadDump) {
+      this.threadDump = threadDump;
+    }
+
+    public boolean isMetrics() {
+      return metrics;
+    }
+
+    public void setMetrics(final boolean metrics) {
+      this.metrics = metrics;
+    }
+
+    public boolean isConfiguration() {
+      return configuration;
+    }
+
+    public void setConfiguration(final boolean configuration) {
+      this.configuration = configuration;
+    }
+
+    public boolean isSecurity() {
+      return security;
+    }
+
+    public void setSecurity(final boolean security) {
+      this.security = security;
+    }
+
+    public boolean isLog() {
+      return log;
+    }
+
+    public void setLog(final boolean log) {
+      this.log = log;
+    }
+
+    public boolean isTaskLog() {
+      return taskLog;
+    }
+
+    public void setTaskLog(final boolean taskLog) {
+      this.taskLog = taskLog;
+    }
+
+    public boolean isJmx() {
+      return jmx;
+    }
+
+    public void setJmx(final boolean jmx) {
+      this.jmx = jmx;
+    }
+
+    public boolean isLimitFileSizes() {
+      return limitFileSizes;
+    }
+
+    public void setLimitFileSizes(final boolean limitFileSizes) {
+      this.limitFileSizes = limitFileSizes;
+    }
+
+    public boolean isLimitZipSize() {
+      return limitZipSize;
+    }
+
+    public void setLimitZipSize(final boolean limitZipSize) {
+      this.limitZipSize = limitZipSize;
+    }
+
+    @Override
+    public String toString() {
+      return getClass().getSimpleName() + "{" +
+          "systemInformation=" + systemInformation +
+          ", threadDump=" + threadDump +
+          ", metrics=" + metrics +
+          ", configuration=" + configuration +
+          ", security=" + security +
+          ", log=" + log +
+          ", tasklog=" + taskLog +
+          ", jmx=" + jmx +
+          ", limitFileSizes=" + limitFileSizes +
+          ", limitZipSize=" + limitZipSize +
+          '}';
+    }
+  }
+
+  /**
+   * Result of support ZIP generate request.
+   */
+  class Result
+  {
     /**
      * True if the ZIP or any of its contents had been truncated.
      */
+    private boolean truncated;
+
+    /**
+     * The location of the generated ZIP file.
+     */
+    private File file;
+
     public boolean isTruncated() {
       return truncated;
     }
 
-    /**
-     * The name of the generated ZIP file.
-     */
-    public String getFilename() {
-      return filename;
+    public void setTruncated(final boolean truncated) {
+      this.truncated = truncated;
     }
 
-    /**
-     * The local path of the generated ZIP file.
-     */
-    public String getLocalPath() {
-      return localPath;
+    public File getFile() {
+      return file;
     }
 
-    /**
-     * The size of the generated ZIP file.
-     */
-    public long getSize() {
-      return size;
+    public void setFile(final File file) {
+      this.file = file;
     }
 
     @Override
     public String toString() {
       return getClass().getSimpleName() + "{" +
           "truncated=" + truncated +
-          ", filename=" + filename +
-          ", localPath=" + localPath +
-          ", size=" + size +
+          ", file=" + file +
           '}';
     }
   }
@@ -88,12 +217,7 @@ public interface SupportZipGenerator
   /**
    * Generate a support ZIP for the given request.
    */
-  Result generate(SupportZipGeneratorRequest request);
-
-  /**
-   * Generate a support ZIP for the given request with a custom prefix.
-   */
-  Result generate(SupportZipGeneratorRequest request, String prefix);
+  Result generate(Request request);
 
   /**
    * Generate a support ZIP.
@@ -102,5 +226,5 @@ public interface SupportZipGenerator
    * @return true if the zip was truncated.
    * @since 3.5
    */
-  boolean generate(SupportZipGeneratorRequest request, String prefix, OutputStream outputStream);
+  boolean generate(Request request, String prefix, OutputStream outputStream);
 }

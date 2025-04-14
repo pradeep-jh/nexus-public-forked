@@ -16,9 +16,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import javax.annotation.Nullable;
+
 import org.sonatype.goodies.i18n.I18N;
 import org.sonatype.goodies.i18n.MessageBundle;
 
+import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -36,6 +39,15 @@ import static java.util.stream.Stream.concat;
 public class RepositoryCombobox
     extends Combobox<String>
 {
+
+  public static final String REGARDLESS_VIEW_PERMISSIONS = "regardlessViewPermissions";
+
+  public static final String FACET = "facet";
+
+  public static final String CONTENT_CLASS = "contentClass";
+
+  public static final String ALL_REPOS_ENTRY = "allReposEntry";
+
   private List<String> includingTypes;
 
   private List<String> excludingTypes;
@@ -138,7 +150,14 @@ public class RepositoryCombobox
    * Repository will be present if is of any of specified formats.
    */
   public RepositoryCombobox includingAnyOfFacets(final Class<?>... facets) {
-    this.includingFacets = Lists.transform(Arrays.asList(facets), Class::getName);
+    this.includingFacets = Lists.transform(Arrays.asList(facets), new Function<Class<?>, String>()
+    {
+      @Nullable
+      @Override
+      public String apply(final Class<?> input) {
+        return input.getName();
+      }
+    });
     return this;
   }
 
@@ -166,11 +185,6 @@ public class RepositoryCombobox
   public RepositoryCombobox includeEntriesForAllFormats() {
     this.includeEntriesForAllFormats = true;
     return this;
-  }
-
-  @Override
-  public boolean getAllowAutocomplete() {
-    return true;
   }
 
   /**

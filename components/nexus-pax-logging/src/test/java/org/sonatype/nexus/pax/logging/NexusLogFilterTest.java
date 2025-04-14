@@ -18,19 +18,17 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.MDC;
-import org.slf4j.Marker;
-import org.slf4j.MarkerFactory;
 
 import static ch.qos.logback.core.spi.FilterReply.DENY;
 import static ch.qos.logback.core.spi.FilterReply.NEUTRAL;
 import static org.hamcrest.core.IsEqual.equalTo;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertThat;
 import static org.sonatype.nexus.logging.task.TaskLogger.TASK_LOG_ONLY_MDC;
 import static org.sonatype.nexus.logging.task.TaskLogger.TASK_LOG_WITH_PROGRESS_MDC;
-import static org.sonatype.nexus.logging.task.TaskLoggingMarkers.AUDIT_LOG_ONLY;
 import static org.sonatype.nexus.logging.task.TaskLoggingMarkers.INTERNAL_PROGRESS;
 import static org.sonatype.nexus.logging.task.TaskLoggingMarkers.PROGRESS;
 import static org.sonatype.nexus.logging.task.TaskLoggingMarkers.TASK_LOG_ONLY;
+import static org.sonatype.nexus.pax.logging.NexusLogFilter.MDC_MARKER_ID;
 
 public class NexusLogFilterTest
 {
@@ -46,6 +44,7 @@ public class NexusLogFilterTest
 
   @After
   public void tearDown() {
+    MDC.remove(MDC_MARKER_ID);
     MDC.remove(TASK_LOG_ONLY_MDC);
     MDC.remove(TASK_LOG_WITH_PROGRESS_MDC);
   }
@@ -57,45 +56,36 @@ public class NexusLogFilterTest
 
   @Test
   public void testOtherMarkerInMDC() {
-    Marker fooMarker = MarkerFactory.getMarker("foo");
-    assertThat(excludeProgressLogsFilter.decide(eventWithMarkerOf(fooMarker)), equalTo(NEUTRAL));
+    MDC.put(MDC_MARKER_ID, "foo");
+    assertThat(excludeProgressLogsFilter.decide(event), equalTo(NEUTRAL));
   }
 
   @Test
   public void testTaskLogWithProgressMarkerInMDC() {
+    MDC.put(MDC_MARKER_ID, INTERNAL_PROGRESS.getName());
     MDC.put(TASK_LOG_WITH_PROGRESS_MDC, "true");
 
     // as the method also returns NEUTRAL by default, we also test that TASK_LOG_ONLY_MDC being set has no affect
     MDC.put(TASK_LOG_ONLY_MDC, "anything");
 
-    assertThat(excludeProgressLogsFilter.decide(eventWithMarkerOf(INTERNAL_PROGRESS)), equalTo(NEUTRAL));
+    assertThat(excludeProgressLogsFilter.decide(event), equalTo(NEUTRAL));
   }
 
   @Test
   public void testProgressMarkerInMDC() {
-    assertThat(excludeProgressLogsFilter.decide(eventWithMarkerOf(PROGRESS)), equalTo(DENY));
+    MDC.put(MDC_MARKER_ID, PROGRESS.getName());
+    assertThat(excludeProgressLogsFilter.decide(event), equalTo(DENY));
   }
 
   @Test
   public void testTaskMarkerInMDC() {
-    assertThat(excludeProgressLogsFilter.decide(eventWithMarkerOf(TASK_LOG_ONLY)), equalTo(DENY));
+    MDC.put(MDC_MARKER_ID, TASK_LOG_ONLY.getName());
+    assertThat(excludeProgressLogsFilter.decide(event), equalTo(DENY));
   }
 
   @Test
   public void testTaskOnlyMDCConstant_InMDC() {
     MDC.put(TASK_LOG_ONLY_MDC, "anything");
     assertThat(excludeProgressLogsFilter.decide(event), equalTo(DENY));
-  }
-
-  @Test
-  public void testAuditLogNotWrittenToNexusLog() {
-    assertThat(excludeProgressLogsFilter.decide(eventWithMarkerOf(AUDIT_LOG_ONLY)), equalTo(DENY));
-  }
-
-  private ILoggingEvent eventWithMarkerOf(final Marker marker) {
-    LoggingEvent event = new LoggingEvent();
-    event.setMessage("Test Message");
-    event.setMarker(marker);
-    return event;
   }
 }

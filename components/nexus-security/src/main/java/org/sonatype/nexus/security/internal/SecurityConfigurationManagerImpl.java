@@ -18,11 +18,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -42,19 +40,14 @@ import org.sonatype.nexus.security.config.SecurityConfigurationCleaner;
 import org.sonatype.nexus.security.config.SecurityConfigurationManager;
 import org.sonatype.nexus.security.config.SecurityConfigurationSource;
 import org.sonatype.nexus.security.config.SecurityContributor;
-import org.sonatype.nexus.security.privilege.DuplicatePrivilegeException;
 import org.sonatype.nexus.security.privilege.NoSuchPrivilegeException;
-import org.sonatype.nexus.security.privilege.ReadonlyPrivilegeException;
-import org.sonatype.nexus.security.role.DuplicateRoleException;
 import org.sonatype.nexus.security.role.NoSuchRoleException;
-import org.sonatype.nexus.security.role.ReadonlyRoleException;
-import org.sonatype.nexus.security.role.RoleContainsItselfException;
 import org.sonatype.nexus.security.user.NoSuchRoleMappingException;
+import org.sonatype.nexus.security.user.UserManager;
 import org.sonatype.nexus.security.user.UserNotFoundException;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.google.common.collect.Sets.SetView;
 import com.google.common.eventbus.AllowConcurrentEvents;
 import com.google.common.eventbus.Subscribe;
 import org.apache.shiro.authc.credential.PasswordService;
@@ -89,11 +82,10 @@ public class SecurityConfigurationManagerImpl
   private boolean firstTimeConfiguration = true;
 
   @Inject
-  public SecurityConfigurationManagerImpl(
-      final SecurityConfigurationSource configurationSource,
-      final SecurityConfigurationCleaner configCleaner,
-      final PasswordService passwordService,
-      final EventManager eventManager)
+  public SecurityConfigurationManagerImpl(final SecurityConfigurationSource configurationSource,
+                                          final SecurityConfigurationCleaner configCleaner,
+                                          final PasswordService passwordService,
+                                          final EventManager eventManager)
   {
     this.configurationSource = configurationSource;
     this.eventManager = eventManager;
@@ -128,32 +120,22 @@ public class SecurityConfigurationManagerImpl
   }
 
   @Override
-  public void createPrivilege(final CPrivilege privilege) {
-    if (getMergedConfiguration().getPrivileges().stream().anyMatch(p -> p.getId().equals(privilege.getId()))) {
-      throw new DuplicatePrivilegeException(privilege.getId());
-    }
-
+  public void createPrivilege(CPrivilege privilege) {
     getDefaultConfiguration().addPrivilege(privilege);
   }
 
   @Override
-  public void createRole(final CRole role) {
-    if (getMergedConfiguration().getRoles().stream().anyMatch(p -> p.getId().equals(role.getId()))) {
-      throw new DuplicateRoleException(role.getId());
-    }
-
-    validateContainedRolesAndPrivileges(role);
-
+  public void createRole(CRole role) {
     getDefaultConfiguration().addRole(role);
   }
 
   @Override
-  public void createUser(final CUser user, final Set<String> roles) {
+  public void createUser(CUser user, Set<String> roles) {
     createUser(user, null, roles);
   }
 
   @Override
-  public void createUser(final CUser user, final String password, final Set<String> roles) {
+  public void createUser(CUser user, String password, Set<String> roles) {
     if (!Strings2.isBlank(password)) {
       user.setPassword(passwordService.encryptPassword(password));
     }
@@ -161,59 +143,25 @@ public class SecurityConfigurationManagerImpl
   }
 
   @Override
-  public void deletePrivilege(final String id) {
-    try {
-      getDefaultConfiguration().removePrivilege(id);
-    }
-    catch (NoSuchPrivilegeException e) {
-      //note that readonly check is done here, rather than at orient level, as we dont store readonly flag with
-      //config, basically any privileges added via SecurityContributor impls are marked as readonly
-      if (getMergedConfiguration().getPrivileges().stream().anyMatch(p -> p.getId().equals(id))) {
-        throw new ReadonlyPrivilegeException(id);
-      }
+  public void deletePrivilege(String id) throws NoSuchPrivilegeException {
+    boolean found = getDefaultConfiguration().removePrivilege(id);
+    if (!found) {
       throw new NoSuchPrivilegeException(id);
     }
-
-    cleanRemovedPrivilege(id);
+    configCleaner.privilegeRemoved(getDefaultConfiguration(), id);
   }
 
   @Override
-  public void deletePrivilegeByName(final String name) {
-    CPrivilege existing = readPrivilegeByName(name);
-   try {
-     getDefaultConfiguration().removePrivilegeByName(name);
-   }catch (NoSuchPrivilegeException e){
-
-     boolean isReadOnly = getMergedConfiguration().getPrivileges().stream().anyMatch(p -> p.getName().equals(name));
-
-     if(isReadOnly){
-       throw new ReadonlyPrivilegeException(name);
-     }
-
-     throw new NoSuchPrivilegeException(name);
-   }
-
-   cleanRemovedPrivilege(existing.getId());
-  }
-
-  @Override
-  public void deleteRole(final String id) {
-    try {
-      getDefaultConfiguration().removeRole(id);
-    }
-    catch (NoSuchRoleException e) {
-      //note that readonly check is done here, rather than at orient level, as we dont store readonly flag with
-      //config, basically any roles added via SecurityContributor impls are marked as readonly
-      if (getMergedConfiguration().getRoles().stream().anyMatch(p -> p.getId().equals(id))) {
-        throw new ReadonlyRoleException(id);
-      }
-      throw e;
+  public void deleteRole(String id) throws NoSuchRoleException {
+    boolean found = getDefaultConfiguration().removeRole(id);
+    if (!found) {
+      throw new NoSuchRoleException(id);
     }
     configCleaner.roleRemoved(getDefaultConfiguration(), id);
   }
 
   @Override
-  public void deleteUser(final String id) throws UserNotFoundException {
+  public void deleteUser(String id) throws UserNotFoundException {
     boolean found = getDefaultConfiguration().removeUser(id);
 
     if (!found) {
@@ -222,33 +170,13 @@ public class SecurityConfigurationManagerImpl
   }
 
   @Override
-  public CPrivilege newPrivilege() {
-    return getDefaultConfiguration().newPrivilege();
-  }
-
-  @Override
-  public CRole newRole() {
-    return getDefaultConfiguration().newRole();
-  }
-
-  @Override
-  public CUser newUser() {
-    return getDefaultConfiguration().newUser();
-  }
-
-  @Override
-  public CUserRoleMapping newUserRoleMapping() {
-    return getDefaultConfiguration().newUserRoleMapping();
-  }
-
-  @Override
-  public CPrivilege readPrivilege(final String id) {
+  public CPrivilege readPrivilege(String id) throws NoSuchPrivilegeException {
     CPrivilege privilege = getMergedConfiguration().getPrivilege(id);
     if (privilege != null) {
       return privilege;
     }
 
-    privilege = validateExistingPrivilege(id);
+    privilege = getDefaultConfiguration().getPrivilege(id);
     if (privilege != null) {
       return privilege;
     }
@@ -257,38 +185,7 @@ public class SecurityConfigurationManagerImpl
   }
 
   @Override
-  public CPrivilege readPrivilegeByName(final String name) {
-    return Optional.of(name)
-        .map(n -> getMergedConfiguration().getPrivilegeByName(n))
-        .orElseGet(() ->Optional.ofNullable(getDefaultConfiguration().getPrivilegeByName(name))
-            .orElseThrow(() -> new NoSuchPrivilegeException(name)));
-  }
-
-  @Override
-  public List<CPrivilege> readPrivileges(final Set<String> ids) {
-    List<CPrivilege> inMemoryPrivileges = getMergedConfiguration().getPrivileges(ids);
-    Set<String> foundPrivilegeIds = inMemoryPrivileges.stream().map(CPrivilege::getId).collect(Collectors.toSet());
-    SetView<String> notFoundIds = Sets.difference(ids, foundPrivilegeIds);
-    // in case of found all privileges - just return all of them
-    if (notFoundIds.isEmpty()) {
-      return inMemoryPrivileges;
-    }
-
-    // find the rest privileges from the default config
-    List<CPrivilege> privileges = getDefaultConfiguration().getPrivileges(notFoundIds);
-    foundPrivilegeIds = privileges.stream().map(CPrivilege::getId).collect(Collectors.toSet());
-    notFoundIds = Sets.difference(notFoundIds, foundPrivilegeIds);
-    if (!notFoundIds.isEmpty()) {
-      log.debug("Unable to find privileges for ids={}", notFoundIds);
-    }
-
-    // merge privileges from the Merged and Default configs
-    return Stream.concat(privileges.stream(), inMemoryPrivileges.stream())
-        .collect(Collectors.toList());
-  }
-
-  @Override
-  public CRole readRole(final String id) {
+  public CRole readRole(String id) throws NoSuchRoleException {
     CRole role = getMergedConfiguration().getRole(id);
     if (role != null) {
       return role;
@@ -303,7 +200,7 @@ public class SecurityConfigurationManagerImpl
   }
 
   @Override
-  public CUser readUser(final String id) throws UserNotFoundException {
+  public CUser readUser(String id) throws UserNotFoundException {
     CUser user = getDefaultConfiguration().getUser(id);
 
     if (user != null) {
@@ -313,77 +210,39 @@ public class SecurityConfigurationManagerImpl
   }
 
   @Override
-  public void updatePrivilege(final CPrivilege privilege) {
-    CPrivilege existing = getDefaultConfiguration().getPrivilege(privilege.getId());
-
-    if (existing == null) {
-      //note that readonly check is done here, rather than at orient level, as we dont store readonly flag with
-      //config, basically any privileges added via SecurityContributor impls are marked as readonly
-      if (getMergedConfiguration().getPrivileges().stream().anyMatch(p -> p.getId().equals(privilege.getId()))) {
-        throw new ReadonlyPrivilegeException(privilege.getId());
-      }
-      throw new NoSuchPrivilegeException(privilege.getId());
-    }
-
+  public void updatePrivilege(CPrivilege privilege) throws NoSuchPrivilegeException {
     getDefaultConfiguration().updatePrivilege(privilege);
   }
 
   @Override
-  public void updatePrivilegeByName(final CPrivilege privilege) {
-    boolean onDefaultConfig = Optional.ofNullable(getDefaultConfiguration().getPrivilegeByName(privilege.getName()))
-        .isPresent();
-
-    if (!onDefaultConfig) {
-      //note that readonly check is done here, rather than at orient level, as we dont store readonly flag with
-      //config, basically any privileges added via SecurityContributor impls are marked as readonly
-      boolean isReadOnly = getMergedConfiguration().getPrivileges().stream().anyMatch(p -> p.getName().equals(privilege.getName()));
-
-      if (isReadOnly) {
-        throw new ReadonlyPrivilegeException(privilege.getName());
-      }
-      throw new NoSuchPrivilegeException(privilege.getName());
-    }
-
-    getDefaultConfiguration().updatePrivilegeByName(privilege);
-  }
-
-  @Override
-  public void updateRole(final CRole role) {
-    CRole existing = getDefaultConfiguration().getRole(role.getId());
-
-    if (existing == null) {
-      //note that readonly check is done here, rather than at orient level, as we dont store readonly flag with
-      //config, basically any role added via SecurityContributor impls are marked as readonly
-      if (getMergedConfiguration().getRoles().stream().anyMatch(p -> p.getId().equals(role.getId()))) {
-        throw new ReadonlyRoleException(role.getId());
-      }
-      throw new NoSuchRoleException(role.getId());
-    }
-
-    validateContainedRolesAndPrivileges(role);
-
-    validateRoleDoesntContainItself(role);
-
+  public void updateRole(CRole role) throws NoSuchRoleException {
     getDefaultConfiguration().updateRole(role);
   }
 
   @Override
-  public void updateUser(final CUser user) throws UserNotFoundException {
-    getDefaultConfiguration().updateUser(user);
+  public void updateUser(CUser user) throws UserNotFoundException {
+    Set<String> roles = Collections.emptySet();
+    try {
+      roles = readUserRoleMapping(user.getId(), UserManager.DEFAULT_SOURCE).getRoles();
+    }
+    catch (NoSuchRoleMappingException e) {
+      log.debug("User: {} has no roles", user.getId());
+    }
+    updateUser(user, roles);
   }
 
   @Override
-  public void updateUser(final CUser user, final Set<String> roles) throws UserNotFoundException {
+  public void updateUser(CUser user, Set<String> roles) throws UserNotFoundException {
     getDefaultConfiguration().updateUser(user, roles);
   }
 
   @Override
-  public void createUserRoleMapping(final CUserRoleMapping userRoleMapping) {
+  public void createUserRoleMapping(CUserRoleMapping userRoleMapping) {
     getDefaultConfiguration().addUserRoleMapping(userRoleMapping);
   }
 
   @Override
-  public CUserRoleMapping readUserRoleMapping(final String userId, final String source) throws NoSuchRoleMappingException {
+  public CUserRoleMapping readUserRoleMapping(String userId, String source) throws NoSuchRoleMappingException {
     CUserRoleMapping mapping = getDefaultConfiguration().getUserRoleMapping(userId, source);
 
     if (mapping != null) {
@@ -395,12 +254,12 @@ public class SecurityConfigurationManagerImpl
   }
 
   @Override
-  public void updateUserRoleMapping(final CUserRoleMapping userRoleMapping) throws NoSuchRoleMappingException {
+  public void updateUserRoleMapping(CUserRoleMapping userRoleMapping) throws NoSuchRoleMappingException {
     getDefaultConfiguration().updateUserRoleMapping(userRoleMapping);
   }
 
   @Override
-  public void deleteUserRoleMapping(final String userId, final String source) throws NoSuchRoleMappingException {
+  public void deleteUserRoleMapping(String userId, String source) throws NoSuchRoleMappingException {
     boolean found = getDefaultConfiguration().removeUserRoleMapping(userId, source);
 
     if (!found) {
@@ -420,11 +279,6 @@ public class SecurityConfigurationManagerImpl
       securityContributors.remove(contributor);
     }
     eventManager.post(new SecurityContributionChangedEvent());
-  }
-
-  @Override
-  public void cleanRemovedPrivilege(final String privilegeId) {
-    configCleaner.privilegeRemoved(getDefaultConfiguration(), privilegeId);
   }
 
   private SecurityConfiguration getDefaultConfiguration() {
@@ -527,7 +381,7 @@ public class SecurityConfigurationManagerImpl
     return to;
   }
 
-  private CRole mergeRolesContents(final CRole roleA, final CRole roleB) {
+  private CRole mergeRolesContents(CRole roleA, CRole roleB) {
     Set<String> roles = new HashSet<>();
     // make sure they are not empty
     if (roleA.getRoles() != null) {
@@ -546,7 +400,7 @@ public class SecurityConfigurationManagerImpl
       privs.addAll(roleB.getPrivileges());
     }
 
-    CRole newRole = newRole();
+    CRole newRole = new CRole();
     newRole.setId(roleA.getId());
     newRole.setRoles(Sets.newHashSet(roles));
     newRole.setPrivileges(Sets.newHashSet(privs));
@@ -567,45 +421,5 @@ public class SecurityConfigurationManagerImpl
     }
 
     return newRole;
-  }
-
-  /**
-   * Simply validates the existence of each role/privilege assigned (readRole/readPrivilege throw
-   * NoSuch(Role/Privilege)Exception if not found)
-   */
-  private void validateContainedRolesAndPrivileges(final CRole role) {
-    role.getRoles().forEach(this::readRole);
-    role.getPrivileges().forEach(this::readPrivilege);
-  }
-
-  /**
-   * Validate a role doesn't contain itself (either directly or indirectly)
-   *
-   * @param role The role to validate
-   */
-  private void validateRoleDoesntContainItself(final CRole role) {
-    validateRoleDoesntContainItself(role, role, new HashSet<>());
-  }
-
-  private void validateRoleDoesntContainItself(final CRole role, final CRole child, final Set<String> checkedRoles) {
-    child.getRoles().forEach(r -> {
-      if (r.equals(role.getId())) {
-        throw new RoleContainsItselfException(role.getId());
-      }
-      else if (!checkedRoles.contains(r)) {
-        checkedRoles.add(r);
-        validateRoleDoesntContainItself(role, readRole(r), checkedRoles);
-      }
-    });
-  }
-
-  private CPrivilege validateExistingPrivilege(final String identifier) {
-    CPrivilege privilege;
-    privilege = getDefaultConfiguration().getPrivilege(identifier);
-    if (privilege == null) {
-      privilege = getDefaultConfiguration().getPrivilegeByName(identifier);
-      return privilege;
-    }
-    return privilege;
   }
 }

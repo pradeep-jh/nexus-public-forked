@@ -12,6 +12,8 @@
  */
 package org.sonatype.nexus.blobstore;
 
+import javax.inject.Named;
+
 import org.sonatype.nexus.blobstore.api.BlobId;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -24,6 +26,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * @since 3.0
  */
+@Named("volume-chapter")
 public class VolumeChapterLocationStrategy
     extends LocationStrategySupport
 {
@@ -38,7 +41,8 @@ public class VolumeChapterLocationStrategy
     return String.format("vol-%02d/chap-%02d/%s",
         tier(blobId, TIER_1_MODULO),
         tier(blobId, TIER_2_MODULO),
-        escapeFilename(blobId.asUniqueString()));
+        escapeFilename(blobId.asUniqueString())
+    );
   }
 
   private int tier(final BlobId blobId, final int modulo) {

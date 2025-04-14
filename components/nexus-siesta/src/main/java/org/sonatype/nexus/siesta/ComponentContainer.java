@@ -23,7 +23,6 @@ import org.sonatype.nexus.rest.Component;
 import org.sonatype.nexus.rest.Resource;
 
 import org.eclipse.sisu.BeanEntry;
-import org.jboss.resteasy.core.Dispatcher;
 
 /**
  * Siesta {@link Component} (and {@link Resource} container abstraction.
@@ -41,6 +40,4 @@ public interface ComponentContainer
   void addComponent(BeanEntry<?,?> entry) throws Exception;
 
   void removeComponent(BeanEntry<?,?> entry) throws Exception;
-
-  Dispatcher getDispatcher();
 }

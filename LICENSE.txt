@@ -1,4 +1,5 @@
-Eclipse Public License - v 1.0
+Eclipse Public License -v 1.0
+
 THE ACCOMPANYING PROGRAM IS PROVIDED UNDER THE TERMS OF THIS ECLIPSE PUBLIC LICENSE ("AGREEMENT"). ANY USE, REPRODUCTION OR DISTRIBUTION OF THE PROGRAM CONSTITUTES RECIPIENT'S ACCEPTANCE OF THIS AGREEMENT.
 
 1. DEFINITIONS
@@ -17,7 +18,7 @@ where such changes and/or additions to the Program originate from and are distri
 
 "Contributor" means any person or entity that distributes the Program.
 
-"Licensed Patents" mean patent claims licensable by a Contributor which are necessarily infringed by the use or sale of its Contribution alone or when combined with the Program.
+"Licensed Patents " mean patent claims licensable by a Contributor which are necessarily infringed by the use or sale of its Contribution alone or when combined with the Program.
 
 "Program" means the Contributions distributed in accordance with this Agreement.
 

@@ -20,8 +20,6 @@ import javax.inject.Singleton;
 import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.goodies.common.Mutex;
 import org.sonatype.nexus.common.event.EventAware;
-import org.sonatype.nexus.common.event.EventConsumer;
-import org.sonatype.nexus.common.event.EventHelper;
 import org.sonatype.nexus.common.event.EventManager;
 import org.sonatype.nexus.jmx.reflect.ManagedAttribute;
 import org.sonatype.nexus.jmx.reflect.ManagedObject;
@@ -45,8 +43,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 @Singleton
 @ManagedObject
 public class AnonymousManagerImpl
-    extends ComponentSupport
-    implements AnonymousManager, EventAware
+  extends ComponentSupport
+  implements AnonymousManager, EventAware
 {
   private final EventManager eventManager;
 
@@ -59,21 +57,15 @@ public class AnonymousManagerImpl
   private AnonymousConfiguration configuration;
 
   @Inject
-  public AnonymousManagerImpl(
-      final EventManager eventManager,
-      final AnonymousConfigurationStore store,
-      @Named("initial") final Provider<AnonymousConfiguration> defaults)
+  public AnonymousManagerImpl(final EventManager eventManager,
+                              final AnonymousConfigurationStore store,
+                              @Named("initial") final Provider<AnonymousConfiguration> defaults)
   {
     this.eventManager = checkNotNull(eventManager);
     this.store = checkNotNull(store);
     log.debug("Store: {}", store);
     this.defaults = checkNotNull(defaults);
     log.debug("Defaults: {}", defaults);
-  }
-
-  @Override
-  public boolean isConfigured() {
-    return store.load() != null;
   }
 
   //
@@ -88,15 +80,10 @@ public class AnonymousManagerImpl
 
     // use defaults if no configuration was loaded from the store
     if (model == null) {
-      AnonymousConfiguration defaultModel = defaults.get();
+      model = defaults.get();
 
       // default config must not be null
-      checkNotNull(defaultModel);
-
-      model = store.newConfiguration();
-      model.setEnabled(defaultModel.isEnabled());
-      model.setRealmName(defaultModel.getRealmName());
-      model.setUserId(defaultModel.getUserId());
+      checkNotNull(model);
 
       log.info("Using default configuration: {}", model);
     }
@@ -130,22 +117,15 @@ public class AnonymousManagerImpl
   }
 
   @Override
-  public AnonymousConfiguration newConfiguration() {
-    return store.newConfiguration();
-  }
-
-  @Override
   public void setConfiguration(final AnonymousConfiguration configuration) {
     checkNotNull(configuration);
 
     AnonymousConfiguration model = configuration.copy();
+    // TODO: Validate configuration before saving?  Or leave to ext.direct?  Should we try and verify the user exists?
 
     log.info("Saving configuration: {}", model);
-
     synchronized (lock) {
-      if (!EventHelper.isReplicating()) {
-        store.save(model);
-      }
+      store.save(model);
       this.configuration = model;
     }
 
@@ -171,10 +151,10 @@ public class AnonymousManagerImpl
     // custom principals to aid with anonymous subject detection
     PrincipalCollection principals = new AnonymousPrincipalCollection(
         model.getUserId(),
-        model.getRealmName());
+        model.getRealmName()
+    );
 
-    // FIXME: buildSubject() calls deeply into various shiro dao/save bits which are probably overhead we don't need
-    // here at all
+    // FIXME: buildSubject() calls deeply into various shiro dao/save bits which are probably overhead we don't need here at all
 
     return new Subject.Builder()
         .principals(principals)
@@ -187,21 +167,14 @@ public class AnonymousManagerImpl
    * @since 3.2
    */
   @Subscribe
-  public void onStoreChanged(final AnonymousConfigurationEvent event) {
-    handleReplication(event, e -> setConfiguration(e.getAnonymousConfiguration()));
-  }
-
-  private void handleReplication(
-      final AnonymousConfigurationEvent event,
-      final EventConsumer<AnonymousConfigurationEvent> consumer)
-  {
+  public void onStoreChanged(AnonymousConfigurationEvent event) {
     if (!event.isLocal()) {
-      try {
-        consumer.accept(event);
+      log.debug("Reloading configuration after change by node {}", event.getRemoteNodeId());
+      AnonymousConfiguration model;
+      synchronized (lock) {
+        configuration = model = loadConfiguration();
       }
-      catch (Exception e) {
-        log.error("Failed to replicate: {}", event, e);
-      }
+      eventManager.post(new AnonymousConfigurationChangedEvent(model));
     }
   }
 }

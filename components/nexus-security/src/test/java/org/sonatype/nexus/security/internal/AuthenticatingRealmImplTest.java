@@ -15,7 +15,6 @@ package org.sonatype.nexus.security.internal;
 import org.sonatype.goodies.testsupport.TestSupport;
 import org.sonatype.nexus.security.config.CUser;
 import org.sonatype.nexus.security.config.SecurityConfigurationManager;
-import org.sonatype.nexus.security.config.memory.MemoryCUser;
 
 import org.apache.shiro.authc.UsernamePasswordToken;
 import org.junit.Before;
@@ -25,7 +24,7 @@ import org.mockito.Mock;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
@@ -41,7 +40,9 @@ public class AuthenticatingRealmImplTest
   @Mock
   private SecurityConfigurationManager configuration;
 
-  private CUser testUser = new MemoryCUser();
+  private CUser testUser = new CUser();
+
+  private AuthenticatingRealmImpl underTest;
 
   @Before
   public void setUp() throws Exception {
@@ -59,23 +60,15 @@ public class AuthenticatingRealmImplTest
       testUser.setPassword(((CUser) inv.getArguments()[0]).getPassword());
       return null;
     }).when(configuration).updateUser(any());
+
+    underTest = new AuthenticatingRealmImpl(configuration,
+        new DefaultSecurityPasswordService(new LegacyNexusPasswordService()));
   }
 
   @Test
-  public void testLegacyPasswordIsReHashedOnOrient() {
+  public void testLegacyPasswordIsReHashed() throws Exception {
     assertThat(testUser.getPassword(), is(LEGACY_PASSWORD_HASH));
-    AuthenticatingRealmImpl underTestOrient = new AuthenticatingRealmImpl(configuration,
-        new DefaultSecurityPasswordService(new LegacyNexusPasswordService()), true);
-    underTestOrient.getAuthenticationInfo(new UsernamePasswordToken(TEST_USERNAME, TEST_PASSWORD));
-    assertThat(testUser.getPassword(), startsWith("$shiro1$SHA-512$1024$"));
-  }
-
-  @Test
-  public void testLegacyPasswordIsReHashedOnNewDB() {
-    assertThat(testUser.getPassword(), is(LEGACY_PASSWORD_HASH));
-    AuthenticatingRealmImpl underTestOrient = new AuthenticatingRealmImpl(configuration,
-        new DefaultSecurityPasswordService(new LegacyNexusPasswordService()), false);
-    underTestOrient.getAuthenticationInfo(new UsernamePasswordToken(TEST_USERNAME, TEST_PASSWORD));
+    underTest.getAuthenticationInfo(new UsernamePasswordToken(TEST_USERNAME, TEST_PASSWORD));
     assertThat(testUser.getPassword(), startsWith("$shiro1$SHA-512$1024$"));
   }
 }

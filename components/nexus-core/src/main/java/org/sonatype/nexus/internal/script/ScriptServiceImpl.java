@@ -30,7 +30,6 @@ import javax.script.SimpleScriptContext;
 import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.common.app.GlobalComponentLookupHelper;
 import org.sonatype.nexus.common.script.ScriptApi;
-import org.sonatype.nexus.common.script.ScriptCleanupHandler;
 import org.sonatype.nexus.common.script.ScriptService;
 
 import org.eclipse.sisu.inject.BeanLocator;
@@ -49,45 +48,66 @@ public class ScriptServiceImpl
     extends ComponentSupport
     implements ScriptService
 {
-  public static final String SCRIPT_CLEANUP_HANDLER = "scriptCleanupHandler";
-
   private final ScriptEngineManager engineManager;
 
   private final BeanLocator beanLocator;
 
   private final GlobalComponentLookupHelper lookupHelper;
-
+  
   private final List<ScriptApi> scriptApis;
 
-  private final ScriptCleanupHandler scriptCleanupHandler;
-
-  private final boolean allowOnlyGroovy;
-
   @Inject
-  public ScriptServiceImpl(
-      final ScriptEngineManager engineManager,
-      final BeanLocator beanLocator,
-      final GlobalComponentLookupHelper lookupHelper,
-      final List<ScriptApi> scriptApis,
-      final ScriptCleanupHandler scriptCleanupHandler,
-      @Named("${nexus.scripts.groovyOnly:-true}") final boolean allowOnlyGroovy)
+  public ScriptServiceImpl(final ScriptEngineManager engineManager,
+                           final BeanLocator beanLocator,
+                           final GlobalComponentLookupHelper lookupHelper,
+                           final List<ScriptApi> scriptApis)
   {
     this.engineManager = checkNotNull(engineManager);
     this.beanLocator = checkNotNull(beanLocator);
     this.lookupHelper = checkNotNull(lookupHelper);
     this.scriptApis = checkNotNull(scriptApis);
-    this.scriptCleanupHandler = checkNotNull(scriptCleanupHandler);
-    this.allowOnlyGroovy = allowOnlyGroovy;
+  }
+
+  @Override
+  public ScriptEngineManager getEngineManager() {
+    return engineManager;
   }
 
   @Override
   @Nonnull
   public ScriptEngine engineForLanguage(final String language) {
-    validateLanguage(language);
+    checkNotNull(language);
 
     log.trace("Resolving engine for language: {}", language);
     ScriptEngine engine = engineManager.getEngineByName(language);
     checkState(engine != null, "Missing engine for language: %s", language);
+
+    log.trace("Engine: {}", engine);
+    return engine;
+  }
+
+  @Override
+  @Nonnull
+  public ScriptEngine engineForExtension(final String extension) {
+    checkNotNull(extension);
+
+    log.trace("Resolving engine for extension: {}", extension);
+    ScriptEngine engine = engineManager.getEngineByExtension(extension);
+    checkState(engine != null, "Missing engine for extension: %s", extension);
+
+    log.trace("Engine: {}", engine);
+    return engine;
+  }
+
+  @Override
+  @Nonnull
+  public ScriptEngine engineForMimeType(final String mimeType) {
+    checkNotNull(mimeType);
+
+    log.trace("Resolving engine for mime-type: {}", mimeType);
+    ScriptEngine engine = engineManager.getEngineByMimeType(mimeType);
+    checkState(engine != null, "Missing engine for mime-type: %s", mimeType);
+
     log.trace("Engine: {}", engine);
     return engine;
   }
@@ -101,7 +121,6 @@ public class ScriptServiceImpl
 
     bindings.put("beanLocator", beanLocator);
     bindings.put("container", lookupHelper);
-    bindings.put(SCRIPT_CLEANUP_HANDLER, scriptCleanupHandler);
     for (ScriptApi scriptApi : scriptApis) {
       bindings.put(scriptApi.getName(), scriptApi);
     }
@@ -114,20 +133,16 @@ public class ScriptServiceImpl
     context.setBindings(engineForLanguage(language).createBindings(), ScriptContext.ENGINE_SCOPE);
     return context;
   }
-
+  
   @Override
-  public void customizeBindings(
-      final ScriptContext context,
-      final int scope,
-      final Map<String, Object> customizations)
-  {
+  public void customizeBindings(final ScriptContext context, final int scope, final Map<String, Object> customizations) {
     Bindings bindings = context.getBindings(scope);
     applyDefaultBindings(bindings);
     for (Entry<String, Object> entry : customizations.entrySet()) {
-      bindings.put(entry.getKey(), entry.getValue());
+      bindings.put(entry.getKey(), entry.getValue());  
     }
   }
-
+  
   @Override
   public void customizeBindings(final ScriptContext context, final Map<String, Object> customizations) {
     customizeBindings(context, ScriptContext.ENGINE_SCOPE, customizations);
@@ -145,13 +160,5 @@ public class ScriptServiceImpl
     ScriptContext context = createContext(language);
     customizeBindings(context, customBindings);
     return eval(language, script, context);
-  }
-
-  private void validateLanguage(final String language) {
-    checkNotNull(language);
-
-    if (allowOnlyGroovy && !language.equals(ScriptEngineManagerProvider.DEFAULT_LANGUAGE)) {
-      throw new IllegalScriptLanguageException("Language: " + language + " is not allowed");
-    }
   }
 }

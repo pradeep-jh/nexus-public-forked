@@ -81,8 +81,7 @@ public class ResteasyViolationExceptionMapper
 
   private String getPath(final ResteasyConstraintViolation violation) {
     final String propertyPath = violation.getPath();
-    final String propertyName = propertyPath.substring(propertyPath.lastIndexOf('.') + 1);
 
-    return violation.type() + (!"".equals(propertyPath) ? ' ' + propertyName : "");
+    return violation.type() + (!"".equals(propertyPath) ? ' ' + propertyPath : "");
   }
 }

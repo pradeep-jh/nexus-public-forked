@@ -24,10 +24,10 @@ import com.codahale.metrics.health.jvm.ThreadDeadlockHealthCheck;
  *
  * @since 2.8
  */
-@Named("Thread Deadlock Detector")
+@Named("deadlocks")
 @Singleton
 public class DeadlockHealthCheckProvider
-    implements Provider<HealthCheck>
+  implements Provider<HealthCheck>
 {
   public HealthCheck get() {
     return new ThreadDeadlockHealthCheck();

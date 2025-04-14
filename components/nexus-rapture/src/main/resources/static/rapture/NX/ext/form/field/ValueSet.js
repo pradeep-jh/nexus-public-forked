@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -25,7 +21,7 @@ Ext.define('NX.ext.form.field.ValueSet', {
   extend: 'Ext.form.FieldContainer',
     alias: 'widget.nx-valueset',
   requires: [
-    'Ext.data.identifier.Sequential',
+    'Ext.data.SequentialIdGenerator',
     'Ext.data.Store',
     'Ext.util.KeyNav',
     'NX.Icons'
@@ -35,27 +31,14 @@ Ext.define('NX.ext.form.field.ValueSet', {
   },
 
   statics: {
-    identifier: Ext.create('Ext.data.identifier.Sequential'),
+    idGenerator: Ext.create('Ext.data.SequentialIdGenerator'),
     generateId: function () {
-      return 'nx-valueset-valuefield-' + NX.ext.form.field.ValueSet.identifier.generate();
+      return 'nx-valueset-valuefield-' + NX.ext.form.field.ValueSet.idGenerator.generate();
     }
   },
 
-  plugins: {
-    responsive:true
-  },
-  responsiveConfig: {
-    'width <= 1366': {
-      maxWidth: 600
-    },
-    'width <= 1600': {
-      maxWidth: 800
-    },
-    'width > 1600' : {
-      maxWidth: 1000
-    }
-  },
-  width: '100%',
+  // FIXME: This is not the best way to ensure that forms are limited width
+  width: 600,
 
   /**
    * @cfg {Number} [minValues=0] Minimum number of selections allowed.
@@ -114,6 +97,16 @@ Ext.define('NX.ext.form.field.ValueSet', {
     toValues: undefined,
     fromValues: undefined
   },
+
+  /**
+   * @cfg {String} [glyphAddButton="xf055@FontAwesome"]
+   */
+  glyphAddButton: 'xf055@FontAwesome' /* fa-plus-circle */,
+
+  /**
+   * @cfg {String} [glyphDeleteButton="xf056@FontAwesome"]
+   */
+  glyphDeleteButton: 'xf056@FontAwesome' /* fa-minus-circle */,
 
   /**
    * @private {Ext.data.Store} Stores managed values
@@ -191,7 +184,7 @@ Ext.define('NX.ext.form.field.ValueSet', {
               scope: me
             },
             ui: 'nx-plain',
-            iconCls: 'x-fa fa-plus-circle'
+            glyph: me.glyphAddButton
           }
         ]
       },
@@ -238,8 +231,7 @@ Ext.define('NX.ext.form.field.ValueSet', {
           me.validate();
         }
       });
-      Ext.create('Ext.util.KeyNav', {
-        target: me.valueField.el,
+      Ext.create('Ext.util.KeyNav', me.valueField.el, {
         enter: me.addValue,
         scope: me
       });

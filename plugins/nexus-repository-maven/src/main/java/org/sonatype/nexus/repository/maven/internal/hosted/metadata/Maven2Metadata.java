@@ -12,7 +12,7 @@
  */
 package org.sonatype.nexus.repository.maven.internal.hosted.metadata;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -96,15 +96,6 @@ public class Maven2Metadata
       result = 31 * result + name.hashCode();
       return result;
     }
-
-    @Override
-    public String toString() {
-      return "Plugin{" +
-          "artifactId='" + artifactId + '\'' +
-          ", prefix='" + prefix + '\'' +
-          ", name='" + name + '\'' +
-          '}';
-    }
   }
 
   // A level
@@ -138,15 +129,6 @@ public class Maven2Metadata
 
     public List<String> getVersions() {
       return versions;
-    }
-
-    @Override
-    public String toString() {
-      return "BaseVersions{" +
-          "latest='" + latest + '\'' +
-          ", release='" + release + '\'' +
-          ", versions=" + versions +
-          '}';
     }
   }
 
@@ -222,37 +204,26 @@ public class Maven2Metadata
       result = 31 * result + version.hashCode();
       return result;
     }
-
-    @Override
-    public String toString() {
-      return "Snapshot{" +
-          "lastUpdated=" + lastUpdated +
-          ", extension='" + extension + '\'' +
-          ", classifier='" + classifier + '\'' +
-          ", version='" + version + '\'' +
-          '}';
-    }
   }
 
   public static class Snapshots
   {
-    private final Long snapshotTimestamp;
+    private final long snapshotTimestamp;
 
     private final int snapshotBuildNumber;
 
     private final List<Snapshot> snapshots;
 
-    private Snapshots(@Nullable final Long snapshotTimestamp,
+    private Snapshots(final long snapshotTimestamp,
                       final int snapshotBuildNumber,
-                      @Nullable final List<Snapshot> snapshots)
+                      final List<Snapshot> snapshots)
     {
       this.snapshotTimestamp = snapshotTimestamp;
       this.snapshotBuildNumber = snapshotBuildNumber;
-      this.snapshots = snapshots != null ? ImmutableList.copyOf(snapshots) : Collections.emptyList();
+      this.snapshots = ImmutableList.copyOf(snapshots);
     }
 
-    @Nullable
-    public Long getSnapshotTimestamp() {
+    public long getSnapshotTimestamp() {
       return snapshotTimestamp;
     }
 
@@ -262,15 +233,6 @@ public class Maven2Metadata
 
     public List<Snapshot> getSnapshots() {
       return snapshots;
-    }
-
-    @Override
-    public String toString() {
-      return "Snapshots{" +
-          "timestamp=" + snapshotTimestamp +
-          ", buildNumber=" + snapshotBuildNumber +
-          ", snapshots=" + snapshots +
-          '}';
     }
   }
 
@@ -415,32 +377,11 @@ public class Maven2Metadata
     checkNotNull(version);
     checkArgument(snapshotTimestamp > 0);
     checkArgument(snapshotBuildNumber > 0);
-    final Snapshots snaps = new Snapshots(snapshotTimestamp, snapshotBuildNumber, snapshots);
+    List<Snapshot> ss = new ArrayList<>();
+    if (snapshots != null) {
+      ss.addAll(snapshots);
+    }
+    final Snapshots snaps = new Snapshots(snapshotTimestamp, snapshotBuildNumber, ss);
     return new Maven2Metadata(Level.BASEVERSION, lastUpdated, groupId, artifactId, version, null, null, snaps);
-  }
-
-  public static Maven2Metadata newNonUniqueVersionLevel(final String groupId,
-                                                        final String artifactId,
-                                                        final String version)
-  {
-    checkNotNull(groupId);
-    checkNotNull(artifactId);
-    checkNotNull(version);
-    final Snapshots snaps = new Snapshots(null, 1, null);
-    return new Maven2Metadata(Level.BASEVERSION, DateTime.now(), groupId, artifactId, version, null, null, snaps);
-  }
-
-  @Override
-  public String toString() {
-    return "Maven2Metadata{" +
-        "level=" + level +
-        ", lastUpdated=" + lastUpdated +
-        ", groupId='" + groupId + '\'' +
-        ", artifactId='" + artifactId + '\'' +
-        ", version='" + version + '\'' +
-        ", plugins=" + plugins +
-        ", baseVersions=" + baseVersions +
-        ", snapshots=" + snapshots +
-        '}';
   }
 }

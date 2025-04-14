@@ -45,9 +45,8 @@ public class GlobalComponentLookupHelperImpl
   private final BeanLocator beanLocator;
 
   @Inject
-  public GlobalComponentLookupHelperImpl(
-      @Named("nexus-uber") final ClassLoader classLoader,
-      final BeanLocator beanLocator)
+  public GlobalComponentLookupHelperImpl(@Named("nexus-uber") final ClassLoader classLoader,
+                                         final BeanLocator beanLocator)
   {
     this.classLoader = checkNotNull(classLoader);
     this.beanLocator = checkNotNull(beanLocator);

@@ -19,17 +19,9 @@ import javax.inject.Singleton;
 
 import org.sonatype.goodies.common.ComponentSupport;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Throwables;
 import org.apache.velocity.app.VelocityEngine;
-
-import static org.apache.velocity.runtime.RuntimeConstants.RESOURCE_LOADERS;
-import static org.apache.velocity.runtime.RuntimeConstants.RESOURCE_LOADER_CACHE;
-import static org.apache.velocity.runtime.RuntimeConstants.RESOURCE_LOADER_CHECK_INTERVAL;
-import static org.apache.velocity.runtime.RuntimeConstants.RESOURCE_LOADER_CLASS;
-import static org.apache.velocity.runtime.RuntimeConstants.RUNTIME_REFERENCES_STRICT;
-import static org.apache.velocity.runtime.RuntimeConstants.VM_LIBRARY;
-import static org.apache.velocity.runtime.RuntimeConstants.VM_PERM_INLINE_LOCAL;
+import org.apache.velocity.runtime.RuntimeConstants;
 
 /**
  * Nexus preconfigured ans shared Velocity provider.
@@ -56,27 +48,35 @@ public class VelocityEngineProvider
 
   private VelocityEngine create() {
     VelocityEngine engine = new VelocityEngine();
-    Joiner j = Joiner.on('.');
+
+    // log using our chute (slf4j with level fix)
+    engine.setProperty(RuntimeConstants.RUNTIME_LOG_LOGSYSTEM, new Slf4jLogChute());
 
     // to avoid "unable to find resource 'VM_global_library.vm' in any resource loader."
-    engine.setProperty(VM_LIBRARY, "");
+    engine.setProperty("velocimacro.library", "");
 
     // to use classpath loader
-    engine.setProperty(RESOURCE_LOADERS, RESOURCE_LOADER_CLASS);
-    engine.setProperty(j.join(RESOURCE_LOADERS, RESOURCE_LOADER_CLASS, RESOURCE_LOADER_CLASS),
+    engine.setProperty(RuntimeConstants.RESOURCE_LOADER, "class");
+    engine.setProperty("class.resource.loader.class",
+        "org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
+
+    // to make us strict with template references (early problem detection)
+    engine.setProperty("runtime.references.strict", "true");
+    engine.setProperty(RuntimeConstants.RESOURCE_LOADER, "class");
+    engine.setProperty("class.resource.loader.class",
         "org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
 
     // to set caching ON
-    engine.setProperty(j.join(RESOURCE_LOADERS, RESOURCE_LOADER_CLASS, RESOURCE_LOADER_CACHE), "true");
+    engine.setProperty("class.resource.loader.cache", "true");
 
     // to never check for template modification (they are JARred)
-    engine.setProperty(j.join(RESOURCE_LOADERS, RESOURCE_LOADER_CLASS, RESOURCE_LOADER_CHECK_INTERVAL), "0");
+    engine.setProperty("class.resource.loader.modificationCheckInterval", "0");
 
     // to set strict mode OFF
-    engine.setProperty(RUNTIME_REFERENCES_STRICT, "false");
+    engine.setProperty("runtime.references.strict", "false");
 
     // to force templates having inline local scope for VM definitions
-    engine.setProperty(VM_PERM_INLINE_LOCAL, "true");
+    engine.setProperty("velocimacro.permissions.allow.inline.local.scope", "true");
 
     log.debug("Initializing: {}", engine);
     try {

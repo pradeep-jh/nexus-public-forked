@@ -13,7 +13,6 @@
 package org.sonatype.nexus.jmx.reflect;
 
 import java.lang.reflect.Method;
-import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
 import javax.management.Descriptor;
@@ -22,6 +21,8 @@ import javax.management.MBeanAttributeInfo;
 
 import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.jmx.MBeanAttribute;
+
+import com.google.common.base.Supplier;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;

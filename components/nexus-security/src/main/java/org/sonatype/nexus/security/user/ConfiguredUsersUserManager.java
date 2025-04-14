@@ -68,7 +68,7 @@ public class ConfiguredUsersUserManager
     List<CUserRoleMapping> userRoleMappings = configuration.listUserRoleMappings();
     for (CUserRoleMapping userRoleMapping : userRoleMappings) {
       try {
-        User user = securitySystem.getUser(userRoleMapping.getUserId(), userRoleMapping.getSource(), userRoleMapping.getRoles());
+        User user = securitySystem.getUser(userRoleMapping.getUserId(), userRoleMapping.getSource());
         if (user != null) {
           users.add(user);
         }
@@ -104,12 +104,6 @@ public class ConfiguredUsersUserManager
 
   @Override
   public User getUser(final String userId) {
-    // this resource will only list the users
-    return null;
-  }
-
-  @Override
-  public User getUser(final String userId, final Set<String> roleIds) {
     // this resource will only list the users
     return null;
   }
@@ -155,10 +149,5 @@ public class ConfiguredUsersUserManager
   @Override
   public String getAuthenticationRealmName() {
     return null;
-  }
-
-  @Override
-  public boolean isConfigured() {
-    throw new UnsupportedOperationException("Not supported yet.");
   }
 }

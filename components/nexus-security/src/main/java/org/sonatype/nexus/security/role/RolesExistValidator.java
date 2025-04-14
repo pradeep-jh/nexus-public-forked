@@ -53,7 +53,7 @@ public class RolesExistValidator
         authorizationManager.getRole(String.valueOf(item));
       }
       catch (NoSuchRoleException e) {
-        missing.add(getEscapeHelper().stripJavaEl(item.toString()));
+        missing.add(item);
       }
     }
     if (missing.isEmpty()) {

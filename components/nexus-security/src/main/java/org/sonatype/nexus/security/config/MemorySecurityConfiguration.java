@@ -13,22 +13,11 @@
 package org.sonatype.nexus.security.config;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
-import javax.annotation.Nullable;
-
-import org.sonatype.nexus.security.config.memory.MemoryCPrivilege;
-import org.sonatype.nexus.security.config.memory.MemoryCRole;
-import org.sonatype.nexus.security.config.memory.MemoryCUser;
-import org.sonatype.nexus.security.config.memory.MemoryCUserRoleMapping;
 import org.sonatype.nexus.security.privilege.NoSuchPrivilegeException;
 import org.sonatype.nexus.security.role.NoSuchRoleException;
 import org.sonatype.nexus.security.user.NoSuchRoleMappingException;
@@ -37,11 +26,9 @@ import org.sonatype.nexus.security.user.UserNotFoundException;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import org.apache.shiro.util.CollectionUtils;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
-import static org.sonatype.nexus.security.config.SecuritySourceUtil.isCaseInsensitiveSource;
 
 /**
  * Memory based {@link SecurityConfiguration}.
@@ -85,21 +72,11 @@ public class MemorySecurityConfiguration
   public void addUser(final CUser user, final Set<String> roles) {
     addUser(user);
 
-    CUserRoleMapping mapping = new MemoryCUserRoleMapping();
+    CUserRoleMapping mapping = new CUserRoleMapping();
     mapping.setUserId(user.getId());
     mapping.setSource(UserManager.DEFAULT_SOURCE);
     mapping.setRoles(roles);
     addUserRoleMapping(mapping);
-  }
-
-  @Override
-  public void addRoleMapping(final String userId, final Set<String> roles, final String source) {
-    // No op
-  }
-
-  @Override
-  public CUser newUser() {
-    return new MemoryCUser();
   }
 
   public void setUsers(final Collection<CUser> users) {
@@ -111,25 +88,15 @@ public class MemorySecurityConfiguration
     }
   }
 
-  public MemorySecurityConfiguration withUsers(final CUser... users) {
-    setUsers(Arrays.asList(users));
-    return this;
-  }
-
   @Override
-  public void updateUser(final CUser user) throws UserNotFoundException {
+  public void updateUser(final CUser user, final Set<String> roles) throws UserNotFoundException {
     checkNotNull(user);
     checkNotNull(user.getId());
     if (users.replace(user.getId(), user) == null) {
       throw new UserNotFoundException(user.getId());
     }
-  }
 
-  @Override
-  public void updateUser(final CUser user, final Set<String> roles) throws UserNotFoundException {
-    updateUser(user);
-
-    CUserRoleMapping mapping = new MemoryCUserRoleMapping();
+    CUserRoleMapping mapping = new CUserRoleMapping();
     mapping.setUserId(user.getId());
     mapping.setSource(UserManager.DEFAULT_SOURCE);
     mapping.setRoles(roles);
@@ -170,7 +137,8 @@ public class MemorySecurityConfiguration
     checkNotNull(mapping.getSource());
     checkState(
         userRoleMappings.putIfAbsent(userRoleMappingKey(mapping.getUserId(), mapping.getSource()), mapping) == null,
-        "%s/%s already exists", mapping.getUserId(), mapping.getSource());
+        "%s/%s already exists", mapping.getUserId(), mapping.getSource()
+    );
   }
 
   public void setUserRoleMappings(final Collection<CUserRoleMapping> mappings) {
@@ -180,11 +148,6 @@ public class MemorySecurityConfiguration
         addUserRoleMapping(mapping);
       }
     }
-  }
-
-  public MemorySecurityConfiguration withUserRoleMappings(final CUserRoleMapping... mappings) {
-    setUserRoleMappings(Arrays.asList(mappings));
-    return this;
   }
 
   @Override
@@ -215,35 +178,11 @@ public class MemorySecurityConfiguration
     return privileges.get(id);
   }
 
-  @Nullable
   @Override
-  public CPrivilege getPrivilegeByName(final String name) {
-    return Optional.ofNullable(name)
-        .flatMap(n -> privileges.values()
-            .stream()
-            .filter(p -> p.getName().equals(n))
-            .findFirst())
-        .orElse(null);
-  }
-
-  @Override
-  public List<CPrivilege> getPrivileges(final Set<String> ids) {
-    if (CollectionUtils.isEmpty(ids)) {
-      return Collections.emptyList();
-    }
-
-    return ids.stream()
-        .map(privileges::get)
-        .filter(Objects::nonNull)
-        .toList();
-  }
-
-  @Override
-  public CPrivilege addPrivilege(final CPrivilege privilege) {
+  public void addPrivilege(final CPrivilege privilege) {
     checkNotNull(privilege);
     checkNotNull(privilege.getId());
     checkState(privileges.putIfAbsent(privilege.getId(), privilege) == null, "%s already exists", privilege.getId());
-    return privilege;
   }
 
   public void setPrivileges(final Collection<CPrivilege> privileges) {
@@ -255,13 +194,8 @@ public class MemorySecurityConfiguration
     }
   }
 
-  public MemorySecurityConfiguration withPrivileges(final CPrivilege... privileges) {
-    setPrivileges(new ArrayList<>(Arrays.asList(privileges)));
-    return this;
-  }
-
   @Override
-  public void updatePrivilege(final CPrivilege privilege) {
+  public void updatePrivilege(final CPrivilege privilege) throws NoSuchPrivilegeException {
     checkNotNull(privilege);
     checkNotNull(privilege.getId());
     if (privileges.replace(privilege.getId(), privilege) == null) {
@@ -270,23 +204,9 @@ public class MemorySecurityConfiguration
   }
 
   @Override
-  public void updatePrivilegeByName(final CPrivilege privilege) {
-    updatePrivilege(privilege);
-  }
-
-  @Override
   public boolean removePrivilege(final String id) {
     checkNotNull(id);
     return privileges.remove(id) != null;
-  }
-
-  @Override
-  public boolean removePrivilegeByName(final String name) {
-    return Optional.ofNullable(name)
-        .map(this::getPrivilegeByName)
-        .map(CPrivilege::getId)
-        .map(this::removePrivilege)
-        .orElse(false);
   }
 
   @Override
@@ -316,13 +236,8 @@ public class MemorySecurityConfiguration
     }
   }
 
-  public MemorySecurityConfiguration withRoles(final CRole... roles) {
-    setRoles(Arrays.asList(roles));
-    return this;
-  }
-
   @Override
-  public void updateRole(final CRole role) {
+  public void updateRole(final CRole role) throws NoSuchRoleException {
     checkNotNull(role);
     checkNotNull(role.getId());
     if (roles.replace(role.getId(), role) == null) {
@@ -349,21 +264,6 @@ public class MemorySecurityConfiguration
   }
 
   private String userRoleMappingKey(final String userId, final String source) {
-    return (isCaseInsensitiveSource(source) ? userId.toLowerCase() : userId) + "|" + source;
-  }
-
-  @Override
-  public CUserRoleMapping newUserRoleMapping() {
-    return new MemoryCUserRoleMapping();
-  }
-
-  @Override
-  public CRole newRole() {
-    return new MemoryCRole();
-  }
-
-  @Override
-  public CPrivilege newPrivilege() {
-    return new MemoryCPrivilege();
+    return userId + "|" + source;
   }
 }

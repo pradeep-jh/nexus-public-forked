@@ -17,7 +17,7 @@ import javax.validation.Valid;
 
 import org.sonatype.nexus.validation.constraint.PortNumber;
 
-import javax.validation.constraints.NotBlank;
+import org.hibernate.validator.constraints.NotBlank;
 
 /**
  * Proxy-server configuration.

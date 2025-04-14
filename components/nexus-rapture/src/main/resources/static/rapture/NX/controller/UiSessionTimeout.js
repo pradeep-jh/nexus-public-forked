@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -29,8 +25,7 @@ Ext.define('NX.controller.UiSessionTimeout', {
     'NX.Security',
     'NX.State',
     'NX.I18n',
-    'NX.State',
-    'NX.util.Window'
+    'NX.State'
   ],
 
   views: [
@@ -66,7 +61,6 @@ Ext.define('NX.controller.UiSessionTimeout', {
       },
       component: {
         'nx-expire-session': {
-          beforerender: NX.util.Window.closeWindows,
           afterrender: me.startTicking
         },
         'nx-expire-session button[action=cancel]': {
@@ -99,10 +93,6 @@ Ext.define('NX.controller.UiSessionTimeout', {
     if (uiSettings.sessionTimeout !== oldUiSettings.sessionTimeout) {
       this.setupTimeout();
     }
-
-    if (uiSettings.requestTimeout) {
-      this.setRequestTimeout(uiSettings.requestTimeout);
-    }
   },
 
   /**
@@ -110,13 +100,12 @@ Ext.define('NX.controller.UiSessionTimeout', {
    */
   setupTimeout: function () {
     var me = this,
-        hasUser = !Ext.isEmpty(NX.State.getUser()),
+        user = NX.State.getUser(),
         uiSettings = NX.State.getValue('uiSettings') || {},
-        sessionTimeout = uiSettings['sessionTimeout'],
-        requestTimeout = uiSettings['requestTimeout'];
+        sessionTimeout = user ? uiSettings['sessionTimeout'] : undefined;
 
     me.cancelTimeout();
-    if ((hasUser && NX.State.isReceiving()) && sessionTimeout > 0) {
+    if ((user && NX.State.isReceiving()) && sessionTimeout > 0) {
       //<if debug>
       me.logDebug('Session expiration enabled for', sessionTimeout, 'minutes');
       //</if>
@@ -129,22 +118,6 @@ Ext.define('NX.controller.UiSessionTimeout', {
       });
       me.activityMonitor.start();
     }
-
-    me.setRequestTimeout(requestTimeout);
-  },
-
-  /**
-   * @private
-   */
-  setRequestTimeout: function (timeoutSeconds) {
-    if (isNaN(timeoutSeconds)) {
-      return;
-    }
-
-    var timeoutMilliseconds = timeoutSeconds * 1000;
-    Ext.Ajax.setTimeout(timeoutMilliseconds);
-    Ext.override(Ext.form.Panel, { timeout: timeoutSeconds });
-    Ext.override(Ext.data.Connection, { timeout: timeoutSeconds });
   },
 
   /**
@@ -182,7 +155,7 @@ Ext.define('NX.controller.UiSessionTimeout', {
    * @private
    */
   showExpirationWindow: function () {
-    NX.Messages.warning(NX.I18n.get('UiSessionTimeout_Expire_Message'));
+    NX.Messages.add({text: NX.I18n.get('UiSessionTimeout_Expire_Message'), type: 'warning'});
     this.getExpireSessionView().create();
   },
 
@@ -200,7 +173,10 @@ Ext.define('NX.controller.UiSessionTimeout', {
           win.down('button[action=close]').show();
           win.down('button[action=signin]').show();
           win.down('button[action=cancel]').hide();
-          NX.Messages.warning(NX.I18n.format('UiSessionTimeout_Expired_Message', NX.State.getValue('uiSettings')['sessionTimeout']));
+          NX.Messages.add({
+            text: NX.I18n.format('UiSessionTimeout_Expired_Message', NX.State.getValue('uiSettings')['sessionTimeout']),
+            type: 'warning'
+          });
           NX.Security.signOut();
         }
       },

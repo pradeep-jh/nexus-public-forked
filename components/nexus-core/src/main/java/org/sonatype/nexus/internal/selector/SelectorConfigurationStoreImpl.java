@@ -16,118 +16,100 @@ import java.util.List;
 
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 
+import org.sonatype.nexus.common.app.ManagedLifecycle;
 import org.sonatype.nexus.common.entity.EntityId;
-import org.sonatype.nexus.common.event.EventManager;
-import org.sonatype.nexus.datastore.ConfigStoreSupport;
-import org.sonatype.nexus.datastore.api.DataSessionSupplier;
-import org.sonatype.nexus.distributed.event.service.api.EventType;
-import org.sonatype.nexus.distributed.event.service.api.common.SelectorConfigurationChangedEvent;
+import org.sonatype.nexus.common.stateguard.Guarded;
+import org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport;
+import org.sonatype.nexus.orient.DatabaseInstance;
+import org.sonatype.nexus.orient.DatabaseInstanceNames;
 import org.sonatype.nexus.selector.SelectorConfiguration;
-import org.sonatype.nexus.selector.SelectorConfigurationStore;
-import org.sonatype.nexus.transaction.Transactional;
 
 import com.google.common.collect.ImmutableList;
+import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.SCHEMAS;
+import static org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport.State.STARTED;
+import static org.sonatype.nexus.orient.transaction.OrientTransactional.inTx;
+import static org.sonatype.nexus.orient.transaction.OrientTransactional.inTxRetry;
 
 /**
- * MyBatis {@link SelectorConfigurationStore} implementation.
+ * Default {@link SelectorConfigurationStore} implementation.
  *
- * @since 3.21
+ * @since 3.0
  */
-@Named("mybatis")
+@Named
 @Singleton
+@ManagedLifecycle(phase = SCHEMAS)
 public class SelectorConfigurationStoreImpl
-    extends ConfigStoreSupport<SelectorConfigurationDAO>
+    extends StateGuardLifecycleSupport
     implements SelectorConfigurationStore
 {
-  private final EventManager eventManager;
+  private final Provider<DatabaseInstance> databaseInstance;
+
+  private final SelectorConfigurationEntityAdapter entityAdapter;
 
   @Inject
-  public SelectorConfigurationStoreImpl(final DataSessionSupplier sessionSupplier, final EventManager eventManager) {
-    super(sessionSupplier);
-    this.eventManager = checkNotNull(eventManager);
+  public SelectorConfigurationStoreImpl(@Named(DatabaseInstanceNames.CONFIG) final Provider<DatabaseInstance> databaseInstance,
+                                        final SelectorConfigurationEntityAdapter entityAdapter)
+  {
+    this.databaseInstance = databaseInstance;
+    this.entityAdapter = entityAdapter;
   }
 
   @Override
-  public SelectorConfiguration newSelectorConfiguration() {
-    return new SelectorConfigurationData();
+  protected void doStart() throws Exception {
+    try (ODatabaseDocumentTx db = databaseInstance.get().connect()) {
+      entityAdapter.register(db);
+    }
   }
 
-  @Transactional
   @Override
+  @Guarded(by = STARTED)
   public List<SelectorConfiguration> browse() {
-    return ImmutableList.copyOf(dao().browse());
+    return inTx(databaseInstance).call(db -> ImmutableList.copyOf(entityAdapter.browse(db)));
   }
 
   @Override
-  public void create(final SelectorConfiguration configuration) {
-    doCreate(configuration);
-    postEvent(configuration);
-    postDesEvent(EventType.CREATED);
-  }
-
-  @Transactional
-  protected void doCreate(final SelectorConfiguration configuration) {
-    dao().create((SelectorConfigurationData) configuration);
-  }
-
-  @Override
+  @Guarded(by = STARTED)
   public SelectorConfiguration read(final EntityId entityId) {
-    throw new UnsupportedOperationException("Use getByName instead");
+    checkNotNull(entityId);
+
+    return inTx(databaseInstance).call(db -> entityAdapter.read(db, entityId));
   }
 
   @Override
-  public void update(final SelectorConfiguration configuration) {
-    if (doUpdate(configuration)) {
-      postEvent(configuration);
-      postDesEvent(EventType.UPDATED);
-    }
-  }
-
-  @Transactional
-  protected boolean doUpdate(final SelectorConfiguration configuration) {
-    return dao().update((SelectorConfigurationData) configuration);
-  }
-
-  @Override
-  public void delete(final SelectorConfiguration configuration) {
-    if (doDelete(configuration)) {
-      postEvent(configuration);
-      postDesEvent(EventType.DELETED);
-    }
-  }
-
-  @Transactional
-  protected boolean doDelete(final SelectorConfiguration configuration) {
-    return dao().delete(configuration.getName());
-  }
-
-  @Transactional
-  @Override
+  @Guarded(by = STARTED)
   public SelectorConfiguration getByName(final String name) {
-    return dao().read(name).orElse(null);
+    checkNotNull(name);
+
+    return inTx(databaseInstance).call(db -> entityAdapter.getByName(db, name));
   }
 
-  private void postEvent(final SelectorConfiguration configuration) {
-    // trigger invalidation of SelectorManagerImpl caches
-    eventManager.post(new SelectorConfigurationEvent()
-    {
-      @Override
-      public boolean isLocal() {
-        return true;
-      }
+  @Override
+  @Guarded(by = STARTED)
+  public void create(final SelectorConfiguration configuration) {
+    checkNotNull(configuration);
 
-      @Override
-      public SelectorConfiguration getSelectorConfiguration() {
-        return configuration;
-      }
-    });
+    inTxRetry(databaseInstance).run(db -> entityAdapter.addEntity(db, configuration));
   }
 
-  private void postDesEvent(final EventType eventType) {
-    eventManager.post(new SelectorConfigurationChangedEvent(eventType));
+  @Override
+  @Guarded(by = STARTED)
+  public void update(final SelectorConfiguration configuration) {
+    checkNotNull(configuration);
+
+    inTxRetry(databaseInstance).run(db -> entityAdapter.editEntity(db, configuration));
+  }
+
+  @Override
+  @Guarded(by = STARTED)
+  public void delete(final SelectorConfiguration configuration) {
+    checkNotNull(configuration);
+
+    inTxRetry(databaseInstance).run(db -> entityAdapter.deleteEntity(db, configuration));
   }
 }

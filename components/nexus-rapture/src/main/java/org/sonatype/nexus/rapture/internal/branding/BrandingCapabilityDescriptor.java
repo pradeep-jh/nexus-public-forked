@@ -25,7 +25,6 @@ import org.sonatype.nexus.capability.CapabilityDescriptorSupport;
 import org.sonatype.nexus.capability.CapabilityType;
 import org.sonatype.nexus.capability.Tag;
 import org.sonatype.nexus.capability.Taggable;
-import org.sonatype.nexus.common.upgrade.AvailabilityVersion;
 import org.sonatype.nexus.formfields.CheckboxFormField;
 import org.sonatype.nexus.formfields.FormField;
 import org.sonatype.nexus.formfields.TextAreaFormField;
@@ -37,7 +36,6 @@ import com.google.common.collect.Lists;
  *
  * @since 3.0
  */
-@AvailabilityVersion(from = "1.0")
 @Named(BrandingCapabilityDescriptor.TYPE_ID)
 @Singleton
 public class BrandingCapabilityDescriptor
@@ -63,8 +61,10 @@ public class BrandingCapabilityDescriptor
     @DefaultMessage("Header HTML snippet")
     String headerHtmlLabel();
 
-    @DefaultMessage("An HTML snippet to be included in branding header. Use '$baseUrl' to insert the base URL of the " +
-        "server (e.g. to reference an image)")
+    @DefaultMessage(
+        "An HTML snippet to be included in branding header.<br/>"
+            + "Use '$baseUrl' to insert the base URL of the server (e.g. to reference an image)"
+    )
     String headerHtmlHelp();
 
     @DefaultMessage("Enable footer")
@@ -76,8 +76,10 @@ public class BrandingCapabilityDescriptor
     @DefaultMessage("Footer HTML snippet")
     String footerHtmlLabel();
 
-    @DefaultMessage("An HTML snippet to be included in branding footer. Use '$baseUrl' to insert the base URL of the " +
-        "server (e.g. to reference an image)")
+    @DefaultMessage(
+        "An HTML snippet to be included in branding footer.<br/>"
+            + "Use '$baseUrl' to insert the base URL of the server (e.g. to reference an image)"
+    )
     String footerHtmlHelp();
   }
 

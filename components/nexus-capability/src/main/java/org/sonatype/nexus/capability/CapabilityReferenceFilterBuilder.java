@@ -15,7 +15,6 @@ package org.sonatype.nexus.capability;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Predicate;
 
 /**
@@ -37,8 +36,6 @@ public class CapabilityReferenceFilterBuilder
 
     private String typeId;
 
-    private CapabilityIdentity ignoreCapabilityId;
-
     private Boolean enabled;
 
     private Boolean active;
@@ -49,11 +46,6 @@ public class CapabilityReferenceFilterBuilder
 
     public String getTypeId() {
       return typeId;
-    }
-
-    @VisibleForTesting
-    CapabilityIdentity getIgnoreCapabilityId() {
-      return ignoreCapabilityId;
     }
 
     public Boolean isEnabled() {
@@ -74,14 +66,6 @@ public class CapabilityReferenceFilterBuilder
 
     public CapabilityReferenceFilter withType(final CapabilityType type) {
       typeId = type.toString();
-      return this;
-    }
-
-    /**
-     * @since 3.13
-     */
-    public CapabilityReferenceFilter ignore(final CapabilityIdentity id) {
-      ignoreCapabilityId = id;
       return this;
     }
 
@@ -144,9 +128,6 @@ public class CapabilityReferenceFilterBuilder
         return false;
       }
       if (typeId != null && !typeId.equals(input.context().type().toString())) {
-        return false;
-      }
-      if (ignoreCapabilityId != null && ignoreCapabilityId.equals(input.context().id())) {
         return false;
       }
       if (enabled != null && !enabled.equals(input.context().isEnabled())) {

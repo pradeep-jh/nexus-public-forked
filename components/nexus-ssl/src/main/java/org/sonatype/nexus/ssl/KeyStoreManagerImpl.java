@@ -201,7 +201,7 @@ public class KeyStoreManagerImpl
   }
 
   private void logTrustedCertificateAliases(final KeystoreInstance ks) {
-    checkNotNull(ks);
+    assert ks != null;
 
     if (log.isTraceEnabled()) {
       try {
@@ -429,10 +429,5 @@ public class KeyStoreManagerImpl
     } finally {
       privateKeyStoreLock.writeLock().unlock();
     }
-  }
-
-  @Override
-  public void reloadTrustedKeystore() throws KeystoreException {
-    trustedKeyStore.reloadIfReplicating(config.getTrustedKeyStorePassword());
   }
 }

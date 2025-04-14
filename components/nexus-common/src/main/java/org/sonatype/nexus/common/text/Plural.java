@@ -27,11 +27,10 @@ public final class Plural
     // empty
   }
 
-  public static StringBuilder append(
-      final StringBuilder buff,
-      final int value,
-      final String singular,
-      @Nullable final String plural)
+  public static StringBuilder append(final StringBuilder buff,
+                                     final int value,
+                                     final String singular,
+                                     @Nullable final String plural)
   {
     checkNotNull(buff);
     checkNotNull(singular);
@@ -50,13 +49,13 @@ public final class Plural
     return buff;
   }
 
-  public static StringBuilder append(
-      final StringBuilder buff,
-      final int value,
-      final String singular)
+  public static StringBuilder append(final StringBuilder buff,
+                                     final int value,
+                                     final String singular)
   {
     return append(buff, value, singular, null);
   }
+
 
   public static String of(final int value, final String singular, @Nullable final String plural) {
     return append(new StringBuilder(), value, singular, plural).toString();

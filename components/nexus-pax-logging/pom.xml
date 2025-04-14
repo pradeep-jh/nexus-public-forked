@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus</groupId>
     <artifactId>nexus-components</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-pax-logging</artifactId>
@@ -28,12 +28,6 @@
   <packaging>bundle</packaging>
 
   <dependencies>
-    <dependency>
-      <groupId>org.osgi</groupId>
-      <artifactId>osgi.core</artifactId>
-      <scope>provided</scope>
-    </dependency>
-
     <dependency>
       <groupId>org.ops4j.pax.logging</groupId>
       <artifactId>pax-logging-api</artifactId>
@@ -52,7 +46,7 @@
     </dependency>
 
     <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
+      <groupId>com.codahale.metrics</groupId>
       <artifactId>metrics-logback</artifactId>
       <optional>true</optional>
     </dependency>
@@ -69,14 +63,8 @@
     </dependency>
 
     <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-testsupport</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.awaitility</groupId>
-      <artifactId>awaitility</artifactId>
+      <groupId>org.sonatype.goodies</groupId>
+      <artifactId>goodies-testsupport</artifactId>
       <scope>test</scope>
     </dependency>
 
@@ -90,7 +78,7 @@
         <configuration>
           <instructions>
             <Bundle-Activator>
-              org.sonatype.nexus.pax.logging.NexusLogActivator
+              org.ops4j.pax.logging.logback.internal.Activator
             </Bundle-Activator>
             <Embed-Dependency>
               pax-logging-logback;inline=true,
@@ -111,9 +99,6 @@
               !org.osgi.service.event,
               javax.*|org.*|com.codahale.*
             </Import-Package>
-            <Export-Package>
-              org.sonatype.nexus.pax.logging.*
-            </Export-Package>
           </instructions>
         </configuration>
       </plugin>

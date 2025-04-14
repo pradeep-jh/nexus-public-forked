@@ -23,11 +23,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.sonatype.goodies.testsupport.TestSupport;
+import org.sonatype.nexus.orient.testsupport.DatabaseInstanceRule;
 import org.sonatype.nexus.quartz.TaskSchedulerHelper;
 
 import com.google.common.base.Throwables;
 import org.junit.After;
-import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
 import org.quartz.Job;
 import org.quartz.JobBuilder;
@@ -46,11 +47,9 @@ import org.quartz.TriggerKey;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.quartz.simpl.SimpleJobFactory;
 
-import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.quartz.JobBuilder.newJob;
@@ -65,12 +64,11 @@ import static org.quartz.TriggerKey.triggerKey;
  *
  * @see <a href="http://svn.terracotta.org/svn/quartz/tags/quartz-2.2.2/quartz-core/src/test/java/org/quartz/AbstractSchedulerTest.java">AbstractSchedulerTest.java</a>
  */
-@Ignore("NEXUS-43375")
 public class SchedulerTest
     extends TestSupport
 {
-  //@Rule
-  //public DatabaseInstanceRule database = DatabaseInstanceRule.inMemory("test");
+  @Rule
+  public DatabaseInstanceRule database = DatabaseInstanceRule.inMemory("test");
 
   public TaskSchedulerHelper taskSchedulerHelper;
 
@@ -124,7 +122,7 @@ public class SchedulerTest
 
   protected Scheduler createScheduler(String name, int threadPoolSize) throws SchedulerException {
     try {
-      //this.taskSchedulerHelper = new TaskSchedulerHelper(database.getInstance());
+      this.taskSchedulerHelper = new TaskSchedulerHelper(database.getInstance());
       this.taskSchedulerHelper.init(threadPoolSize, new SimpleJobFactory());
       this.taskSchedulerHelper.start();
       return ((QuartzSchedulerSPI) taskSchedulerHelper.getScheduler()).getScheduler();
@@ -540,7 +538,6 @@ public class SchedulerTest
     barrier.await(TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
 
     Thread jobThread = (Thread) scheduler.getContext().get(JOB_THREAD);
-    assertThat(jobThread, notNullValue());
     jobThread.join(TimeUnit.SECONDS.toMillis(TEST_TIMEOUT_SECONDS));
   }
 

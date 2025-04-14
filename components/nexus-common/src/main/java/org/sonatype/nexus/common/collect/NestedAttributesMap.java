@@ -16,7 +16,6 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 
@@ -29,31 +28,24 @@ import static com.google.common.base.Preconditions.checkState;
  * @since 3.0
  */
 public class NestedAttributesMap
-    extends AttributesMap
+  extends AttributesMap
 {
   @VisibleForTesting
   static final String SEPARATOR = "::";
 
-  @JsonProperty
   @Nullable
-  private NestedAttributesMap parent;
+  private final NestedAttributesMap parent;
 
-  @JsonProperty
-  private String key;
-
-  public NestedAttributesMap() {
-    super();
-  }
+  private final String key;
 
   public NestedAttributesMap(final String key, final Map<String, Object> backing) {
     this(null, key, backing);
   }
 
   @VisibleForTesting
-  NestedAttributesMap(
-      @Nullable final NestedAttributesMap parent,
-      final String key,
-      final Map<String, Object> backing)
+  NestedAttributesMap(@Nullable final NestedAttributesMap parent,
+                      final String key,
+                      final Map<String, Object> backing)
   {
     super(backing);
     this.parent = parent;
@@ -109,14 +101,13 @@ public class NestedAttributesMap
   /**
    * Create new backing for new children attributes backing.
    */
-  protected Map<String, Object> newChildBacking() {
+  protected Map<String,Object> newChildBacking() {
     return Maps.newHashMap();
   }
 
   /**
    * Returns nested children attributes for given name.
    */
-  @SuppressWarnings("unchecked")
   public NestedAttributesMap child(final String name) {
     checkNotNull(name);
 
@@ -128,8 +119,18 @@ public class NestedAttributesMap
     else {
       checkState(child instanceof Map, "child '%s' not a Map", name);
     }
-    // noinspection unchecked,ConstantConditions
+    //noinspection unchecked,ConstantConditions
     return new NestedAttributesMap(this, name, (Map<String, Object>) child);
+  }
+
+  /**
+   * Prevents setting {@link Map} values and require use of {@link #child}.
+   */
+  @Nullable
+  @Override
+  public Object set(final String key, @Nullable final Object value) {
+    checkState(!(value instanceof Map), "Use child() to set a map value");
+    return super.set(key, value);
   }
 
   @Override

@@ -34,14 +34,13 @@ import org.mockito.Mock;
 
 import static com.google.common.collect.Lists.newArrayList;
 import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.sonatype.nexus.repository.RepositoryTaskSupport.ALL_REPOSITORIES;
 
 public class RemoveSnapshotsTaskTest
     extends TestSupport
@@ -64,7 +63,7 @@ public class RemoveSnapshotsTaskTest
     configuration = new TaskConfiguration();
     configuration.setId("test");
     configuration.setTypeId("test");
-    configuration.setString(RepositoryTaskSupport.REPOSITORY_NAME_FIELD_ID, ALL_REPOSITORIES);
+    configuration.setString(RepositoryTaskSupport.REPOSITORY_NAME_FIELD_ID, "*");
 
     when(mavenFacet.getVersionPolicy()).thenReturn(VersionPolicy.SNAPSHOT);
 
@@ -147,14 +146,14 @@ public class RemoveSnapshotsTaskTest
     verify(removeSnapshotsFacet, times(2)).removeSnapshots(any());
   }
 
-  private void verifyGroups(final Repository... groups) {
+  private void verifyGroups(Repository... groups) {
     for (Repository group : groups) {
       assertThat(taskUnderTest.hasBeenProcessed(group), is(true));
       verify(group, never()).facet(RemoveSnapshotsFacet.class); // groups should not have the facet executed against
     }
   }
 
-  private void verifyRepoProcessed(final Repository repo, final int numFacetExecutions) {
+  private void verifyRepoProcessed(Repository repo, int numFacetExecutions) {
     assertThat(taskUnderTest.hasBeenProcessed(repo), is(true));
     verify(repo, times(numFacetExecutions)).facet(RemoveSnapshotsFacet.class);
   }
@@ -169,7 +168,7 @@ public class RemoveSnapshotsTaskTest
     return repo;
   }
 
-  private Repository mockGroup(final List<Repository> groupMembers) {
+  private Repository mockGroup(List<Repository> groupMembers) {
     Repository group = mock(Repository.class);
     GroupFacet facet = mock(GroupFacet.class);
 

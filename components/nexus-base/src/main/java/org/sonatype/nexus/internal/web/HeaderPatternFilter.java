@@ -80,10 +80,8 @@ public class HeaderPatternFilter
   }
 
   @Override
-  public void doFilter(
-      final ServletRequest request,
-      final ServletResponse response,
-      final FilterChain chain) throws IOException, ServletException
+  public void doFilter(final ServletRequest request, final ServletResponse response, final FilterChain chain)
+      throws IOException, ServletException
   {
     if (request instanceof HttpServletRequest && response instanceof HttpServletResponse) {
       HttpServletRequest httpRequest = (HttpServletRequest) request;

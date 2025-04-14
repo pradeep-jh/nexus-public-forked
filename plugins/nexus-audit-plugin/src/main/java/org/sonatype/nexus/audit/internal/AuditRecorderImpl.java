@@ -25,13 +25,8 @@ import org.sonatype.nexus.audit.AuditRecorder;
 import org.sonatype.nexus.audit.InitiatorProvider;
 import org.sonatype.nexus.common.event.EventManager;
 import org.sonatype.nexus.common.node.NodeAccess;
-import org.sonatype.nexus.security.UserIdHelper;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static org.sonatype.nexus.logging.task.TaskLoggingMarkers.AUDIT_LOG_ONLY;
 
 /**
  * Default {@link AuditRecorder} implementation.
@@ -48,20 +43,21 @@ public class AuditRecorderImpl
 
   private final NodeAccess nodeAccess;
 
-  private final InitiatorProvider initiatorProvider;
+  private final AuditStore auditStore;
 
-  private final Logger auditLogger = LoggerFactory.getLogger("auditlog");
+  private final InitiatorProvider initiatorProvider;
 
   private volatile boolean enabled = false;
 
   @Inject
-  public AuditRecorderImpl(
-      final EventManager eventManager,
-      final NodeAccess nodeAccess,
-      final InitiatorProvider initiatorProvider)
+  public AuditRecorderImpl(final EventManager eventManager,
+                           final NodeAccess nodeAccess,
+                           final AuditStore auditStore,
+                           final InitiatorProvider initiatorProvider)
   {
     this.eventManager = eventManager;
     this.nodeAccess = nodeAccess;
+    this.auditStore = auditStore;
     this.initiatorProvider = initiatorProvider;
   }
 
@@ -87,34 +83,17 @@ public class AuditRecorderImpl
         data.setNodeId(nodeAccess.getId());
       }
       if (data.getInitiator() == null) {
-        String initiator = initiatorProvider.get();
-        if (initiator.contains(UserIdHelper.UNKNOWN)) {
-          setInitiator(data, initiator);
-        }
-        else {
-          data.setInitiator(initiator);
-        }
+        data.setInitiator(initiatorProvider.get());
       }
 
+      log.debug("Record: {}", data);
       try {
-        auditLogger.info(AUDIT_LOG_ONLY, new AuditDTO(data).toString());
-
-        eventManager.post(new AuditDataRecordedEvent(data));
+        auditStore.add(data);
+        eventManager.post(new AuditDataRecordedEvent(data.copy()));
       }
       catch (Exception e) {
         log.warn("Failed to record audit data", e);
       }
     }
   }
-
-  private void setInitiator(final AuditData data, final String initiator) {
-    if (data.getAttributes().containsKey("principal")) {
-      String newInitiator = initiator.replace(UserIdHelper.UNKNOWN, data.getAttributes().get("principal").toString());
-      data.setInitiator(newInitiator);
-    }
-    else {
-      data.setInitiator(initiator);
-    }
-  }
-
 }

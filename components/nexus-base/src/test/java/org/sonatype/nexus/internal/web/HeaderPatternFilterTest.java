@@ -24,7 +24,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -158,6 +158,7 @@ public class HeaderPatternFilterTest
     testHeaderForwardedValue("  proto=https; by=203.0.113.43;for=192.0.2.60;");
     verify(filterChain).doFilter(request, response);
   }
+
 
   @Test
   public void testFilter_JustInvalidProto() throws Exception {

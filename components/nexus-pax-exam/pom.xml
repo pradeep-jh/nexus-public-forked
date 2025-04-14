@@ -20,22 +20,17 @@
   <parent>
     <groupId>org.sonatype.nexus</groupId>
     <artifactId>nexus-components</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-pax-exam</artifactId>
   <name>${project.groupId}:${project.artifactId}</name>
   <packaging>bundle</packaging>
 
-  <properties>
-    <!-- this is a bundle used only by tests -->
-    <clm.skip>true</clm.skip>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>org.osgi</groupId>
-      <artifactId>osgi.core</artifactId>
+      <artifactId>org.osgi.core</artifactId>
     </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
@@ -78,23 +73,6 @@
       <groupId>org.sonatype.goodies</groupId>
       <artifactId>goodies-testsupport</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-testsupport</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>testcontainers</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.adobe.testing</groupId>
-      <artifactId>s3mock-testcontainers</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.codehaus.groovy</groupId>
-      <artifactId>groovy-ant</artifactId>
-    </dependency>
 
     <!--
     Minimum API expected by nexus-pax-exam
@@ -106,10 +84,6 @@
     <dependency>
       <groupId>org.sonatype.nexus</groupId>
       <artifactId>nexus-scheduling</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.aries.spifly</groupId>
-      <artifactId>org.apache.aries.spifly.dynamic.bundle</artifactId>
     </dependency>
   </dependencies>
 
@@ -132,17 +106,11 @@
             <Embed-Directory>testlib</Embed-Directory>
             <_nodefaultversion>true</_nodefaultversion>
             <Embed-Dependency>
-              goodies-testsupport,
-              testcontainers,
-              s3mock-testcontainers,
-              duct-tape
+              goodies-testsupport
             </Embed-Dependency>
             <_exportcontents>
               !*.internal,
-              org.sonatype.*,
-              org.testcontainers.*,
-              com.adobe.testing.s3mock.testcontainers.*,
-              org.rnorth.ducttape.*
+              org.sonatype.*
             </_exportcontents>
             <!--
             These imports are available immediately at boot

@@ -21,10 +21,9 @@ import org.sonatype.nexus.capability.ConditionEvent.Satisfied;
 import org.sonatype.nexus.capability.ConditionEvent.Unsatisfied;
 import org.sonatype.nexus.common.event.EventManager;
 
-import org.hamcrest.BaseMatcher;
-import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.junit.Before;
+import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -34,7 +33,7 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.instanceOf;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doAnswer;
 
 /**
@@ -82,14 +81,11 @@ public class EventManagerTestSupport
   protected static Matcher<Object> satisfied(final Condition condition) {
     return allOf(
         instanceOf(Satisfied.class),
-        new BaseMatcher<Object>() {
+        new ArgumentMatcher<Object>()
+        {
           @Override
-          public boolean matches(final Object actual) {
-            return ((Satisfied) actual).getCondition() == condition;
-          }
-
-          @Override
-          public void describeTo(final Description description) {
+          public boolean matches(final Object argument) {
+            return ((Satisfied) argument).getCondition() == condition;
           }
         }
     );
@@ -98,14 +94,11 @@ public class EventManagerTestSupport
   protected static Matcher<Object> unsatisfied(final Condition condition) {
     return allOf(
         instanceOf(Unsatisfied.class),
-        new BaseMatcher<Object>() {
+        new ArgumentMatcher<Object>()
+        {
           @Override
-          public boolean matches(final Object actual) {
-            return ((Unsatisfied) actual).getCondition() == condition;
-          }
-
-          @Override
-          public void describeTo(final Description description) {
+          public boolean matches(final Object argument) {
+            return ((Unsatisfied) argument).getCondition() == condition;
           }
         }
     );

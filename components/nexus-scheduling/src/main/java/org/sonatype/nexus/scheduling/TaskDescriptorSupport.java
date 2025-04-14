@@ -55,8 +55,6 @@ public abstract class TaskDescriptorSupport
 
   protected static final boolean NOT_EXPOSED = false;
 
-  protected static final boolean REQUEST_RECOVERY = true;
-
   private final String id;
 
   private final String name;
@@ -67,12 +65,8 @@ public abstract class TaskDescriptorSupport
 
   private final boolean exposed;
 
-  private final boolean requestRecovery;
-
   private final List<FormField> formFields;
 
-  private boolean isReadOnlyUi;
-
   public TaskDescriptorSupport(final String id,
                                final Class<? extends Task> type,
                                final String name,
@@ -80,23 +74,12 @@ public abstract class TaskDescriptorSupport
                                final boolean exposed,
                                final FormField... formFields)
   {
-    this(id, type, name, visible, exposed, false, formFields);
-  }
 
-  public TaskDescriptorSupport(final String id,
-                               final Class<? extends Task> type,
-                               final String name,
-                               final boolean visible,
-                               final boolean exposed,
-                               final boolean requestRecovery,
-                               final FormField... formFields)
-  {
     this.id = checkNotNull(id);
     this.type = checkNotNull(type);
     this.name = checkNotNull(name);
     this.visible = visible;
     this.exposed = exposed;
-    this.requestRecovery = requestRecovery;
 
     checkNotNull(formFields);
     this.formFields = Arrays.stream(formFields).filter(Objects::nonNull).collect(toList());
@@ -118,12 +101,12 @@ public abstract class TaskDescriptorSupport
   }
 
   @Override
-  public boolean isVisible() {
+  public final boolean isVisible() {
     return visible;
   }
 
   @Override
-  public boolean isExposed() {
+  public final boolean isExposed() {
     return exposed;
   }
 
@@ -141,11 +124,6 @@ public abstract class TaskDescriptorSupport
         ", visible=" + visible +
         ", exposed=" + exposed +
         '}';
-  }
-
-  @Override
-  public TaskConfiguration createTaskConfiguration() {
-    return new TaskConfiguration();
   }
 
   @Override
@@ -170,24 +148,5 @@ public abstract class TaskDescriptorSupport
   protected static ComboboxFormField<String> newLimitNodeFormField() {
     return new ComboboxFormField<String>(LIMIT_NODE_KEY, LIMIT_NODE_LABEL, LIMIT_NODE_HELP, true)
         .withStoreApi("node_NodeAccess.nodes").withIdMapping("name").withNameMapping("displayName");
-  }
-
-  @Override
-  public boolean isRecoverable() {
-    return requestRecovery;
-  }
-
-  @Override
-  public boolean allowConcurrentRun() {
-    return true;
-  }
-
-  public void setReadOnlyUi(final boolean readOnlyUi) {
-    this.isReadOnlyUi = readOnlyUi;
-  }
-
-  @Override
-  public boolean isReadOnlyUi() {
-    return isReadOnlyUi;
   }
 }

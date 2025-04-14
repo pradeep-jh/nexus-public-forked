@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -25,29 +21,23 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
   extend: 'NX.controller.Drilldown',
   requires: [
     'NX.Bookmarks',
-    'NX.Dialogs',
     'NX.Messages',
     'NX.Permissions',
     'NX.I18n',
     'NX.State'
   ],
-  mixins: {
-    componentUtils: 'NX.coreui.mixin.ComponentUtils'
-  },
   masters: [
     'nx-coreui-componentassettreefeature nx-coreui-browse-repository-list'
   ],
   stores: [
     'Repository',
-    'ComponentAssetTree',
-    'UploadComponentDefinition'
+    'ComponentAssetTree'
   ],
   models: [
     'RepositoryReference',
     'ComponentAssetTree',
     'Component',
-    'Asset',
-    'UploadComponentDefinition'
+    'Asset'
   ],
 
   views: [
@@ -55,30 +45,23 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
     'browse.ComponentAssetTreeFeature',
     'browse.ComponentAssetTree',
     'component.ComponentInfo',
-    'component.ComponentAssetInfo',
-    'component.ComponentFolderInfo'
+    'component.ComponentAssetInfo'
   ],
 
   refs: [
     {ref: 'feature', selector: 'nx-coreui-componentassettreefeature'},
     {ref: 'repositoryList', selector: 'nx-coreui-componentassettreefeature nx-coreui-browse-repository-list'},
     {ref: 'componentAssetTree', selector: 'nx-coreui-componentassettreefeature nx-coreui-component-asset-tree'},
-    {ref: 'componentAssetTreePanel', selector: 'nx-coreui-componentassettreefeature nx-coreui-component-asset-tree treepanel'},
+    {ref: 'componentAssetTreePanel', selector: 'nx-coreui-componentassettreefeature treepanel'},
+    {ref: 'treeFilterBox', selector: 'nx-coreui-componentassettreefeature nx-searchbox'},
     {ref: 'advancedSearchLink', selector: 'nx-coreui-componentassettreefeature #nx-coreui-component-asset-tree-advanced-search'},
-    {ref: 'uploadButton', selector: 'nx-coreui-componentassettreefeature button[action=upload]'},
     {ref: 'htmlViewLink', selector: 'nx-coreui-componentassettreefeature #nx-coreui-component-asset-tree-html-view'},
     {ref: 'componentInfo', selector: 'nx-coreui-component-componentinfo'},
     {ref: 'componentAssetInfo', selector: 'nx-coreui-component-componentassetinfo'},
-    {ref: 'componentFolderInfo', selector: 'nx-coreui-component-componentfolderinfo'},
     {ref: 'deleteComponentButton', selector: 'nx-coreui-component-componentinfo button[action=deleteComponent]'},
     {ref: 'deleteAssetButton', selector: 'nx-coreui-component-componentassetinfo button[action=deleteAsset]'},
-    {ref: 'deleteAssetFolderButton', selector: 'nx-coreui-component-componentassetinfo button[action=deleteFolder]'},
-    {ref: 'deleteFolderButton', selector: 'nx-coreui-component-componentfolderinfo button[action=deleteFolder]'},
-    {ref: 'analyzeApplicationButton', selector: 'nx-coreui-component-componentinfo button[action=analyzeApplication]'},
-    {ref: 'viewVulnerabilitiesButton', selector: 'nx-coreui-component-componentinfo button[action=viewVulnerabilities]'},
     {ref: 'analyzeApplicationWindow', selector: 'nx-coreui-component-analyze-window'},
-    {ref: 'rootContainer', selector: 'nx-main'},
-    {ref: 'treeWarning', selector: 'nx-coreui-componentassettreefeature nx-coreui-component-asset-tree #warning'}
+    {ref: 'rootContainer', selector: 'nx-main'}
   ],
 
   icons: {
@@ -100,12 +83,11 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
       text: NX.I18n.get('FeatureGroups_Browse_Text'),
       description: NX.I18n.get('FeatureGroups_Browse_Description'),
       view: 'NX.coreui.view.browse.ComponentAssetTreeFeature',
-      iconCls: 'x-fa fa-database',
-      authenticationRequired: false,
-      visible: function() {
-        return !NX.State.getValue('nexus.react.browse', false)
-            && NX.State.getValue('browseableformats', []).length > 0;
-      }
+      iconConfig: {
+        file: 'database_share.png',
+        variants: ['x16', 'x32']
+      },
+      authenticationRequired: false
     };
 
     me.callParent();
@@ -120,41 +102,37 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
       controller: {
         '#Refresh': {
           refresh: me.loadStores
-        },
-        '#State': {
-          changed: me.stateChanged,
-          userchanged: me.loadStores
         }
       },
       component: {
         'nx-coreui-componentassettreefeature nx-coreui-browse-repository-list': {
           beforerender: me.onBeforeRender
         },
+        'nx-coreui-componentassettreefeature nx-drilldown-item > container': {
+          beforedeactivate: me.onBeforeDeactivate
+        },
         'nx-coreui-componentassettreefeature treepanel': {
           select: me.selectNode,
-          itemkeydown: me.itemKeyDown,
-          itemexpand: me.itemExpand
-  },
+          itemkeydown: me.itemKeyDown
+        },
+        'nx-coreui-componentassettreefeature nx-searchbox': {
+          search: me.onFilterChanged,
+          searchcleared: me.onFilterChanged
+        },
         'nx-coreui-component-componentinfo button[action=deleteComponent]': {
           click: me.deleteComponent
         },
         'nx-coreui-component-componentinfo button[action=analyzeApplication]': {
-          click: me.mixins.componentUtils.openAnalyzeApplicationWindow
-        },
-        'nx-coreui-component-componentinfo button[action=viewVulnerabilities]': {
-          click: me.mixins.componentUtils.viewVulnerabilities
+          click: me.openAnalyzeApplicationWindow
         },
         'nx-coreui-component-componentassetinfo button[action=deleteAsset]': {
           click: me.deleteAsset
         },
-        'nx-coreui-component-componentassetinfo button[action=deleteFolder]': {
-          click: me.deleteAssetFolder
+        'nx-coreui-component-analyze-window button[action=analyze]': {
+          click: me.analyzeAsset
         },
-        'nx-coreui-component-componentfolderinfo button[action=deleteFolder]': {
-          click: me.deleteFolder
-        },
-        'nx-coreui-componentassettreefeature button[action=upload]': {
-          click: me.onClickUploadButton
+        'nx-coreui-component-analyze-window combobox[name="asset"]': {
+          select: me.selectedApplicationChanged
         },
         'nx-coreui-componentassettreefeature #nx-coreui-component-asset-tree-html-view': {
           render: function () { me.updateHtmlLink(); }
@@ -170,14 +148,6 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
       'tree-component': {
         file: 'box_front.png',
         variants: ['x16']
-      },
-      'tree-component-vulnerable': {
-        file: 'box_front_error.png',
-        variants: ['x16']
-      },
-      'vulnerability': {
-        file: 'vulnerability.png',
-        variants: ['x16', 'x32']
       },
       'tree-asset': {
         file: 'page_white_stack.png',
@@ -232,7 +202,7 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
       modelId = decodeURIComponent(list_ids.shift());
       store = lists[0].getStore();
 
-      if (store.isLoading() || !store.isLoaded()) {
+      if (store.isLoading()) {
         // The store hasn’t yet loaded, load it when ready
         me.mon(store, 'load', function() {
           me.selectModelById(0, modelId);
@@ -242,7 +212,7 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
         me.selectModelById(0, modelId);
       }
     } else {
-      me.loadView(0);
+      me.loadView(0, false);
     }
   },
 
@@ -253,45 +223,32 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
   onRepositorySelection: function(model) {
     var me = this, componentAssetTreeStore = me.getStore('ComponentAssetTree');
 
-    //reset the filter
-    componentAssetTreeStore.proxy.setExtraParam('filter');
-    componentAssetTreeStore.proxy.setExtraParam('repositoryName', model.get('name'));
+    if (!me.selectedRepository || me.selectedRepository.id !== model.id) {
+      //reset the filter
+      componentAssetTreeStore.proxy.setExtraParam('filter');
+      componentAssetTreeStore.proxy.setExtraParam('repositoryName', model.get('name'));
+    }
 
     // Update HTML View link
     me.updateHtmlLink(model);
-    me.updateUploadButton(model);
 
     me.reloadNodes();
 
     me.expandTree();
 
     me.selectedRepository = model;
-
-    me.updateWarningMessage(model.get('name'));
   },
 
   expandTree: function() {
     var me = this,
         treePanel = me.getComponentAssetTreePanel(),
-        segments = window.location.hash.split(':'),
-        hasPath = segments && segments.length === 3,
-        path;
+        segments = window.location.hash.split(':');
 
-    if (treePanel.getStore().isLoading()) {
-      treePanel.getStore().on({
-        load: me.expandTree,
-        scope: me,
-        single: true
-      });
-    }
-    else if (hasPath) {
-      path = decodeURIComponent(segments[2]);
-      treePanel.selectPath('/Root/' + path, 'text', '/', function (successful, lastNode) {
+    if (segments && segments.length === 3) {
+      // Extract the filter object from the URI and select it in the tree
+      treePanel.selectPath('/Root/' + decodeURIComponent(segments.pop()), 'text', '/', function (successful) {
         if (!successful) {
           NX.Messages.error(NX.I18n.get('Component_Asset_Tree_Expand_Failure'));
-        }
-        else {
-          lastNode.expand();
         }
       });
     }
@@ -321,8 +278,43 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
   },
 
   browseNodesLoaded: function(store, node, records) {
-    if (records && records.length === NX.State.getValue('browseTreeMaxNodes')) {
-      NX.Messages.warning(NX.I18n.get('Component_Asset_Tree_Results_Warning'));
+    var message = { type: 'warning', text: NX.I18n.get('Component_Asset_Tree_Results_Warning')};
+    if (records && records.length === NX.State.getValue('browseTreeMaxNodes') && !NX.Messages.messageExists(message)) {
+      NX.Messages.add(message);
+    }
+  },
+
+  /**
+   * @private
+   * Handle when the filter changes, so the tree will be reloaded and future node requests will contain the filter
+   * parameter
+   */
+  onFilterChanged: function(filterBox, value) {
+    var me = this,
+        componentAssetTreeStore = me.getStore('ComponentAssetTree'),
+        emptyText = me.getComponentAssetTreePanel().view.emptyText,
+        advancedSearchLink = me.getAdvancedSearchLink(),
+        treePanel = me.getComponentAssetTreePanel(),
+        url;
+
+    if (me.selectedRepository) {
+      // repository selected, filter the tree
+      if (value) {
+        url = 'browse/search=' + encodeURIComponent('keyword=' + value);
+        emptyText = emptyText.replace(/>.*</, '>' + NX.I18n.get('Component_Asset_Tree_Filtered_EmptyText_View') + '<');
+        emptyText = emptyText.replace('browse/search', url);
+
+        advancedSearchLink.setText(advancedSearchLink.initialConfig.html.replace('browse/search', url), false);
+      } else {
+        emptyText = emptyText.replace(/>.*</, '>' + NX.I18n.get('Component_Asset_Tree_EmptyText_View') + '<');
+
+        advancedSearchLink.setText(advancedSearchLink.initialConfig.html, false);
+      }
+      treePanel.view.emptyText = emptyText;
+
+      componentAssetTreeStore.proxy.setExtraParam('filter', value);
+
+      me.reloadNodes();
     }
   },
 
@@ -342,35 +334,9 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
     }
   },
 
-  stateChanged: function() {
-    var currentRepository = this.getCurrentRepository(),
-        repositoryName = currentRepository ? currentRepository.get('name') : null;
-
-    this.updateUploadButton();
-    this.updateWarningMessage(repositoryName);
-  },
-
-  updateWarningMessage: function(repositoryName) {
-    var warning = this.getTreeWarning(),
-        rebuildingRepositories = NX.State.getValue('rebuildingRepositories') || [];
-
-    if (!warning) {
-      return;
-    }
-
-    if (rebuildingRepositories.indexOf('*') !== -1 || rebuildingRepositories.indexOf(repositoryName) !== -1) {
-      warning.setTitle(NX.I18n.format('ComponentDetails_Rebuild_Warning'));
-      warning.show();
-    }
-    else {
-      warning.hide();
-    }
-  },
-
-  bookmarkNode: function(node) {
-    const ROOT_LENGTH = '/Root/'.length;
+  bookmarkNode: function(nodeId) {
     var baseUrl = '#browse/browse:' + encodeURIComponent(this.getCurrentRepository().get('name')),
-        encodedId = node ? encodeURIComponent(node.getPath('text').substring(ROOT_LENGTH)) : null;
+        encodedId = nodeId ? encodeURIComponent(nodeId) : null;
 
     //if we don't have the replaceState method, don't bother doing anything
     if (window.history.replaceState && window.location.hash.indexOf(baseUrl) === 0) {
@@ -378,182 +344,72 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
     }
   },
 
-  itemExpand: function(view) {
-    var childNodes = Ext.Array.filter(view.childNodes, function(node) {
-      return node.data.packageUrl;
-    });
-    var packageUrls = Ext.Array.map(childNodes, function(node) {
-      return node.data.packageUrl;
-    });
-    if (packageUrls.length > 0 && NX.direct.coreui_Vulnerability) {
-      NX.direct.coreui_Vulnerability.read(packageUrls, function(response) {
-        if (response.success && response.data) {
-          Ext.Array.each(view.childNodes, function(node) {
-            var report = response.data[node.data.packageUrl];
-            if (report && report.count > 0) {
-              node.set('vulnerable', true);
-              node.set('iconCls', 'nx-icon-vulnerability-x16');
-              node.commit();
-            }
-          })
-        }
-      });
-    }
-  },
-
-  selectNode: function(view, node) {
+  selectNode: function(view, model) {
     var me = this,
+        containerView = me.getComponentAssetTree(),
         componentInfoPanel,
-        componentInfoPanelTitleText,
         assetInfoPanel,
-        isFolder = !node.get('leaf');
+        currentRepository;
 
     me.removeSideContent();
-    me.bookmarkNode(node);
+    me.bookmarkNode(model.get('id'));
 
-    if ('component' === node.get('type')) {
-      componentInfoPanelTitleText = me.buildPathString(node);
-      componentInfoPanel = me.getComponentInfo();
-      componentInfoPanel.setTitle(componentInfoPanelTitleText);
-      componentInfoPanel.setIconCls(me.mixins.componentUtils.getIconForAsset(node).get('cls'));
-      componentInfoPanel.getDependencySnippetPanel().hide();
-      componentInfoPanel.show();
-      componentInfoPanel.mask(NX.I18n.get('ComponentDetails_Loading_Mask'));
-
-      NX.direct.coreui_Component.readComponent(node.get('componentId'), me.getCurrentRepository().get('name'), function(response) {
-        var componentModel;
+    if ('component' === model.get('type')) {
+      componentInfoPanel = containerView.add(me.getComponentComponentInfoView().create({
+        title: me.buildPathString(model),
+        iconCls: 'nx-icon-tree-component-x16',
+        flex: 2
+      }));
+      componentInfoPanel.getEl() && componentInfoPanel.getEl().mask(NX.I18n.get('ComponentDetails_Loading_Mask'));
+      currentRepository = me.getCurrentRepository();
+      if (currentRepository && currentRepository.get('type') !== 'group') {
+        me.getDeleteComponentButton().show();
+      }
+      NX.direct.coreui_Component.readComponent(model.get('componentId'), me.getCurrentRepository().get('name'), function(response) {
         me.maybeUnmask(componentInfoPanel);
         if (me.isPanelVisible(componentInfoPanel) && me.isResponseSuccessful(response)) {
-          componentModel = me.getComponentModel().create(response.data);
-          me.setComponentModel(componentModel);
+          componentInfoPanel.setModel(me.getComponentModel().create(response.data));
          }
       });
-
-      me.handleVulnerabilitiesPanel(node, componentInfoPanel);
     }
-    else if ('asset' === node.get('type')) {
-      assetInfoPanel = me.getComponentAssetInfo();
-      assetInfoPanel.setIconCls(me.mixins.componentUtils.getIconForAsset(node).get('cls'));
-      assetInfoPanel.getDependencySnippetPanel().hide();
-      assetInfoPanel.show();
-      assetInfoPanel.mask(NX.I18n.get('ComponentDetails_Loading_Mask'));
+    else if ('asset' === model.get('type')) {
+      assetInfoPanel = containerView.add(me.getComponentComponentAssetInfoView().create({
+        flex: 2,
+        iconCls: 'nx-icon-tree-asset-x16'
+      }));
+      assetInfoPanel.getEl() && assetInfoPanel.getEl().mask(NX.I18n.get('ComponentDetails_Loading_Mask'));
+      currentRepository = me.getCurrentRepository();
+      if (currentRepository && currentRepository.get('type') !== 'group') {
+        me.getDeleteAssetButton().show();
+      }
 
-      NX.direct.coreui_Component.readAsset(node.get('assetId'), me.getCurrentRepository().get('name'), function(response) {
+      NX.direct.coreui_Component.readAsset(model.get('assetId'), me.getCurrentRepository().get('name'), function(response) {
         if (me.isPanelVisible(assetInfoPanel) && me.isResponseSuccessful(response)) {
-          me.setInfoPanelModel(assetInfoPanel, me.getAssetModel().create(response.data), isFolder);
+          me.setInfoPanelModel(assetInfoPanel, me.getAssetModel().create(response.data));
         }
         else {
           me.maybeUnmask(assetInfoPanel);
         }
       });
-
-      me.handleVulnerabilitiesPanel(node, assetInfoPanel);
-    }
-    else if ('folder' === node.get('type')) {
-      var folderInfoPanel = me.getComponentFolderInfo();
-      folderInfoPanel.setTitle(me.buildPathString(node));
-      folderInfoPanel.setIconCls(me.mixins.componentUtils.getIconForAsset(node).get('cls'));
-      folderInfoPanel.show();
-
-      folderInfoPanel.mask(NX.I18n.get('ComponentDetails_Loading_Mask'));
-      me.getDeleteFolderButton().show();
-      me.getDeleteFolderButton().enable();
-      folderInfoPanel.setModel({repositoryName: me.getCurrentRepository().get('name'), folderName: node.get('text'), path: node.get('id')});
-      me.updateDeleteFolderButton(me.getDeleteFolderButton(), me.getCurrentRepository(), node.get('id'));
-      me.maybeUnmask(folderInfoPanel);
     }
   },
 
-  handleVulnerabilitiesPanel: function(node, panel) {
+  setInfoPanelModel: function(assetInfoPanel, asset) {
     var me = this;
-    if ('OSS' === NX.State.getEdition() && me.getCurrentRepository().get('type') === 'proxy' &&
-        NX.direct.coreui_Vulnerability) {
-      var packageUrl = node.get('packageUrl');
-      NX.direct.coreui_Vulnerability.read([packageUrl],
-          function(response) {
-            var vulnerabilityPanel = panel.getVulnerabilityPanel();
-            if(response.success && response.data) {
-              vulnerabilityPanel.setVisible(true);
-              var vulnReport = response.data[packageUrl];
-              me.setVulnerabilityInfo(vulnerabilityPanel, vulnReport);
-              me.updateVulnerabilitiesButton(panel, vulnReport);
-            }
-            else {
-              vulnerabilityPanel.setVisible(false);
-              me.updateVulnerabilitiesButton(panel, null);
-            }
-          });
-    }
-  },
-
-  setComponentModel: function(componentModel) {
-    var componentInfoPanel = this.getComponentInfo();
-
-    componentInfoPanel.setModel(componentModel);
-    this.updateDeleteComponentButton(this.getCurrentRepository(), componentModel);
-    this.updateAnalyzeButton(componentModel);
-    this.setDependencySnippets(componentInfoPanel.getDependencySnippetPanel(), componentModel);
-  },
-
-  setInfoPanelModel: function(assetInfoPanel, asset, isFolder) {
-    var me = this,
-        componentModel;
-
     if (asset.get('componentId')) {
       NX.direct.coreui_Component.readComponent(asset.get('componentId'), me.getCurrentRepository().get('name'), function (response) {
         me.maybeUnmask(assetInfoPanel);
         if (me.isPanelVisible(assetInfoPanel) && me.isResponseSuccessful(response)) {
-          componentModel = me.getComponentModel().create(response.data);
-          assetInfoPanel.setModel(asset, componentModel);
-          me.updateDeleteAssetButton(me.getCurrentRepository(), asset, isFolder);
-          me.setDependencySnippets(assetInfoPanel.getDependencySnippetPanel(), componentModel, asset);
+          assetInfoPanel.setModel(asset, me.getComponentModel().create(response.data));
         }
       });
     }
     else {
       me.maybeUnmask(assetInfoPanel);
       if (me.isPanelVisible(assetInfoPanel)) {
-        componentModel = me.getComponentModel().create({});
-        assetInfoPanel.setModel(asset, componentModel);
-        me.updateDeleteAssetButton(me.getCurrentRepository(), asset, isFolder);
-        me.setDependencySnippets(assetInfoPanel.getDependencySnippetPanel(), componentModel, asset);
+        assetInfoPanel.setModel(asset, me.getComponentModel().create({}));
       }
     }
-  },
-
-  setDependencySnippets: function(dependencySnippetPanel, componentModel, assetModel) {
-    var format, dependencySnippets;
-
-    if (componentModel) {
-      format = componentModel.get('format');
-      dependencySnippets = NX.getApplication().getDependencySnippetController()
-          .getDependencySnippets(format, componentModel, assetModel);
-
-      dependencySnippetPanel.setDependencySnippets(format, dependencySnippets);
-
-      if (dependencySnippets && dependencySnippets.length > 0) {
-        dependencySnippetPanel.show();
-      }
-    }
-  },
-
-  setVulnerabilityInfo: function(vulnerabilityPanel, vulnerabilityInfo) {
-    var summary = {};
-
-    if (vulnerabilityInfo) {
-        summary[NX.I18n.get('Vulnerability_Count')] = Ext.htmlEncode(vulnerabilityInfo.count);
-        summary[NX.I18n.get('Vulnerability_Ref')] = NX.util.Url.asLink(vulnerabilityInfo.reference);
-        vulnerabilityPanel.referenceLink = vulnerabilityInfo.reference;
-        if(vulnerabilityInfo.count > 0) {
-          vulnerabilityPanel.items.items[0].header.addCls('vulnerabilities');
-        } else {
-          vulnerabilityPanel.items.items[0].header.removeCls('vulnerabilities');
-        }
-    }
-    else {
-      summary[NX.I18n.get('Vulnerability_Information')] = Ext.htmlEncode(NX.I18n.get('Vulnerability_NotScanned'));
-    }
-    vulnerabilityPanel.showInfo(summary);
   },
 
   isPanelVisible : function(panel) {
@@ -580,20 +436,18 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
 
   removeSideContent: function() {
     var me = this,
-        componentInfo = me.getComponentInfo(),
-        componentAssetInfo = me.getComponentAssetInfo(),
-        componentFolderInfo = me.getComponentFolderInfo();
+        containerView = me.getComponentAssetTree();
 
-    componentInfo.hide();
-    componentAssetInfo.hide();
-    componentFolderInfo.hide();
+    while (containerView.items.getCount() > 1) {
+      containerView.remove(containerView.items.getAt(1));
+    }
   },
 
   buildPathString: function(node) {
     var path = '';
     //node.parentNode check will skip the trees root node (labeld Root and hidden)
     while (node != null && node.parentNode != null) {
-      path = path ? (node.get('text') + '/' + path) : node.get('text');
+      path = node.get('text') + '/' + path;
       node = node.parentNode;
     }
 
@@ -635,36 +489,28 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
         repoModel;
 
     if (repoList) {
-      repoList.getStore().on({
-        load: function() {
-          repoModel = me.getCurrentRepository();
+      repoList.getStore().load(function() {
+        repoModel = me.getCurrentRepository();
 
-          if (repoModel) {
-            //0 references the first list in the Drilldown parent (the repository list)
-            me.onModelChanged(0, repoModel);
-            me.onRepositorySelection(repoModel);
-          }
+        if (repoModel) {
+          //0 references the first list in the Drilldown parent (the repository list)
+          me.onModelChanged(0, repoModel);
+          me.onRepositorySelection(repoModel);
+        }
 
-          me.reselect();
-        },
-        single: true
+        me.reselect();
       });
-
-      // In theory we should be able to just pass in the above load listener here, but for some reason it isn't being called
-      repoList.getStore().load();
     }
   },
 
   /**
    * @private
-   * Opens the Upload UI for current repository
+   * Clears the filter box before the view is changed
    */
-  onClickUploadButton: function() {
-    var me = this,
-        repository = me.getCurrentRepository(),
-        uploadUrl = '#browse/upload:' + encodeURIComponent(repository.get('name'));
+  onBeforeDeactivate: function(oldCard) {
+    var filterBox = oldCard.down('nx-searchbox');
 
-    window.open(uploadUrl, '_self');
+    filterBox && filterBox.clearSearch && filterBox.clearSearch();
   },
 
   /**
@@ -679,36 +525,8 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
 
     if (htmlViewLink && htmlViewLink.el && repositoryName) {
       htmlViewLink.el.select('a').set({
-        href: NX.util.Url.urlOf('/service/rest/repository/browse/'+ encodeURIComponent(repositoryName))
+        href: NX.util.Url.urlOf('/service/siesta/repository/browse/'+ encodeURIComponent(repositoryName))
       });
-    }
-  },
-
-  /**
-   * @private
-   * Updates the visibility of the upload button.
-   */
-  updateUploadButton: function(repo) {
-    var me = this,
-        uploadButton = me.getUploadButton(),
-        store = me.getStore('UploadComponentDefinition'),
-        repository = repo || me.getCurrentRepository();
-
-    if (uploadButton && repository) {
-      if (NX.State.getValue('upload') &&
-          NX.Permissions.check('nexus:component:create') &&
-          repository.getData().type === 'hosted' &&
-          repository.getData().versionPolicy !== 'SNAPSHOT') {
-        store.load(function (store, results) {
-          var isSupported = Ext.Array.some(results.getRecords(), function (item) {
-            return item.getData().format === repository.getData().format;
-          });
-          uploadButton.setVisible(isSupported);
-        });
-      }
-      else {
-        uploadButton.setVisible(false);
-      }
     }
   },
 
@@ -738,24 +556,19 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
     var me = this,
         treePanel = me.getComponentAssetTreePanel(),
         componentInfo = me.getComponentInfo(),
-        selectedNode = treePanel.getSelectionModel().getSelection()[0],
-        componentModel, componentId;
+        componentModel, componentId, repositoryName;
 
     if (componentInfo) {
       componentModel = componentInfo.componentModel;
       componentId = componentModel.get('name') + '/' + componentModel.get('version');
-      NX.Dialogs.askConfirmation(NX.I18n.get('ComponentDetails_Delete_Title'), Ext.htmlEncode(NX.I18n.format('ComponentDetails_Delete_Body', componentId)), function() {
-        NX.direct.coreui_Component.deleteComponent(JSON.stringify(componentModel.getData()), function(response) {
-          if (Ext.isObject(response) && response.success && Ext.isArray(response.data)) {
-            me.removeNodeFromTree(selectedNode);
-            Ext.each(response.data, function (nodeId) {
-              var nodePath = nodeId.charAt(0) === '/' ? nodeId.substring(1) : nodeId;
-              var node = treePanel.getStore().findNode('id', nodePath);
-              if (node) {
-                me.removeNodeFromTree(node);
-              }
-            });
-            NX.Messages.success(NX.I18n.format('ComponentDetails_Delete_Success', componentId));
+      repositoryName = componentModel.get('repositoryName');
+      NX.Dialogs.askConfirmation(NX.I18n.get('ComponentDetails_Delete_Title'), NX.I18n.format('ComponentDetails_Delete_Body', componentId), function() {
+        NX.direct.coreui_Component.deleteComponent(componentModel.getId(), repositoryName, function(response) {
+          if (Ext.isObject(response) && response.success) {
+            var selectedRecord = treePanel.getSelectionModel().getSelection()[0];
+            me.removeNodeFromTree(selectedRecord);
+            me.removeSideContent();
+            NX.Messages.add({text: NX.I18n.format('ComponentDetails_Delete_Success', componentId), type: 'success'});
           }
         });
       });
@@ -773,19 +586,19 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
 
     if (componentAssetInfo) {
       var asset = componentAssetInfo.assetModel;
-      NX.Dialogs.askConfirmation(NX.I18n.get('AssetInfo_Delete_Title'), Ext.htmlEncode(asset.get('name')), function () {
+      NX.Dialogs.askConfirmation(NX.I18n.get('AssetInfo_Delete_Title'), asset.get('name'), function () {
         NX.direct.coreui_Component.deleteAsset(asset.getId(), asset.get('repositoryName'), function (response) {
           if (Ext.isObject(response) && response.success) {
             var selectedRecord = treePanel.getSelectionModel().getSelection()[0];
             if (selectedRecord.get('leaf')) {
-              me.removeSideContent();
               me.removeNodeFromTree(selectedRecord);
             }
             else {
               selectedRecord.set('type', 'folder');
-              selectedRecord.set('iconCls', me.mixins.componentUtils.getIconForAsset(selectedRecord).get('cls'));
+              selectedRecord.set('iconCls', selectedRecord.computeIconClass());
             }
-            NX.Messages.success(NX.I18n.format('AssetInfo_Delete_Success', asset.get('name')));
+            me.removeSideContent();
+            NX.Messages.add({text: NX.I18n.format('AssetInfo_Delete_Success', asset.get('name')), type: 'success'});
           }
         });
       });
@@ -793,54 +606,111 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
   },
 
   /**
+   * Open the analyze application form window
+   *
    * @private
-   * Remove selected Folder.
    */
-  deleteFolder: function() {
+  openAnalyzeApplicationWindow: function() {
     var me = this,
-        componentFolderInfo = me.getComponentFolderInfo();
+        componentInfo = me.getComponentInfo(),
+        componentId = componentInfo.componentModel.getId(),
+        repositoryName = componentInfo.componentModel.get('repositoryName');
 
-    if (componentFolderInfo) {
-      var model = componentFolderInfo.folderModel;
-      NX.Dialogs.askConfirmation(
-          NX.I18n.get('FolderInfo_Delete_Title'),
-          NX.I18n.format('FolderInfo_Delete_Text', Ext.htmlEncode(model.folderName)),
-          function() {
-            NX.direct.coreui_Component.deleteFolder(decodeURIComponent(model.path.replace(/\+/g, ' ')), model.repositoryName,
-                function(response) {
-                  if (Ext.isObject(response) && response.success) {
-                    NX.Messages.success(NX.I18n.format('FolderInfo_Delete_Success'));
-                  }
-                });
+    function doOpenAnalyzeWindow(response) {
+      var widget = Ext.widget('nx-coreui-component-analyze-window');
+      var form = widget.down('form');
+      form.getForm().setValues(response.data);
+      //I am setting the original value so it won't be marked dirty unless user touches it
+      form.down('textfield[name="reportLabel"]').originalValue = response.data.reportLabel;
+
+      var assetKeys = response.data.assetMap ? Ext.Object.getKeys(response.data.assetMap) : [];
+
+      if (assetKeys.length < 1) {
+        widget.close();
+        NX.Dialogs.showError(NX.I18n.get('AnalyzeApplicationWindow_No_Assets_Error_Title'),
+            NX.I18n.get('AnalyzeApplicationWindow_No_Assets_Error_Message'));
+      }
+      else if (assetKeys.length === 1) {
+        widget.down('combo[name="asset"]').setValue(response.data.selectedAsset);
+      }
+      else {
+        var data = [];
+        for (var i = 0; i < assetKeys.length; i++) {
+          data.push([assetKeys[i], response.data.assetMap[assetKeys[i]]]);
+        }
+        var combo = widget.down('combo[name="asset"]');
+        combo.getStore().loadData(data, false);
+        combo.setValue(response.data.selectedAsset);
+        combo.show();
+      }
+    }
+
+    me.getRootContainer().getEl().mask(NX.I18n.get('AnalyzeApplicationWindow_Loading_Mask'));
+    NX.direct.ahc_Component.getPredefinedValues(componentId, repositoryName, function(response) {
+      me.getRootContainer().getEl().unmask();
+      if (Ext.isObject(response) && response.success) {
+        if (response.data.tosAccepted) {
+          doOpenAnalyzeWindow(response);
+        }
+        else {
+          Ext.widget('nx-coreui-healthcheck-eula', {
+            acceptFn: function() {
+              NX.direct.ahc_Component.acceptTermsOfService(function() {
+                doOpenAnalyzeWindow(response);
+              });
+            }
+          });
+        }
+      }
+    });
+  },
+
+  /**
+   * Analyze a component using the AHC service
+   *
+   * @private
+   */
+  analyzeAsset: function(button) {
+    var me = this,
+        componentInfo = me.getComponentInfo(),
+        win,
+        form,
+        formValues,
+        repositoryName,
+        assetId;
+
+    if (componentInfo) {
+      win = button.up('window');
+      form = button.up('form');
+      formValues = form.getForm().getValues();
+      repositoryName = componentInfo.componentModel.get('repositoryName');
+      assetId = form.down('combo[name="asset"]').getValue();
+      NX.direct.ahc_Component.analyzeAsset(repositoryName, assetId, formValues.emailAddress, formValues.password,
+          formValues.proprietaryPackages, formValues.reportLabel, function (response) {
+            if (Ext.isObject(response) && response.success) {
+              win.close();
+              NX.Messages.add({text: NX.I18n.get('ComponentDetails_Analyze_Success'), type: 'success'});
+            }
           });
     }
   },
 
   /**
-   * @private
-   * Remove selected Folder.
+   * When app changes, update the reportName as well
    */
-  deleteAssetFolder: function() {
-    var componentAssetInfo = this.getComponentAssetInfo();
+  selectedApplicationChanged: function(combo) {
+    var me = this,
+        componentInfo = me.getComponentInfo(),
+        labelField;
 
-    if (componentAssetInfo) {
-      var asset = componentAssetInfo.assetModel;
-      NX.Dialogs.askConfirmation(
-          NX.I18n.get('FolderInfo_Delete_Title'),
-          NX.I18n.format('FolderInfo_Delete_Text', Ext.htmlEncode(asset.get('name'))),
-          function() {
-            NX.direct.coreui_Component.deleteFolder(asset.get('name'), asset.get('repositoryName'),
-                function(response) {
-                  if (Ext.isObject(response) && response.success) {
-                    NX.Messages.success(NX.I18n.format('FolderInfo_Delete_Success'));
-                  }
-                });
-          });
+    if (componentInfo) {
+      labelField = me.getAnalyzeApplicationWindow().down('textfield[name="reportLabel"]');
+      if (!labelField.isDirty()) {
+        //I am setting the original value so it won't be marked dirty unless user touches it
+        labelField.originalValue = combo.getRawValue();
+        labelField.setValue(combo.getRawValue());
+      }
     }
-  },
-
-  fetchComponentModelFromView: function() {
-    return this.getComponentInfo().componentModel;
   },
 
   removeNodeFromTree: function(node) {
@@ -866,7 +736,7 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
     }
   },
 
-  loadView: function (index, model) {
+  loadView: function (index, animate, model) {
     var me = this,
       lists = Ext.ComponentQuery.query('nx-drilldown-master'),
       hasPath = NX.Bookmarks.getBookmark().getSegments().length > 2;
@@ -888,7 +758,7 @@ Ext.define('NX.coreui.controller.ComponentAssetTree', {
     }
 
     // Show the next view in line
-    me.showChild(index);
+    me.showChild(index, animate);
     if (!hasPath) {
       me.bookmark(index, model);
     }

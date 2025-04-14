@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus</groupId>
     <artifactId>nexus-components</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-rapture</artifactId>
@@ -31,7 +31,8 @@
     <resource.url.suffix>?_v=${project.version}&amp;_dc=${resource.url.suffix.timestamp}</resource.url.suffix>
     <sonar.sources>src/main/java,src/main/resources/static/rapture</sonar.sources>
     <sonar.exclusions>
-      src/main/resources/static/rapture/baseapp-*.js
+      src/main/resources/static/rapture/baseapp-*.js,
+      src/main/resources/static/rapture/d3.v4.min.js
     </sonar.exclusions>
   </properties>
 
@@ -48,52 +49,24 @@
 
     <dependency>
       <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-ui-plugin</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-base</artifactId>
-      <scope>provided</scope>
+      <artifactId>nexus-orient</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.osgi</groupId>
-      <artifactId>osgi.core</artifactId>
+      <artifactId>org.osgi.core</artifactId>
       <scope>provided</scope>
     </dependency>
 
     <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
+      <groupId>com.codahale.metrics</groupId>
       <artifactId>metrics-annotation</artifactId>
       <scope>provided</scope>
     </dependency>
 
     <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-testsupport</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
-      <artifactId>metrics-healthchecks</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
-      <artifactId>metrics-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-scheduling</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.spockframework</groupId>
-      <artifactId>spock-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>cglib</groupId>
-      <artifactId>cglib-nodep</artifactId>
+      <groupId>org.sonatype.goodies</groupId>
+      <artifactId>goodies-testsupport</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -101,21 +74,20 @@
   <build>
     <plugins>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-javadoc-plugin</artifactId>
-        <configuration>
-            <excludePackageNames>org.sonatype.nexus.rapture.internal.branding:org.sonatype.nexus.rapture.internal.security</excludePackageNames>
-        </configuration>
-      </plugin>
-      <plugin>
         <groupId>org.sonatype.nexus.buildsupport</groupId>
         <artifactId>extjs-maven-plugin</artifactId>
         <configuration>
           <namespace>NX</namespace>
           <excludes>
             <exclude>baseapp-*.js</exclude>
+            <exclude>d3.v4.min.js</exclude>
           </excludes>
         </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>com.github.klieber</groupId>
+        <artifactId>phantomjs-maven-plugin</artifactId>
       </plugin>
 
       <plugin>
@@ -136,6 +108,35 @@
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.github.searls</groupId>
+        <artifactId>jasmine-maven-plugin</artifactId>
+        <configuration>
+          <preloadSources>
+            <source>baseapp-debug.js</source>
+            <source>NX-test.js</source>
+          </preloadSources>
+          <sourceIncludes>
+            <include>**/*.js</include>
+          </sourceIncludes>
+          <sourceExcludes>
+            <exclude>**/baseapp-*.js</exclude>
+          </sourceExcludes>
+          <specIncludes>
+            <include>**/*-spec.js</include>
+          </specIncludes>
+          <jsSrcDir>${project.basedir}/src/main/resources/static/rapture</jsSrcDir>
+          <jsTestSrcDir>${project.basedir}/src/test/resources/jasmine</jsTestSrcDir>
+          <keepServerAlive>true</keepServerAlive>
+          <webDriverClassName>org.openqa.selenium.phantomjs.PhantomJSDriver</webDriverClassName>
+          <webDriverCapabilities>
+            <capability>
+              <name>phantomjs.binary.path</name>
+              <value>${phantomjs.binary}</value>
+            </capability>
+          </webDriverCapabilities>
+        </configuration>
       </plugin>
 
       <plugin>
@@ -176,10 +177,7 @@
           </execution>
         </executions>
       </plugin>
-      <plugin>
-        <groupId>com.github.eirslett</groupId>
-        <artifactId>frontend-maven-plugin</artifactId>
-      </plugin>
+
     </plugins>
   </build>
 
@@ -196,6 +194,29 @@
               <excludes>
                 <exclude>Ext/ux/**</exclude>
               </excludes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <profile>
+      <id>install-ext</id>
+
+      <build>
+        <defaultGoal>install:install-file</defaultGoal>
+
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-install-plugin</artifactId>
+            <configuration>
+              <file>${ext.dist}</file>
+              <groupId>com.sencha</groupId>
+              <artifactId>ext</artifactId>
+              <classifier>commercial</classifier>
+              <packaging>zip</packaging>
+              <version>${ext.version}</version>
             </configuration>
           </plugin>
         </plugins>
@@ -238,4 +259,5 @@
       </build>
     </profile>
   </profiles>
+
 </project>

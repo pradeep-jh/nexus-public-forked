@@ -13,27 +13,20 @@
 package org.sonatype.nexus.security.privilege;
 
 import java.util.List;
-import javax.inject.Inject;
+
 import javax.inject.Named;
 import javax.inject.Singleton;
 
 import org.sonatype.goodies.i18n.I18N;
 import org.sonatype.goodies.i18n.MessageBundle;
 import org.sonatype.nexus.formfields.FormField;
-import org.sonatype.nexus.formfields.SetOfCheckboxesFormField;
 import org.sonatype.nexus.formfields.StringTextFormField;
 import org.sonatype.nexus.security.config.CPrivilege;
 import org.sonatype.nexus.security.config.CPrivilegeBuilder;
-import org.sonatype.nexus.security.privilege.rest.ApiPrivilegeApplication;
-import org.sonatype.nexus.security.privilege.rest.ApiPrivilegeApplicationRequest;
-import org.sonatype.nexus.security.privilege.rest.PrivilegeAction;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import org.apache.shiro.authz.Permission;
-
-import static com.google.common.base.Preconditions.checkNotNull;
-import static org.sonatype.nexus.common.app.FeatureFlags.REACT_PRIVILEGES_NAMED;
 
 /**
  * Application {@link PrivilegeDescriptor}.
@@ -44,7 +37,7 @@ import static org.sonatype.nexus.common.app.FeatureFlags.REACT_PRIVILEGES_NAMED;
 @Named(ApplicationPrivilegeDescriptor.TYPE)
 @Singleton
 public class ApplicationPrivilegeDescriptor
-    extends PrivilegeDescriptorSupport<ApiPrivilegeApplication, ApiPrivilegeApplicationRequest>
+    extends PrivilegeDescriptorSupport
 {
   public static final String TYPE = "application";
 
@@ -67,23 +60,15 @@ public class ApplicationPrivilegeDescriptor
     @DefaultMessage("Actions")
     String actions();
 
-    @DefaultMessage("A comma-delimited list (without whitespace) of actions allowed with this privilege; " +
-        "options include create, read, update, delete, start, stop, associate, disassociate, and a wildcard (*) " +
-        "<a href='https://links.sonatype.com/products/nxrm3/docs/privileges' target='_blank'>Help</a>")
+    @DefaultMessage("The comma-delimited list of actions")
     String actionsHelp();
-
-    @DefaultMessage("The actions you wish to allow")
-    String actionsCheckboxesHelp();
   }
 
   private static final Messages messages = I18N.create(Messages.class);
 
   private final List<FormField> formFields;
 
-  private static final String P_OPTIONS = "options";
-
-  @Inject
-  public ApplicationPrivilegeDescriptor(@Named(REACT_PRIVILEGES_NAMED) final boolean isReactPrivileges) {
+  public ApplicationPrivilegeDescriptor() {
     super(TYPE);
     this.formFields = ImmutableList.of(
         new StringTextFormField(
@@ -92,27 +77,18 @@ public class ApplicationPrivilegeDescriptor
             messages.domainHelp(),
             FormField.MANDATORY
         ),
-        isReactPrivileges ?
-        new SetOfCheckboxesFormField(
-            P_ACTIONS,
-            messages.actions(),
-            messages.actionsCheckboxesHelp(),
-            FormField.MANDATORY
-        ).withAttribute(P_OPTIONS, PrivilegeAction.getCrudTaskActionStrings()) :
         new StringTextFormField(
             P_ACTIONS,
             messages.actions(),
             messages.actionsHelp(),
-            FormField.MANDATORY,
-            "(^(create|read|update|delete|start|stop|associate|disassociate)" + 
-              "(,(create|read|update|delete|start|stop|associate|disassociate)){0,3}$)|(^\\*$)"
+            FormField.MANDATORY
         )
     );
   }
 
   @Override
   public Permission createPermission(final CPrivilege privilege) {
-    checkNotNull(privilege);
+    assert privilege != null;
     String domain = readProperty(privilege, P_DOMAIN, ALL);
     List<String> actions = readListProperty(privilege, P_ACTIONS, ALL);
     return new ApplicationPermission(domain, actions);
@@ -143,15 +119,5 @@ public class ApplicationPrivilegeDescriptor
         .property(P_DOMAIN, domain)
         .property(P_ACTIONS, actions)
         .create();
-  }
-
-  @Override
-  public ApiPrivilegeApplication createApiPrivilegeImpl(final Privilege privilege) {
-    return new ApiPrivilegeApplication(privilege);
-  }
-
-  @Override
-  public void validate(final ApiPrivilegeApplicationRequest apiPrivilege) {
-    validateActions(apiPrivilege, PrivilegeAction.getCrudTaskAction());
   }
 }

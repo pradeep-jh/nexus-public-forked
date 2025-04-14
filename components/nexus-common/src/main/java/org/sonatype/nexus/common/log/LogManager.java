@@ -15,10 +15,9 @@ package org.sonatype.nexus.common.log;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Path;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
+
 import javax.annotation.Nullable;
 
 import org.sonatype.goodies.lifecycle.Lifecycle;
@@ -27,38 +26,12 @@ import org.sonatype.goodies.lifecycle.Lifecycle;
  * Log manager.
  */
 public interface LogManager
-    extends Lifecycle
+  extends Lifecycle
 {
-  String DEFAULT_LOGGER = "logfile";
-
-  static final String TASKS_PREFIX = "tasks/";
-
-  static final String REPLICATION_PREFIX = "replication/";
-
   Set<File> getLogFiles();
 
   @Nullable
   File getLogFile(String fileName);
-
-  boolean isValidLogFile(Path filepath);
-
-  /**
-   * If the named logger is a file based log, return the file name associated with it.
-   *
-   * @since 3.17
-   * @param loggerName name of the logger whose log file's name, if applicable, should be returned
-   * @return The file name to which the named logger appends
-   */
-  Optional<String> getLogFor(String loggerName);
-
-  /**
-   * If the named logger is a file based log, return the file associated with it.
-   *
-   * @since 3.17
-   * @param loggerName name of the logger whose log file, if applicable, should be returned
-   * @return The file to which the named logger appends
-   */
-  Optional<File> getLogFileForLogger(String loggerName);
 
   /**
    * Provides access to named log-file streams.
@@ -68,15 +41,6 @@ public interface LogManager
    */
   @Nullable
   InputStream getLogFileStream(String fileName, long fromByte, long bytesCount) throws IOException;
-
-  /**
-   * Provides access to named log-file streams.
-   *
-   * @param fileName name of log file to fetch
-   * @return Stream to log file or {@code null} if non-existent.
-   */
-  @Nullable
-  InputStream getLogFileStream(String fileName) throws IOException;
 
   /**
    * Return mapping of existing loggers which have explicit levels configured (never null).
@@ -102,8 +66,6 @@ public interface LogManager
    */
   void setLoggerLevel(String name, @Nullable LoggerLevel level);
 
-  void setLoggerLevelDirect(String name, @Nullable LoggerLevel level);
-
   /**
    * @since 2.7
    */
@@ -119,10 +81,4 @@ public interface LogManager
    * @since 2.7
    */
   LoggerLevel getLoggerEffectiveLevel(String name);
-
-  /**
-   * Return effective loggers map(logger name - log level), updated by latest overrides fetched from datastore
-   * that might not be yet propagated by DES
-   */
-  Map<String, LoggerLevel> getEffectiveLoggersUpdatedByFetchedOverrides();
 }

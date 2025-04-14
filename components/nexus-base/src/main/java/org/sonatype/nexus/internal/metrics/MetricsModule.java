@@ -12,24 +12,21 @@
  */
 package org.sonatype.nexus.internal.metrics;
 
-import javax.inject.Named;
-
-import org.sonatype.nexus.common.app.FeatureFlag;
 import org.sonatype.nexus.security.FilterChainModule;
 import org.sonatype.nexus.security.SecurityFilter;
 import org.sonatype.nexus.security.anonymous.AnonymousFilter;
-import org.sonatype.nexus.security.authc.AntiCsrfFilter;
 import org.sonatype.nexus.security.authc.NexusAuthenticationFilter;
 import org.sonatype.nexus.security.authz.PermissionsFilter;
 
 import com.codahale.metrics.Clock;
+import com.codahale.metrics.servlet.InstrumentedFilter;
+import com.codahale.metrics.servlets.PingServlet;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.inject.AbstractModule;
+import com.google.inject.servlet.ServletModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.sonatype.nexus.common.app.FeatureFlags.SESSION_ENABLED;
 
 /**
  * <a href="http://metrics.dropwizard.io">Dropwizard Metrics</a> guice configuration.
@@ -41,21 +38,18 @@ import static org.sonatype.nexus.common.app.FeatureFlags.SESSION_ENABLED;
  * <li>/service/metrics/threads</li>
  * <li>/service/metrics/data</li>
  * <li>/service/metrics/healthcheck</li>
- * <li>/service/metrics/prometheus</li>
  * </ul>
  * 
  * Protected by {@code nexus:metrics:read} permission.
  * 
  * @since 2.5
  */
-@Named
-@FeatureFlag(name = SESSION_ENABLED)
 public class MetricsModule
     extends AbstractModule
 {
   private static final Logger log = LoggerFactory.getLogger(MetricsModule.class);
 
-  protected static final String MOUNT_POINT = "/service/metrics";
+  private static final String MOUNT_POINT = "/service/metrics";
 
   @Override
   protected void configure() {
@@ -67,10 +61,24 @@ public class MetricsModule
     final JsonFactory jsonFactory = new JsonFactory(new ObjectMapper());
     bind(JsonFactory.class).toInstance(jsonFactory);
 
-    install(new MetricsServletModule(MOUNT_POINT)
+    install(new ServletModule()
     {
       @Override
-      protected void bindSecurityFilter() {
+      protected void configureServlets() {
+        bind(MetricsServlet.class);
+        bind(HealthCheckServlet.class);
+
+        serve(MOUNT_POINT + "/ping").with(new PingServlet());
+        serve(MOUNT_POINT + "/threads").with(new ThreadDumpServlet());
+        serve(MOUNT_POINT + "/data").with(MetricsServlet.class);
+        serve(MOUNT_POINT + "/healthcheck").with(HealthCheckServlet.class);
+
+        // record metrics for all webapp access
+        filter("/*").through(new InstrumentedFilter());
+
+        bind(SecurityFilter.class);
+
+        // configure security
         filter(MOUNT_POINT + "/*").through(SecurityFilter.class);
       }
     });
@@ -83,7 +91,6 @@ public class MetricsModule
         addFilterChain(MOUNT_POINT + "/**",
             NexusAuthenticationFilter.NAME,
             AnonymousFilter.NAME,
-            AntiCsrfFilter.NAME,
             PermissionsFilter.config("nexus:metrics:read"));
       }
     });

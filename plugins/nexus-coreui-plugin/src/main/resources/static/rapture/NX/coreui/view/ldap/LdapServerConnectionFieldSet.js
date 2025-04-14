@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -32,7 +28,7 @@ Ext.define('NX.coreui.view.ldap.LdapServerConnectionFieldSet', {
   /**
    * @override
    */
-  initComponent: function() {
+  initComponent: function () {
     var me = this;
 
     me.defaults = {
@@ -49,8 +45,7 @@ Ext.define('NX.coreui.view.ldap.LdapServerConnectionFieldSet', {
       {
         name: 'name',
         itemId: 'name',
-        fieldLabel: NX.I18n.get('LdapServersConnectionFieldSet_Name_FieldLabel'),
-        transformRawValue: Ext.htmlDecode
+        fieldLabel: NX.I18n.get('LdapServersConnectionFieldSet_Name_FieldLabel')
       },
       {
         xtype: 'label',
@@ -86,7 +81,7 @@ Ext.define('NX.coreui.view.ldap.LdapServerConnectionFieldSet', {
         ],
         queryMode: 'local',
         listeners: {
-          change: function() {
+          change: function(){
             var protocol = this.up('form').down('#port');
             protocol.fireEvent('change', protocol, protocol.getValue(), protocol.getValue());
           }
@@ -106,7 +101,7 @@ Ext.define('NX.coreui.view.ldap.LdapServerConnectionFieldSet', {
         width: 405,
         emptyText: NX.I18n.get('LdapServersConnectionFieldSet_Host_EmptyText'),
         listeners: {
-          change: function() {
+          change: function(){
             var protocol = this.up('form').down('#port');
             protocol.fireEvent('change', protocol, protocol.getValue(), protocol.getValue());
           }
@@ -134,7 +129,6 @@ Ext.define('NX.coreui.view.ldap.LdapServerConnectionFieldSet', {
           if (form.down('#protocol').getValue() === 'ldaps' && form.down('#host').getValue() && field.getValue()) {
             return {
               name: 'useTrustStore',
-              value: form.getRecord() ? form.getRecord().getData().useTrustStore : false,
               host: form.down('#host'),
               port: form.down('#port')
             };
@@ -164,7 +158,6 @@ Ext.define('NX.coreui.view.ldap.LdapServerConnectionFieldSet', {
         listeners: {
           change: function (combo, newValue) {
             this.up('panel').showOrHide('authScheme', newValue);
-            this.up('panel').showOrHidePassFieldOrPassButton();
           }
         }
       },
@@ -182,14 +175,6 @@ Ext.define('NX.coreui.view.ldap.LdapServerConnectionFieldSet', {
         fieldLabel: NX.I18n.get('LdapServersConnectionFieldSet_Username_FieldLabel'),
         helpText: NX.I18n.get('LdapServersConnectionFieldSet_Username_HelpText'),
         authScheme: ['simple', 'DIGEST-MD5', 'CRAM-MD5']
-      },
-      {
-        xtype: 'button',
-        itemId: 'authPasswordButton',
-        text: NX.I18n.get('LdapServersConnectionFieldSet_ChangePasswordItem'),
-        authScheme: ['simple', 'DIGEST-MD5', 'CRAM-MD5'],
-        iconCls: 'x-fa fa-key',
-        action: 'setpassword'
       },
       {
         xtype: 'nx-password',
@@ -264,21 +249,7 @@ Ext.define('NX.coreui.view.ldap.LdapServerConnectionFieldSet', {
 
     me.callParent();
 
-    me.showOrHidePassFieldOrPassButton();
     me.showOrHide('authScheme', undefined);
-  },
-
-  showOrHidePassFieldOrPassButton: function() {
-    const me = this;
-    var component;
-    if (me.up('nx-coreui-ldapserver-connection-form').isAddPage) {
-      component = me.query('component[itemId=authPasswordButton]')[0];
-    }
-    else {
-      component = me.query('component[itemId=authPassword]')[0];
-    }
-    component.disable();
-    component.hide();
   },
 
   /**
@@ -287,12 +258,12 @@ Ext.define('NX.coreui.view.ldap.LdapServerConnectionFieldSet', {
    * @param attribute name of attribute
    * @param value to be matched in order to show
    */
-  showOrHide: function(attribute, value) {
+  showOrHide: function (attribute, value) {
     var me = this,
         form = me.up('form'),
         components = me.query('component[' + attribute + ']');
 
-    Ext.iterate(components, function(component) {
+    Ext.iterate(components, function (component) {
       if (value && component[attribute].indexOf(value) > -1) {
         component.enable();
         component.show();
@@ -302,7 +273,7 @@ Ext.define('NX.coreui.view.ldap.LdapServerConnectionFieldSet', {
         component.hide();
       }
     });
-    if (form && form.rendered) {
+    if (form) {
       form.isValid();
     }
   }

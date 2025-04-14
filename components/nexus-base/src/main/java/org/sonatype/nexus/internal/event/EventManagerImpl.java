@@ -21,7 +21,6 @@ import org.sonatype.nexus.common.app.ManagedLifecycle;
 import org.sonatype.nexus.common.event.EventAware;
 import org.sonatype.nexus.common.event.EventAware.Asynchronous;
 import org.sonatype.nexus.common.event.EventManager;
-import org.sonatype.nexus.common.event.HasAffinity;
 import org.sonatype.nexus.common.property.SystemPropertiesHelper;
 import org.sonatype.nexus.jmx.reflect.ManagedAttribute;
 import org.sonatype.nexus.jmx.reflect.ManagedObject;
@@ -43,7 +42,7 @@ import static org.sonatype.nexus.common.event.EventBusFactory.reentrantEventBus;
  */
 @Named
 @ManagedLifecycle(phase = EVENTS)
-@ManagedObject(typeClass = EventManager.class)
+@ManagedObject(typeClass=EventManager.class)
 @Singleton
 public class EventManagerImpl
     extends LifecycleSupport
@@ -61,7 +60,8 @@ public class EventManagerImpl
   private final EventBus asyncBus;
 
   @Inject
-  public EventManagerImpl(final BeanLocator beanLocator, final EventExecutor eventExecutor) {
+  public EventManagerImpl(final BeanLocator beanLocator, final EventExecutor eventExecutor)
+  {
     this.beanLocator = checkNotNull(beanLocator);
     this.eventExecutor = checkNotNull(eventExecutor);
 
@@ -73,7 +73,7 @@ public class EventManagerImpl
    * Mediator to register and unregister {@link EventAware} components.
    */
   private static class EventAwareMediator
-      implements Mediator<Named, EventAware, EventManagerImpl>
+    implements Mediator<Named, EventAware, EventManagerImpl>
   {
     @Override
     public void add(final BeanEntry<Named, EventAware> entry, final EventManagerImpl watcher) {
@@ -124,21 +124,7 @@ public class EventManagerImpl
   public void post(final Object event) {
     // notify synchronous subscribers before going asynchronous
     eventBus.post(event);
-
-    if (isAffinityEnabled() && event instanceof HasAffinity) {
-      String affinity = ((HasAffinity) event).getAffinity();
-      if (affinity != null) {
-        eventExecutor.executeWithAffinity(affinity, () -> asyncBus.post(event));
-      }
-      else {
-        // unexpected state, fall back to previous behaviour
-        log.warn("Event {} requested 'null' affinity", event);
-        asyncBus.post(event);
-      }
-    }
-    else {
-      asyncBus.post(event);
-    }
+    asyncBus.post(event);
   }
 
   @Override
@@ -146,10 +132,5 @@ public class EventManagerImpl
   @ManagedAttribute
   public boolean isCalmPeriod() {
     return eventExecutor.isCalmPeriod();
-  }
-
-  @Override
-  public boolean isAffinityEnabled() {
-    return eventExecutor.isAffinityEnabled();
   }
 }

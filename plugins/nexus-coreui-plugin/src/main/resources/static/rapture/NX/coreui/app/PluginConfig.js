@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -34,9 +30,61 @@ Ext.define('NX.coreui.app.PluginConfig', {
 
   controllers: [
     {
+      id: 'NX.coreui.controller.Api',
+      active: function() {
+        return NX.State.getValue('api') &&
+            NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
       id: 'NX.coreui.controller.Assets',
       active: function () {
         return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.AnalyticsSettings',
+      active: function () {
+        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-analytics-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.AnalyticsEvents',
+      active: function () {
+        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-analytics-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.AnonymousSettings',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.audit.AuditController',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-audit-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.Browse',
+      active: function () {
+        return !NX.State.getValue('browseComponentAssetTree') &&
+            NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.BrowseAssets',
+      active: function () {
+        return !NX.State.getValue('browseComponentAssetTree') &&
+            NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.BrowseComponents',
+      active: function () {
+        return !NX.State.getValue('browseComponentAssetTree') &&
+            NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
       }
     },
     {
@@ -47,15 +95,15 @@ Ext.define('NX.coreui.app.PluginConfig', {
     },
     {
       id: 'NX.coreui.controller.Capabilities',
-      active: function() {
+      active: function () {
         return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
       }
     },
     {
       id: 'NX.coreui.controller.ComponentAssetTree',
       active: function () {
-        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin') &&
-            NX.State.getValue('browseableformats').length > 0;
+        return NX.State.getValue('browseComponentAssetTree') &&
+            NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
       }
     },
     'NX.coreui.controller.FeatureGroups',
@@ -68,35 +116,21 @@ Ext.define('NX.coreui.app.PluginConfig', {
     {
       id: 'NX.coreui.controller.HealthCheckInfo',
       active: function () {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-clm-oss-plugin')
+        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-healthcheck-oss-plugin')
             || NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-clm-plugin');
       }
     },
     {
       id: 'NX.coreui.controller.HealthCheckRepositoryColumn',
       active: function () {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-clm-oss-plugin')
+        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-healthcheck-oss-plugin')
             || NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-clm-plugin');
       }
     },
     {
       id: 'NX.coreui.controller.HealthCheckRepositoryConfiguration',
       active: function () {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-clm-oss-plugin')
-            || NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-clm-plugin');
-      }
-    },
-    {
-      id: 'NX.coreui.controller.Clm',
-      active: function () {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-clm-oss-plugin')
-            || NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-clm-plugin');
-      }
-    },
-    {
-      id: 'NX.coreui.controller.FirewallRepositoryColumn',
-      active: function () {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-clm-oss-plugin')
+        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-healthcheck-oss-plugin')
             || NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-clm-plugin');
       }
     },
@@ -107,10 +141,33 @@ Ext.define('NX.coreui.app.PluginConfig', {
       }
     },
     {
+      id: 'NX.coreui.controller.Log',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.Loggers',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.Metrics',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
       id: 'NX.coreui.migration.Controller',
       active: function () {
         return NX.State.getValue('migration', {})['enabled'] &&
             NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-migration-plugin');
+      }
+    },
+    { id: 'NX.coreui.controller.NuGetApiKey',
+      active: function () {
+        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-nuget');
       }
     },
     {
@@ -120,9 +177,31 @@ Ext.define('NX.coreui.app.PluginConfig', {
       }
     },
     {
+      id: 'NX.coreui.controller.Bundles',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
       id: 'NX.coreui.controller.Repositories',
       active: function () {
         return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.Blobstores',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    { id: 'NX.coreui.controller.Licensing',
+      active: function () {
+        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-licensing-plugin');
+      }
+    },
+    { id: 'NX.coreui.controller.LicenseUsers',
+      active: function () {
+        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-licensing-plugin');
       }
     },
     {
@@ -138,51 +217,33 @@ Ext.define('NX.coreui.app.PluginConfig', {
       }
     },
     {
+      id: 'NX.coreui.controller.DatabaseWarnings',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.RealmSettings',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.Roles',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
       id: 'NX.coreui.controller.Search',
       active: function () {
         return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
       }
     },
     {
-      id: 'NX.coreui.controller.SearchApt',
+      id: 'NX.coreui.controller.SearchBower',
       active: function () {
-        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-repository-apt');
-      }
-    },
-    {
-      id: 'NX.coreui.controller.SearchCargo',
-      active: function() {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-cargo');
-      }
-    },
-    {
-      id: 'NX.coreui.controller.SearchComposer',
-      active: function() {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-composer');
-      }
-    },
-    {
-      id: 'NX.coreui.controller.SearchConan',
-      active: function () {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-conan');
-      }
-    },
-    {
-      id: 'NX.coreui.controller.SearchConda',
-      active: function () {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-conda');
-      }
-    },
-    {
-      id: 'NX.coreui.controller.SearchGolang',
-      active: function () {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-golang');
-      }
-    },
-    {
-      id: 'NX.coreui.controller.SearchCocoapods',
-      active: function () {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-cocoapods');
+        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-bower');
       }
     },
     {
@@ -195,18 +256,6 @@ Ext.define('NX.coreui.app.PluginConfig', {
       id: 'NX.coreui.controller.SearchGitLfs',
       active: function () {
         return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-gitlfs');
-      }
-    },
-    {
-      id: 'NX.coreui.controller.SearchHelm',
-      active: function () {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-helm');
-      }
-    },
-    {
-      id: 'NX.coreui.controller.SearchHuggingFace',
-      active: function () {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-huggingface');
       }
     },
     {
@@ -234,12 +283,6 @@ Ext.define('NX.coreui.app.PluginConfig', {
       }
     },
     {
-      id: 'NX.coreui.controller.SearchR',
-      active: function() {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-r');
-      }
-    },
-    {
       id: 'NX.coreui.controller.SearchRaw',
       active: function () {
         return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-repository-raw');
@@ -258,9 +301,15 @@ Ext.define('NX.coreui.app.PluginConfig', {
       }
     },
     {
-      id: 'NX.coreui.controller.SearchP2',
+      id: 'NX.coreui.controller.Selectors',
+      active: function() {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.SmtpSettings',
       active: function () {
-        return NX.app.Application.bundleActive('com.sonatype.nexus.plugins.nexus-repository-p2');
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
       }
     },
     {
@@ -273,6 +322,24 @@ Ext.define('NX.coreui.app.PluginConfig', {
       id: 'NX.coreui.controller.SslTrustStore',
       active: function () {
         return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-ssl-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.SupportRequest',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.SupportZip',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
+      }
+    },
+    {
+      id: 'NX.coreui.controller.SysInfo',
+      active: function () {
+        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
       }
     },
     {
@@ -295,14 +362,8 @@ Ext.define('NX.coreui.app.PluginConfig', {
       }
     },
     {
-      id: 'NX.coreui.controller.HealthCheckWarnings',
+      id: 'NX.coreui.controller.FileDescriptorWarnings',
       active: function () {
-        return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
-      }
-    },
-    {
-      id: 'NX.coreui.controller.react.ReactViewController',
-      active: function() {
         return NX.app.Application.bundleActive('org.sonatype.nexus.plugins.nexus-coreui-plugin');
       }
     }

@@ -27,9 +27,4 @@ public interface HttpClientConfigurationStore
   HttpClientConfiguration load();
 
   void save(HttpClientConfiguration configuration);
-
-  /**
-   * @since 3.20
-   */
-  HttpClientConfiguration newConfiguration();
 }

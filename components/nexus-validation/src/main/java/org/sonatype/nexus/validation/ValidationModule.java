@@ -30,7 +30,6 @@ import com.google.inject.Provides;
 import com.google.inject.matcher.Matchers;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.hibernate.validator.HibernateValidator;
-import org.hibernate.validator.messageinterpolation.ParameterMessageInterpolator;
 
 /**
  * Provides validation of methods annotated with {@link Validate}.
@@ -59,7 +58,6 @@ public class ValidationModule
           .constraintValidatorFactory(constraintValidatorFactory)
           .parameterNameProvider(new AopAwareParanamerParameterNameProvider())
           .traversableResolver(new AlwaysTraversableResolver())
-          .messageInterpolator(new ParameterMessageInterpolator())
           .buildValidatorFactory();
 
       // FIXME: Install custom MessageInterpolator that can properly find/merge ValidationMessages.properties for bundles
@@ -68,7 +66,7 @@ public class ValidationModule
       factory.getValidator().validate(new Object()
       {
         // minimal token message
-        @NotNull(message = "{org.sonatype.nexus.validation.constraint.notnull}")
+        @NotNull(message = "${0}")
         String empty;
       });
 

@@ -65,7 +65,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -83,8 +82,8 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -332,7 +331,6 @@ public class KeyStoreManagerImplTest
   /**
    * Verifies removing an certificate by an alias that does not exist, does NOT throw an Exception.
    */
-  @SuppressWarnings("java:S2699") // sonar expects assertions, but best to let this exception bubble up
   @Test
   public void testRemoveCertificateDoesNotExist() throws Exception {
     // nothing much to do here, just call and expect it not to fail
@@ -490,7 +488,6 @@ public class KeyStoreManagerImplTest
    * occur safely.
    */
   @Test
-  @Ignore("NEXUS-44783")
   public void testConcurrentImportTrustCertificate() throws Exception {
     X509Certificate certificate1 = generateCertificate(10,
         "concurrency-1", "ou", "o", "l", "st", "country");
@@ -549,7 +546,6 @@ public class KeyStoreManagerImplTest
    * invocations occur safely.
    */
   @Test
-  @Ignore("NEXUS-44783")
   public void testConcurrentGenerateAndStoreKeyPair() throws Exception {
     KeyStoreManagerConfiguration configuration = createMockConfiguration();
     KeystoreInstance privateStore = mock(KeystoreInstance.class);

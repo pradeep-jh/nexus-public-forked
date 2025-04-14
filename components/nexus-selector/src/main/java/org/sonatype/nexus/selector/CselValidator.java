@@ -12,58 +12,69 @@
  */
 package org.sonatype.nexus.selector;
 
-import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
+import java.io.StringReader;
+import java.util.List;
 
-import com.google.common.collect.ImmutableSet;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.apache.commons.jexl3.JexlException;
+import org.apache.commons.jexl3.JexlInfo;
 import org.apache.commons.jexl3.parser.ASTAndNode;
 import org.apache.commons.jexl3.parser.ASTEQNode;
 import org.apache.commons.jexl3.parser.ASTERNode;
 import org.apache.commons.jexl3.parser.ASTIdentifier;
+import org.apache.commons.jexl3.parser.ASTIdentifierAccess;
 import org.apache.commons.jexl3.parser.ASTJexlScript;
-import org.apache.commons.jexl3.parser.ASTNENode;
 import org.apache.commons.jexl3.parser.ASTOrNode;
+import org.apache.commons.jexl3.parser.ASTReference;
 import org.apache.commons.jexl3.parser.ASTReferenceExpression;
 import org.apache.commons.jexl3.parser.ASTSWNode;
 import org.apache.commons.jexl3.parser.ASTStringLiteral;
-import org.apache.commons.jexl3.parser.JexlNode;
+import org.apache.commons.jexl3.parser.Parser;
 
-import static java.lang.String.format;
+import static java.util.Arrays.asList;
 
 /**
- * Walks the script, checking whether it represents a valid CSEL expression.
- *
- * @since 3.16
+ * @since 3.6
  */
-class CselValidator
-    extends ParserVisitorSupport
+@Named
+@Singleton
+public class CselValidator
+    extends AbstractCselParserVisitor
 {
-  private static final CselValidator INSTANCE = new CselValidator();
+  // this stops JEXL from using expensive new Throwable().getStackTrace() to find caller info
+  private static final JexlInfo CALLER_INFO = new JexlInfo(JexlSelector.class.getName(), 0, 0);
 
-  private static final Set<String> VALID_IDENTIFIERS = ImmutableSet.of("format", "path");
+  private final Parser parser = new Parser(new StringReader(";"));
 
-  private static final String EMBEDDED_STRING_MESSAGE = "String literal '%s' should not contain embedded string (\" or \')";
+  public boolean validate(final String expression) {
+    ASTJexlScript parseTree = parser.parse(CALLER_INFO, expression, null, false, true);
 
-  private static final String BAD_IDENTIFIER_MESSAGE = "Invalid identifier %s, expected one of " + VALID_IDENTIFIERS;
+    Boolean result = true;
+
+    return (boolean) visit(parseTree, result);
+  }
 
   /**
-   * Validates the given CSEL expression (in script form).
-   *
-   * @param script the CSEL script to validate
+   * Accept valid reference identifiers such as "coordinate.groupId"
    */
-  public static void validateCselExpression(final ASTJexlScript script) {
-    script.childrenAccept(INSTANCE, null);
-  }
-
-  private CselValidator() {
-    // utility class
-  }
-
   @Override
-  protected Object doVisit(final JexlNode node, final Object data) {
-    throw new JexlException(node, "Expression not supported in CSEL selector");
+  protected Object visit(final ASTReference node, final Object data) {
+    List<String> parentNames = asList("coordinate");
+    List<String> childNames = asList("groupId", "artifactId", "version", "extension", "classifier", "id");
+    if (node.jjtGetNumChildren() == 2) {
+      ASTIdentifier parentNode = (ASTIdentifier) node.jjtGetChild(0);
+      ASTIdentifierAccess childNode = (ASTIdentifierAccess) node.jjtGetChild(1);
+
+      if (parentNames.contains(parentNode.getName()) && childNames.contains(childNode.getName())) {
+        return data;
+      }
+      throw new JexlException(node,
+          "'Invalid identifier=" + parentNode.getName() + '.' + childNode.getName() + ", expected one of " + parentNames
+              + '.' + childNames + "'");
+    }
+    throw new JexlException(node, "'Invalid reference - too long'");
   }
 
   /**
@@ -83,7 +94,7 @@ class CselValidator
   }
 
   /**
-   * Accept `a == b`
+   * Accept equals nodes of the form `a == b`
    */
   @Override
   protected Object visit(final ASTEQNode node, final Object data) {
@@ -91,29 +102,15 @@ class CselValidator
   }
 
   /**
-   * Accept `a != b`
+   * Accept equals regular expression nodes of the form `a =~ "regex"`
    */
   @Override
-  protected Object visit(final ASTNENode node, final Object data) {
+  protected Object visit(final ASTERNode node, final Object data) {
     return node.childrenAccept(this, data);
   }
 
   /**
-   * Accept `a =~ "regex"`
-   */
-  @Override
-  protected Object visit(final ASTERNode node, final Object data) {
-    try {
-      Pattern.compile(node.jjtGetChild(1).toString());
-      return node.childrenAccept(this, data);
-    }
-    catch (PatternSyntaxException e) {
-      throw new JexlException(node, e.getDescription());
-    }
-  }
-
-  /**
-   * Accept `a =^ "something"`
+   * Accept "Starts With" nodes of the form `a =^ "something"`
    */
   @Override
   protected Object visit(final ASTSWNode node, final Object data) {
@@ -121,38 +118,38 @@ class CselValidator
   }
 
   /**
-   * Accept `( expression )`
+   * Accept identifiers for specific fields
    */
   @Override
-  protected Object visit(final ASTReferenceExpression node, final Object data) {
-    return node.childrenAccept(this, data);
+  protected Object visit(final ASTIdentifier node, final Object data) {
+    List<String> validNames = asList("format", "path");
+    if (validNames.contains(node.getName())) {
+      return node.childrenAccept(this, data);
+    }
+    else {
+      throw new JexlException(node, "'Invalid identifier=" + node.getName() + ", expected one of " + validNames + "'");
+    }
   }
 
   /**
-   * Accept string literals without embedded strings.
+   * Accept string literals of the form "abc"
    */
   @Override
   protected Object visit(final ASTStringLiteral node, final Object data) {
     String literal = node.getLiteral();
-    if (!literal.contains("\"") && !literal.contains("'")) {
-      return node.childrenAccept(this, data);
+
+    if (literal.contains("\"") || literal.contains("'")) {
+      throw new UnsupportedOperationException("String literal " + literal + " should not contain embedded strings (\" or \')");
     }
-    else {
-      throw new JexlException(node, format(EMBEDDED_STRING_MESSAGE, literal));
-    }
+
+    return node.childrenAccept(this, data);
   }
 
   /**
-   * Accept white-listed identifiers.
+   * Accept valid parenthesized expressions `( expression )`
    */
   @Override
-  protected Object visit(final ASTIdentifier node, final Object data) {
-    String id = node.getName();
-    if (VALID_IDENTIFIERS.contains(id)) {
-      return node.childrenAccept(this, data);
-    }
-    else {
-      throw new JexlException(node, format(BAD_IDENTIFIER_MESSAGE, id));
-    }
+  protected Object visit(final ASTReferenceExpression node, final Object data) {
+    return node.childrenAccept(this, data);
   }
 }

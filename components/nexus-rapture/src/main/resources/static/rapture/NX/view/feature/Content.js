@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -23,9 +19,8 @@
  */
 Ext.define('NX.view.feature.Content', {
   extend: 'Ext.panel.Panel',
-  requires: ['NX.view.feature.BreadcrumbPanel', 'NX.view.MaliciousRiskOnDisk', 'NX.State', 'NX.constants.FeatureFlags'],
   alias: 'widget.nx-feature-content',
-  ariaRole: 'main',
+
   itemId: 'feature-content',
   ui: 'nx-feature-content',
   cls: 'nx-feature-content',
@@ -37,51 +32,20 @@ Ext.define('NX.view.feature.Content', {
    */
   discardUnsavedChanges: false,
 
-  dockedItems: [
-    {
-      xtype: 'nx-component-malicious-risk-on-disk',
-      dock: 'top'
-    },
-    {
-      xtype: 'nx-breadcrumb',
-      dock: 'top'
-    }
-  ],
+  header: {
+    items: [
+      {
+        xtype: 'panel',
+        layout: { type: 'hbox' },
+        itemId: 'breadcrumb'
+      }
+    ]
+  },
 
   listeners: {
     afterrender: function(obj) {
       obj.rendered = true;
       obj.showRoot();
-      obj.maybeShowMaliciousRiskOnDisk();
-    }
-  },
-
-  maybeShowMaliciousRiskOnDisk: function() {
-    const me = this;
-    const maliciousRiskOnDisk = me.down('nx-component-malicious-risk-on-disk');
-    const titles = ['Browse', 'Search'];
-    const isCurrentTitleInTitles = titles.includes(me.currentTitle);
-    const user = NX.State.getUser();
-    const isRiskOnDiskEnabled = NX.State.getValue(NX.constants.FeatureFlags.MALWARE_RISK_ON_DISK_ENABLED);
-    const isRiskOnDiskNoneAdminOverrideEnabled = NX.State.getValue(
-        NX.constants.FeatureFlags.MALWARE_RISK_ON_DISK_NONADMIN_OVERRIDE_ENABLED);
-
-    const isAdmin = user && user.administrator;
-    const shouldHideForNonAdmin = isRiskOnDiskNoneAdminOverrideEnabled && !isAdmin;
-
-    if (!user) {
-      document.cookie = 'MALWARE_BANNER=; expires=Thu, 26 Feb 1950 00:00:00 UTC; path=/';
-    }
-
-    const malwareBanner = document.cookie.match(/MALWARE_BANNER_STATUS=([^;]*)/);
-    const hideMalwareBanner = malwareBanner && malwareBanner[1] === 'close';
-
-    if (isRiskOnDiskEnabled && isCurrentTitleInTitles && user && !shouldHideForNonAdmin && !hideMalwareBanner) {
-      maliciousRiskOnDisk.show();
-      maliciousRiskOnDisk.rerender();
-    }
-    else {
-      maliciousRiskOnDisk.hide();
     }
   },
 
@@ -96,66 +60,39 @@ Ext.define('NX.view.feature.Content', {
       return;
     }
 
-    if (breadcrumb.items.length !== 3) {
-      breadcrumb.removeAll();
-      breadcrumb.add(
-          {
-            xtype: 'container',
-            itemId: 'nx-feature-icon',
-            width: 32,
-            height: 32,
-            userCls: me.currentIcon,
-            ariaRole: 'presentation'
-          },
-          {
-            xtype: 'label',
-            cls: 'nx-feature-name',
-            text: me.currentTitle
-          },
-          {
-            xtype: 'label',
-            cls: 'nx-feature-description',
-            text: me.currentDescription
-          }
-      );
-    }
-    else {
-      breadcrumb.items.getAt(0).setUserCls(me.currentIcon);
-      breadcrumb.items.getAt(1).setText(me.currentTitle);
-      breadcrumb.items.getAt(2).setText(me.currentDescription);
-
-      if (breadcrumb.items.length > 3) {
-        Ext.each(breadcrumb.items.getRange(3), function(item) {
-          breadcrumb.remove(item);
-        });
+    breadcrumb.removeAll();
+    breadcrumb.add(
+      {
+        xtype: 'label',
+        cls: 'nx-feature-name',
+        text: me.currentTitle
+      },
+      {
+        xtype: 'label',
+        cls: 'nx-feature-description',
+        text: me.currentDescription
       }
-    }
+    );
   },
 
   /**
-   * The currently set title and icon, so subpanels can access it
+   * The currently set title, so subpanels can access it
+   * @param text
    */
-  currentIcon: undefined,
   currentTitle: undefined,
 
   /**
-   * Custom handling for icon
-   *
-   * @override
-   * @param iconCls
-   */
-  setIconCls: function(iconCls) {
-    this.currentIcon = iconCls;
-  },
-
-  /**
-   * Custom handling for title
+   * Custom handling for title since we are using custom header component.
    *
    * @override
    * @param text
    */
   setTitle: function(text) {
-    this.currentTitle = text;
+    var me = this;
+
+    me.callParent(arguments);
+
+    me.currentTitle = text;
   },
 
   /**

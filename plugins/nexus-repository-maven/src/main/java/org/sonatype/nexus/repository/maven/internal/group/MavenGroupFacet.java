@@ -13,55 +13,179 @@
 package org.sonatype.nexus.repository.maven.internal.group;
 
 import java.io.IOException;
-import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.inject.Named;
 
 import org.sonatype.nexus.repository.Facet;
 import org.sonatype.nexus.repository.Repository;
-import org.sonatype.nexus.repository.group.GroupFacet;
+import org.sonatype.nexus.repository.Type;
+import org.sonatype.nexus.repository.config.Configuration;
+import org.sonatype.nexus.repository.group.GroupFacetImpl;
+import org.sonatype.nexus.repository.http.HttpStatus;
+import org.sonatype.nexus.repository.manager.RepositoryManager;
+import org.sonatype.nexus.repository.maven.MavenFacet;
 import org.sonatype.nexus.repository.maven.MavenPath;
+import org.sonatype.nexus.repository.maven.internal.Constants;
+import org.sonatype.nexus.repository.maven.internal.MavenFacetUtils;
+import org.sonatype.nexus.repository.storage.AssetEvent;
+import org.sonatype.nexus.repository.storage.StorageFacet;
+import org.sonatype.nexus.repository.types.GroupType;
 import org.sonatype.nexus.repository.view.Content;
 import org.sonatype.nexus.repository.view.Response;
-import org.sonatype.nexus.thread.io.StreamCopier;
+import org.sonatype.nexus.transaction.UnitOfWork;
+import org.sonatype.nexus.validation.ConstraintViolationFactory;
 
+import com.google.common.collect.Maps;
+import com.google.common.eventbus.AllowConcurrentEvents;
+import com.google.common.eventbus.Subscribe;
+
+import static com.google.common.base.Preconditions.checkArgument;
+
+/**
+ * Maven2 specific implementation of {@link GroupFacetImpl}: metadata merge and archetype catalog merge is handled.
+ *
+ * @since 3.0
+ */
+@Named
 @Facet.Exposed
-public interface MavenGroupFacet
-    extends GroupFacet
+public class MavenGroupFacet
+    extends GroupFacetImpl
 {
+  private final RepositoryMetadataMerger repositoryMetadataMerger;
+
+  private final ArchetypeCatalogMerger archetypeCatalogMerger;
+
+  private MavenFacet mavenFacet;
+
+  @Inject
+  public MavenGroupFacet(final RepositoryManager repositoryManager,
+                         final ConstraintViolationFactory constraintViolationFactory,
+                         @Named(GroupType.NAME) final Type groupType)
+  {
+    super(repositoryManager, constraintViolationFactory, groupType);
+    this.repositoryMetadataMerger = new RepositoryMetadataMerger();
+    this.archetypeCatalogMerger = new ArchetypeCatalogMerger();
+  }
+
+  @Override
+  protected void doInit(final Configuration configuration) throws Exception {
+    super.doInit(configuration);
+    this.mavenFacet = facet(MavenFacet.class);
+  }
+
   /**
    * Fetches cached content if exists, or {@code null}.
    */
   @Nullable
-  Content getCached(MavenPath mavenPath) throws IOException;
+  public Content getCached(final MavenPath mavenPath) throws IOException
+  {
+    checkMergeHandled(mavenPath);
+    Content content = mavenFacet.get(mavenPath);
+    if (mavenPath.isHash()) {
+      return content; // hashes are recalculated whenever metadata is merged, so they're always fresh
+    }
+    return !isStale(content) ? content : null;
+  }
 
   /**
    * Merges and caches and returns the merged metadata. Returns {@code null} if no usable response was in passed in
    * map.
    */
   @Nullable
-  Content mergeAndCache(MavenPath mavenPath, Map<Repository, Response> responses) throws IOException;
-
-  /**
-   * Merges the metadata but doesn't cache it. Returns {@code null} if no usable response was in passed in map.
-   *
-   * @since 3.13
-   */
-  @Nullable
-  Content mergeWithoutCaching(MavenPath mavenPath, Map<Repository, Response> responses) throws IOException;
-
-  @FunctionalInterface
-  interface ContentFunction<T>
+  public Content mergeAndCache(final MavenPath mavenPath,
+      final Map<Repository, Response> responses) throws IOException
   {
-    Content apply(T data, String contentType) throws IOException;
+    checkMergeHandled(mavenPath);
+    // we do not cache subordinates/hashes, they are created as side-effect of cache
+    checkArgument(!mavenPath.isSubordinate(), "Only main content handled, not hash or signature: %s", mavenPath);
+    LinkedHashMap<Repository, Content> contents = Maps.newLinkedHashMap();
+    for (Map.Entry<Repository, Response> entry : responses.entrySet()) {
+      if (entry.getValue().getStatus().getCode() == HttpStatus.OK) {
+        Response response = entry.getValue();
+        if (response.getPayload() instanceof Content) {
+          contents.put(entry.getKey(), (Content) response.getPayload());
+        }
+      }
+    }
+
+    if (contents.isEmpty()) {
+      log.trace("No 200 OK responses to merge");
+      return null;
+    }
+    final Path path = Files.createTempFile("group-merged-content", "tmp");
+    Content content = null;
+    try {
+      if (mavenFacet.getMavenPathParser().isRepositoryMetadata(mavenPath)) {
+        content = repositoryMetadataMerger.merge(path, mavenPath, contents);
+      }
+      else if (mavenPath.getFileName().equals(Constants.ARCHETYPE_CATALOG_FILENAME)) {
+        content = archetypeCatalogMerger.merge(path, mavenPath, contents);
+      }
+      if (content == null) {
+        log.trace("No content resulted out of merge");
+        return null;
+      }
+      log.trace("Caching merged content");
+      return cache(mavenPath, content);
+    }
+    finally {
+      Files.delete(path);
+    }
   }
 
   /**
-   * Allows different merge methods to be used with the {@link StreamCopier}
+   * Verifies that merge is handled.
    */
-  interface MetadataMerger {
-    void merge(OutputStream outputStream, MavenPath mavenPath, LinkedHashMap<Repository, Content> contents);
+  private void checkMergeHandled(final MavenPath mavenPath) {
+    checkArgument(
+        mavenFacet.getMavenPathParser().isRepositoryMetadata(mavenPath)
+            || mavenPath.getFileName().equals(Constants.ARCHETYPE_CATALOG_FILENAME),
+        "Not handled by Maven2GroupFacet merge: %s",
+        mavenPath
+    );
+  }
+
+  /**
+   * Caches the merged content and it's Maven2 format required sha1/md5 hashes along.
+   */
+  private Content cache(final MavenPath mavenPath, final Content content) throws IOException {
+    return MavenFacetUtils.putWithHashes(mavenFacet, mavenPath, maintainCacheInfo(content));
+  }
+
+  /**
+   * Evicts the cached content and it's Maven2 format required sha1/md5 hashes along.
+   */
+  private void evictCache(final MavenPath mavenPath) throws IOException {
+    MavenFacetUtils.deleteWithHashes(mavenFacet, mavenPath);
+  }
+
+  @Subscribe
+  @AllowConcurrentEvents
+  public void on(final AssetEvent event) {
+    // only make DB changes on the originating node, as orient will also replicate those for us
+    if (event.isLocal() && member(event.getRepositoryName()) && event.getComponentId() == null) {
+      final String path = event.getAsset().name();
+      final MavenPath mavenPath = mavenFacet.getMavenPathParser().parsePath(path);
+      // group deletes path + path.hashes, but it should do only on content change in member
+      if (!mavenPath.isHash()) {
+        UnitOfWork.begin(getRepository().facet(StorageFacet.class).txSupplier());
+        try {
+          evictCache(mavenPath);
+        }
+        catch (IOException e) {
+          log.warn("Could not evict merged content from {} cache at {}", getRepository().getName(),
+              mavenPath.getPath(), e);
+        }
+        finally {
+          UnitOfWork.end();
+        }
+      }
+    }
   }
 }

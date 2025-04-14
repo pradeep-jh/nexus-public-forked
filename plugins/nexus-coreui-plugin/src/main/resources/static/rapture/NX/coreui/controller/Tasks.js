@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -37,9 +33,7 @@ Ext.define('NX.coreui.controller.Tasks', {
   ],
   stores: [
     'Task',
-    'TaskType',
-    'Repository',
-    'Blobstore'
+    'TaskType'
   ],
   models: [
     'Task'
@@ -50,7 +44,6 @@ Ext.define('NX.coreui.controller.Tasks', {
     'task.TaskList',
     'task.TaskSelectType',
     'task.TaskScheduleFieldSet',
-    'task.TaskScheduleFields',
     'task.TaskScheduleAdvanced',
     'task.TaskScheduleDaily',
     'task.TaskScheduleHourly',
@@ -58,11 +51,8 @@ Ext.define('NX.coreui.controller.Tasks', {
     'task.TaskScheduleMonthly',
     'task.TaskScheduleOnce',
     'task.TaskScheduleWeekly',
-    'task.TaskScopeFields',
-    'task.TaskScopeFieldSet',
-    'task.TaskScopeDates',
-    'task.TaskScopeDuration',
     'task.TaskSummary',
+    'task.TaskStatus',
     'task.TaskSettings',
     'task.TaskSettingsForm',
     'formfield.SettingsFieldSet'
@@ -100,9 +90,8 @@ Ext.define('NX.coreui.controller.Tasks', {
         variants: ['x16', 'x32']
       },
       visible: function() {
-        return NX.Permissions.check('nexus:tasks:read') &&
-            !NX.State.getValue('nexus.react.tasks', false);
-      },
+        return NX.Permissions.check('nexus:tasks:read');
+      }
     };
 
     me.callParent();
@@ -141,12 +130,6 @@ Ext.define('NX.coreui.controller.Tasks', {
         },
         'nx-coreui-task-selecttype': {
           cellclick: me.showAddPanel
-        },
-        'combobox[name=property_fromGroup]': {
-          change: me.removeGroupMemberTaskFromGroupChanged
-        },
-        'combobox[name=property_moveRepositoryName]': {
-          change: me.moveRepositoryTaskRepositoryNameChanged
         }
       }
     });
@@ -170,18 +153,11 @@ Ext.define('NX.coreui.controller.Tasks', {
   onSelection: function(list, model) {
     var me = this,
         settings = me.getSettings(),
-        taskTypeModel,
-        taskTypeStore = me.getStore('TaskType');
+        taskTypeModel;
 
     if (Ext.isDefined(model)) {
       me.showSummary(model);
-      if (!taskTypeStore.isLoaded()) {
-        taskTypeStore.on('load', function() {
-          me.onSelection(list, model);
-        }, me, {single: true});
-        return;
-      }
-      taskTypeModel = taskTypeStore.getById(model.get('typeId'));
+      taskTypeModel = me.getStore('TaskType').getById(model.get('typeId'));
       if (taskTypeModel) {
         if (!settings) {
           me.addTab({ xtype: 'nx-coreui-task-settings', title: NX.I18n.get('Tasks_Settings_Title'), weight: 20 });
@@ -206,15 +182,33 @@ Ext.define('NX.coreui.controller.Tasks', {
         me = this,
         summary = me.getSummary();
 
-    info[NX.I18n.get('Tasks_ID_Info')] = Ext.htmlEncode(model.getId());
-    info[NX.I18n.get('Tasks_Name_Info')] = Ext.htmlEncode(model.get('name'));
-    info[NX.I18n.get('Tasks_Type_Info')] = Ext.htmlEncode(model.get('typeName'));
-    info[NX.I18n.get('Tasks_Status_Info')] = Ext.htmlEncode(model.get('statusDescription'));
-    info[NX.I18n.get('Tasks_NextRun_Info')] = Ext.htmlEncode(model.get('nextRun'));
-    info[NX.I18n.get('Tasks_LastRun_Info')] = Ext.htmlEncode(model.get('lastRun'));
-    info[NX.I18n.get('Tasks_LastResult_Info')] = Ext.htmlEncode(model.get('lastRunResult'));
+    info[NX.I18n.get('Tasks_ID_Info')] = model.getId();
+    info[NX.I18n.get('Tasks_Name_Info')] = model.get('name');
+    info[NX.I18n.get('Tasks_Type_Info')] = model.get('typeName');
+    info[NX.I18n.get('Tasks_Status_Info')] = model.get('statusDescription');
+    info[NX.I18n.get('Tasks_NextRun_Info')] = model.get('nextRun');
+    info[NX.I18n.get('Tasks_LastRun_Info')] = model.get('lastRun');
+    info[NX.I18n.get('Tasks_LastResult_Info')] = model.get('lastRunResult');
 
     summary.showInfo(info);
+    me.maybeShowSummaryStatuses(model);
+  },
+
+  /**
+   * @private
+   * Displays task status summary if there are clustered task states.
+   * @param model the task model to get states from
+   */
+  maybeShowSummaryStatuses: function(model) {
+    var me = this;
+
+    if (!model.clusteredTaskStatesStore) {
+      me.getSummary().getStatuses().hide();
+    }
+    else {
+      me.getSummary().getStatuses().show();
+      me.getSummary().getStatuses().getGrid().reconfigure(model.clusteredTaskStatesStore);
+    }
   },
 
   /**
@@ -237,26 +231,16 @@ Ext.define('NX.coreui.controller.Tasks', {
 
     // Show the first panel in the create wizard, and set the breadcrumb
     me.setItemName(1, NX.I18n.get('Tasks_Select_Title'));
-    me.loadCreateWizard(1, Ext.widget({
+    me.loadCreateWizard(1, true, Ext.widget({
       xtype: 'panel',
       layout: {
         type: 'vbox',
         align: 'stretch'
       },
-      items: [
-        {
-          xtype: 'panel',
-          ui: 'nx-drilldown-message',
-          cls: 'nx-drilldown-info',
-          iconCls: NX.Icons.cls('drilldown-info', 'x16'),
-          title: NX.I18n.format('Task_Script_Creation_Disabled'),
-          hidden: NX.State.getValue('allowScriptCreation'),
-        },
-        {
-          xtype: 'nx-coreui-task-selecttype',
-          flex: 1
-        }
-      ]
+      items: {
+        xtype: 'nx-coreui-task-selecttype',
+        flex: 1
+      }
     }));
   },
 
@@ -269,7 +253,7 @@ Ext.define('NX.coreui.controller.Tasks', {
 
     // Show the second panel in the create wizard, and set the breadcrumb
     me.setItemName(2, NX.I18n.format('Tasks_Create_Title', model.get('name')));
-    me.loadCreateWizard(2, panel = Ext.widget({
+    me.loadCreateWizard(2, true, panel = Ext.widget({
       xtype: 'panel',
       layout: {
         type: 'vbox',
@@ -299,16 +283,16 @@ Ext.define('NX.coreui.controller.Tasks', {
       me.getContent().getEl().unmask();
       if (Ext.isObject(response)) {
         if (response.success) {
-          NX.Messages.success(NX.I18n.format('Tasks_Update_Success',
-              me.getDescription(me.getTaskModel().create(response.data))));
+          NX.Messages.add({
+            text: NX.I18n.format('Tasks_Update_Success',
+              me.getDescription(me.getTaskModel().create(response.data))),
+            type: 'success'
+          });
           form.fireEvent('submitted', form);
           me.getStore('Task').load();
         }
         else if (Ext.isDefined(response.errors)) {
           form.markInvalid(response.errors);
-        }
-        else if (Ext.isDefined(response.message)) {
-          NX.Messages.error(response.message);
         }
       }
     });
@@ -325,15 +309,15 @@ Ext.define('NX.coreui.controller.Tasks', {
     NX.direct.coreui_Task.create(values, function(response) {
       if (Ext.isObject(response)) {
         if (response.success) {
-          NX.Messages.success(NX.I18n.format('Tasks_Create_Success',
-              me.getDescription(me.getTaskModel().create(response.data))));
+          NX.Messages.add({
+            text: NX.I18n.format('Tasks_Create_Success',
+              me.getDescription(me.getTaskModel().create(response.data))),
+            type: 'success'
+          });
           me.getStore('Task').load();
         }
         else if (Ext.isDefined(response.errors)) {
           form.markInvalid(response.errors);
-        }
-        else if (Ext.isDefined(response.message)) {
-          NX.Messages.error(response.message);
         }
       }
     });
@@ -351,12 +335,9 @@ Ext.define('NX.coreui.controller.Tasks', {
             NX.Conditions.storeHasRecords('TaskType')
         ),
         {
-          satisfied: function () {
-            button.enable();
-          },
-          unsatisfied: function () {
-            button.disable();
-          }
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
         }
     );
   },
@@ -367,19 +348,17 @@ Ext.define('NX.coreui.controller.Tasks', {
    * Enable 'Run' when user has 'read' permission and task is 'runnable'.
    */
   bindRunButton: function(button) {
-    var me = this;
     button.mon(
         NX.Conditions.and(
             NX.Conditions.isPermitted('nexus:tasks:start'),
-            NX.Conditions.watchEvents(me.getObservables(), me.watchEventsHandler({run: true}))
+            NX.Conditions.gridHasSelection('nx-coreui-task-list', function(model) {
+              return model.get('runnable');
+            })
         ),
         {
-          satisfied: function () {
-            button.enable();
-          },
-          unsatisfied: function () {
-            button.disable();
-          }
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
         }
     );
   },
@@ -390,56 +369,19 @@ Ext.define('NX.coreui.controller.Tasks', {
    * Enable 'Stop' when user has 'delete' permission and task is 'stoppable'.
    */
   bindStopButton: function(button) {
-    var me = this;
     button.mon(
         NX.Conditions.and(
             NX.Conditions.isPermitted('nexus:tasks:stop'),
-            NX.Conditions.watchEvents(me.getObservables(), me.watchEventsHandler({stop: true}))
+            NX.Conditions.gridHasSelection('nx-coreui-task-list', function(model) {
+              return model.get('stoppable');
+            })
         ),
         {
-          satisfied: function () {
-            button.enable();
-          },
-          unsatisfied: function () {
-            button.disable();
-          }
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
         }
     );
-  },
-
-  /**
-   * @private
-   */
-  getObservables: function () {
-    var me = this;
-    return [
-      { observable: me.getStore('Task'), events: ['load']},
-      { observable: Ext.History, events: ['change']}
-    ];
-  },
-
-  /**
-   * @private
-   */
-  watchEventsHandler: function (options) {
-    var me = this,
-        store = me.getStore('Task');
-
-    return function() {
-      var taskId = me.getModelIdFromBookmark(),
-          model = taskId ? store.findRecord('id', taskId, 0, false, true, true) : undefined;
-
-      if (model) {
-        if (options.run) {
-          return model.get('runnable');
-        }
-        else if (options.stop) {
-          return model.get('stoppable');
-        }
-      }
-
-      return false;
-    };
   },
 
   /**
@@ -454,7 +396,9 @@ Ext.define('NX.coreui.controller.Tasks', {
     NX.direct.coreui_Task.remove(model.getId(), function(response) {
       me.getStore('Task').load();
       if (Ext.isObject(response) && response.success) {
-        NX.Messages.success(NX.I18n.format('Tasks_Delete_Success', description));
+        NX.Messages.add({
+          text: NX.I18n.format('Tasks_Delete_Success', description), type: 'success'
+        });
       }
     });
   },
@@ -476,23 +420,20 @@ Ext.define('NX.coreui.controller.Tasks', {
     description = me.getDescription(model);
 
     if (model) {
-      if (model.data.enabled) {
-        description = me.getDescription(model);
-        NX.Dialogs.askConfirmation(NX.I18n.get('Tasks_RunConfirm_Title'),
-            NX.I18n.format('Tasks_RunConfirm_HelpText', description), function() {
-              me.getContent().getEl().mask(NX.I18n.get('Tasks_Run_Mask'));
-              NX.direct.coreui_Task.run(model.getId(), function(response) {
-                me.getContent().getEl().unmask();
-                if (Ext.isObject(response) && response.success) {
-                  me.getStore('Task').load();
-                  NX.Messages.success(NX.I18n.format('Tasks_Run_Success', description));
-                }
-              });
-            }, {scope: me});
-      }
-      else {
-        NX.Messages.warning(NX.I18n.get('Tasks_Run_Disabled'));
-      }
+      description = me.getDescription(model);
+      NX.Dialogs.askConfirmation(NX.I18n.get('Tasks_RunConfirm_Title'),
+        NX.I18n.format('Tasks_RunConfirm_HelpText', description), function() {
+        me.getContent().getEl().mask(NX.I18n.get('Tasks_Run_Mask'));
+        NX.direct.coreui_Task.run(model.getId(), function(response) {
+          me.getContent().getEl().unmask();
+          if (Ext.isObject(response) && response.success) {
+            me.getStore('Task').load();
+            NX.Messages.add({
+              text: NX.I18n.format('Tasks_Run_Success', description), type: 'success'
+            });
+          }
+        });
+      }, {scope: me});
     }
   },
 
@@ -521,70 +462,12 @@ Ext.define('NX.coreui.controller.Tasks', {
           me.getContent().getEl().unmask();
           if (Ext.isObject(response) && response.success) {
             me.getStore('Task').load();
-            NX.Messages.success(NX.I18n.format('Tasks_Stop_Success', description));
+            NX.Messages.add({
+              text: NX.I18n.format('Tasks_Stop_Success', description), type: 'success'
+            });
           }
         });
       }, { scope: me });
     }
-  },
-
-  removeGroupMemberTaskFromGroupChanged: function(groupComboBox, newVal, old) {
-    var members = groupComboBox.up().query('[name=property_memberToRemove]')[0];
-    var selectedGroup = groupComboBox.getStore().getById(newVal);
-    var data = Ext.Array.map(selectedGroup.data.attributes.group.members, function(m) {return {name: m, id: m};});
-    members.setValue(null);
-    members.getStore().setData(data);
-    if(!old) {
-      members.reset();
-    }
-  },
-
-  moveRepositoryTaskRepositoryNameChanged: function(moveRepoComboBox, newVal, old) {
-    this.getStore('Repository').load({
-      scope: this,
-      callback: function() {
-        this.getStore('Blobstore').load({
-          scope: this,
-          callback: function() {
-            var me = this,
-                repoStore = me.getStore('Repository'),
-                selectedRepo = repoStore.findRecord('name', newVal);
-
-            if (selectedRepo) {
-              var blobstoreStore = me.getStore('Blobstore'),
-                  oldSelection,
-                  validSelection = false,
-                  blobstoresCombo = moveRepoComboBox.up().query('[name=property_moveTargetBlobstore]')[0],
-                  currentBlobStore = selectedRepo.data.attributes.storage.blobStoreName,
-                  validBlobstores = blobstoreStore.getRange().filter(function(item) {
-                    return item.data.name !== currentBlobStore;
-                  }).map(function(item) {
-                    return {name: item.data.name, id: item.data.name};
-                  });
-
-              // Check if selected value was valid, if not clean
-              oldSelection = blobstoresCombo.getValue();
-              for (var i = 0; i < validBlobstores.length; i++) {
-                if (validBlobstores[i].id === oldSelection) {
-                  oldSelection = blobstoresCombo.getValue();
-                  validSelection = true;
-                  break;
-                }
-              }
-
-              blobstoresCombo.getStore().setData(validBlobstores);
-              if (!old) {
-                blobstoresCombo.reset();
-              }
-              if (validSelection) {
-                blobstoresCombo.setValue(oldSelection);
-              } else {
-                blobstoresCombo.setValue(null);
-              }
-            }
-          }
-        });
-      }
-    });
   }
 });

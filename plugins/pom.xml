@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus</groupId>
     <artifactId>nexus-parent</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <groupId>org.sonatype.nexus.plugins</groupId>
@@ -30,19 +30,16 @@
 
   <modules>
     <module>nexus-audit-plugin</module>
-    <module>nexus-blobstore-s3</module>
+    <!-- <module>nexus-blobstore-s3</module> -->
     <module>nexus-blobstore-tasks</module>
     <module>nexus-coreui-plugin</module>
     <module>nexus-repository-httpbridge</module>
     <module>nexus-repository-maven</module>
-    <module>nexus-repository-apt</module>
     <module>nexus-repository-raw</module>
+    <module>nexus-restore-maven</module>
     <module>nexus-script-plugin</module>
     <module>nexus-ssl-plugin</module>
     <module>nexus-task-log-cleanup</module>
-    <module>nexus-onboarding-plugin</module>
-    <module>nexus-default-role-plugin</module>
-    <module>nexus-example-content</module>
   </modules>
 
   <dependencyManagement>
@@ -54,7 +51,7 @@
         <groupId>org.sonatype.nexus.buildsupport</groupId>
         <artifactId>nexus-buildsupport-all</artifactId>
         <type>pom</type>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
         <scope>import</scope>
       </dependency>
 
@@ -65,13 +62,13 @@
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-audit-plugin</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
       </dependency>
 
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-audit-plugin</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
         <classifier>features</classifier>
         <type>xml</type>
       </dependency>
@@ -81,13 +78,13 @@
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-blobstore-tasks</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
       </dependency>
 
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-blobstore-tasks</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
         <classifier>features</classifier>
         <type>xml</type>
       </dependency>
@@ -97,13 +94,13 @@
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-coreui-plugin</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
       </dependency>
 
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-coreui-plugin</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
         <classifier>features</classifier>
         <type>xml</type>
       </dependency>
@@ -112,7 +109,7 @@
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-coreui-plugin</artifactId>
         <classifier>sources</classifier>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
       </dependency>
 
       <!-- repository-httpbridge -->
@@ -120,13 +117,13 @@
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-repository-httpbridge</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
       </dependency>
 
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-repository-httpbridge</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
         <classifier>features</classifier>
         <type>xml</type>
       </dependency>
@@ -136,46 +133,43 @@
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-repository-maven</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
       </dependency>
 
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-repository-maven</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
         <classifier>features</classifier>
         <type>xml</type>
       </dependency>
 
-      <!-- repository-apt -->
-
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
-        <artifactId>nexus-repository-apt</artifactId>
-        <version>3.77.0-08</version>
+        <artifactId>nexus-restore-maven</artifactId>
+        <version>3.7.1-02</version>
       </dependency>
 
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
-        <artifactId>nexus-repository-apt</artifactId>
-        <version>3.77.0-08</version>
+        <artifactId>nexus-restore-maven</artifactId>
+        <version>3.7.1-02</version>
         <classifier>features</classifier>
         <type>xml</type>
       </dependency>
-
 
       <!-- repository-raw -->
 
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-repository-raw</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
       </dependency>
 
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-repository-raw</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
         <classifier>features</classifier>
         <type>xml</type>
       </dependency>
@@ -185,13 +179,13 @@
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-ssl-plugin</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
       </dependency>
 
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-ssl-plugin</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
         <classifier>features</classifier>
         <type>xml</type>
       </dependency>
@@ -201,13 +195,13 @@
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-script-plugin</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
       </dependency>
 
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-script-plugin</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.1-02</version>
         <classifier>features</classifier>
         <type>xml</type>
       </dependency>
@@ -217,81 +211,33 @@
       <dependency>
           <groupId>org.sonatype.nexus.plugins</groupId>
           <artifactId>nexus-task-log-cleanup</artifactId>
-          <version>3.77.0-08</version>
+          <version>3.7.1-02</version>
       </dependency>
 
       <dependency>
           <groupId>org.sonatype.nexus.plugins</groupId>
           <artifactId>nexus-task-log-cleanup</artifactId>
-          <version>3.77.0-08</version>
+          <version>3.7.1-02</version>
           <classifier>features</classifier>
           <type>xml</type>
       </dependency>
 
       <!-- s3 blobstore -->
+      <!--
+      <dependency>
+        <groupId>org.sonatype.nexus.plugins</groupId>
+        <artifactId>nexus-blobstore-s3</artifactId>
+        <version>3.7.0-SNAPSHOT</version>
+      </dependency>
 
       <dependency>
         <groupId>org.sonatype.nexus.plugins</groupId>
         <artifactId>nexus-blobstore-s3</artifactId>
-        <version>3.77.0-08</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.sonatype.nexus.plugins</groupId>
-        <artifactId>nexus-blobstore-s3</artifactId>
-        <version>3.77.0-08</version>
+        <version>3.7.0-SNAPSHOT</version>
         <classifier>features</classifier>
         <type>xml</type>
       </dependency>
-
-      <!-- onboarding plugin -->
-
-      <dependency>
-        <groupId>org.sonatype.nexus.plugins</groupId>
-        <artifactId>nexus-onboarding-plugin</artifactId>
-        <version>3.77.0-08</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.sonatype.nexus.plugins</groupId>
-        <artifactId>nexus-onboarding-plugin</artifactId>
-        <version>3.77.0-08</version>
-        <classifier>features</classifier>
-        <type>xml</type>
-      </dependency>
-
-	  <!-- default-role plugin -->
-
-      <dependency>
-        <groupId>org.sonatype.nexus.plugins</groupId>
-        <artifactId>nexus-default-role-plugin</artifactId>
-        <version>3.77.0-08</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.sonatype.nexus.plugins</groupId>
-        <artifactId>nexus-default-role-plugin</artifactId>
-        <version>3.77.0-08</version>
-        <classifier>features</classifier>
-        <type>xml</type>
-      </dependency>
-
-      <!-- example content plugin -->
-
-      <dependency>
-        <groupId>org.sonatype.nexus.plugins</groupId>
-        <artifactId>nexus-example-content</artifactId>
-        <version>3.77.0-08</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.sonatype.nexus.plugins</groupId>
-        <artifactId>nexus-example-content</artifactId>
-        <version>3.77.0-08</version>
-        <classifier>features</classifier>
-        <type>xml</type>
-      </dependency>
-
+      -->
     </dependencies>
   </dependencyManagement>
 
@@ -318,7 +264,7 @@
 
     <plugins>
       <plugin>
-        <groupId>org.eclipse.sisu</groupId>
+        <groupId>org.sonatype.plugins</groupId>
         <artifactId>sisu-maven-plugin</artifactId>
       </plugin>
       <plugin>
@@ -327,36 +273,5 @@
       </plugin>
     </plugins>
   </build>
-
-  <profiles>
-    <profile>
-      <!--
-      Activate this profile to create a deployable Karaf archive (KAR) for your plugin
-      -->
-      <id>buildKar</id>
-      <build>
-        <pluginManagement>
-          <plugins>
-            <plugin>
-              <groupId>org.apache.karaf.tooling</groupId>
-              <artifactId>karaf-maven-plugin</artifactId>
-              <executions>
-                <execution>
-                  <id>buildKar</id>
-                  <goals>
-                    <goal>kar</goal>
-                  </goals>
-                  <configuration>
-                    <resourcesDir>${project.basedir}/src/main/kar-resources</resourcesDir>
-                    <classifier>bundle</classifier>
-                  </configuration>
-                </execution>
-              </executions>
-            </plugin>
-          </plugins>
-        </pluginManagement>
-      </build>
-    </profile>
-  </profiles>
 
 </project>

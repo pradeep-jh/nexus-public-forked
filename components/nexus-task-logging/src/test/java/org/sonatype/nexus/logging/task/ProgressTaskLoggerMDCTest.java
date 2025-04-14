@@ -24,7 +24,7 @@ import org.slf4j.MDC;
 
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.core.IsEqual.equalTo;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -47,8 +47,7 @@ public class ProgressTaskLoggerMDCTest
     // since we are testing with threads, we need to track that the inner thread ran through
     AtomicBoolean tested = new AtomicBoolean(false);
 
-    // create progress task logger with 1ms start delay (i.e. start immediately). Interval is not relevant for this
-    // test.
+    // create progress task logger with 1ms start delay (i.e. start immediately). Interval is not relevant for this test.
     ProgressTaskLogger progressTaskLogger = new ProgressTaskLogger(mockLogger, 1, 60000, TimeUnit.MILLISECONDS)
     {
       void logProgress() {

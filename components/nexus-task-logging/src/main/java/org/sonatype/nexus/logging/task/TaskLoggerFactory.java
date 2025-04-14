@@ -39,8 +39,6 @@ public class TaskLoggerFactory
         return new ProgressTaskLogger(log);
       case TASK_LOG_ONLY:
         return new TaskLogOnlyTaskLogger(log, taskLogInfo);
-      case REPLICATION_LOGGING:
-        return new ReplicationTaskLogger(log, taskLogInfo);
       case TASK_LOG_ONLY_WITH_PROGRESS:
         return new TaskLogWithProgressLogger(log, taskLogInfo);
       case BOTH:
@@ -50,7 +48,5 @@ public class TaskLoggerFactory
   }
 
   @TaskLogging(BOTH)
-  private static final class TaskLoggingDefault
-  {
-  }
+  private static final class TaskLoggingDefault { }
 }

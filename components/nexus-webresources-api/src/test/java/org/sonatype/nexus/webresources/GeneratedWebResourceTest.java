@@ -24,21 +24,20 @@ import org.junit.Test;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 
 /**
  * Tests for {@link GeneratedWebResource}.
  */
 public class GeneratedWebResourceTest
-    extends TestSupport
+  extends TestSupport
 {
   private GeneratedWebResource underTest;
 
   @Before
   public void setUp() throws Exception {
-    this.underTest = new GeneratedWebResource()
-    {
+    this.underTest = new GeneratedWebResource() {
       @Override
       protected byte[] generate() throws IOException {
         return "test".getBytes();
@@ -77,7 +76,7 @@ public class GeneratedWebResourceTest
 
     WebResource prepared = underTest.prepare();
     assertThat(prepared, notNullValue());
-    assertThat(prepared.getSize(), is((long) "test".getBytes().length));
+    assertThat(prepared.getSize(), is((long)"test".getBytes().length));
   }
 
   @Test

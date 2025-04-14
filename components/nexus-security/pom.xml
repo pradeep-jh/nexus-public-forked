@@ -21,52 +21,14 @@
   <parent>
     <groupId>org.sonatype.nexus</groupId>
     <artifactId>nexus-components</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-security</artifactId>
   <name>${project.groupId}:${project.artifactId}</name>
   <packaging>bundle</packaging>
 
-  <!--
-  dependencyManagement blocks are typically reserved for the POMs found within buildsupport.
-  We have defined one here specifically to help eliminate the use of commons-collections 3.x
-  and commons-beanutils from the Nexus Repository project.
-  The shiro-guice dependency used by the nexus-security module is the only remaining dependency
-  to have a transitive dependency on commons-collections 3.x and commons-beanutils.
-  -->
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>commons-collections</groupId>
-        <artifactId>commons-collections</artifactId>
-        <version>3.2.2</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-beanutils</groupId>
-        <artifactId>commons-beanutils</artifactId>
-        <version>1.9.4</version>
-        <exclusions>
-          <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
-
   <dependencies>
-    <dependency>
-      <groupId>com.auth0</groupId>
-      <artifactId>java-jwt</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-distributed-event-service-api</artifactId>
-    </dependency>
-
     <dependency>
       <groupId>org.sonatype.nexus</groupId>
       <artifactId>nexus-common</artifactId>
@@ -103,16 +65,6 @@
     </dependency>
 
     <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-rest</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>io.swagger</groupId>
-      <artifactId>swagger-annotations</artifactId>
-    </dependency>
-
-    <dependency>
       <groupId>org.apache.shiro</groupId>
       <artifactId>shiro-core</artifactId>
     </dependency>
@@ -135,15 +87,22 @@
       <artifactId>jcl-over-slf4j</artifactId>
     </dependency>
 
+    <!--
+    Shiro requires beanutils, ensure we get the right version.
+    -->
+    <dependency>
+      <groupId>commons-beanutils</groupId>
+      <artifactId>commons-beanutils</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>com.google.inject.extensions</groupId>
       <artifactId>guice-servlet</artifactId>
     </dependency>
 
     <dependency>
-      <groupId>javax.ws.rs</groupId>
-      <artifactId>javax.ws.rs-api</artifactId>
-      <scope>provided</scope>
+      <groupId>com.google.inject.extensions</groupId>
+      <artifactId>guice-multibindings</artifactId>
     </dependency>
 
     <dependency>
@@ -175,12 +134,6 @@
     </dependency>
 
     <dependency>
-      <groupId>org.spockframework</groupId>
-      <artifactId>spock-junit4</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
       <groupId>cglib</groupId>
       <artifactId>cglib-nodep</artifactId>
       <scope>test</scope>
@@ -191,11 +144,6 @@
       <artifactId>objenesis</artifactId>
       <scope>test</scope>
     </dependency>
-
-    <dependency>
-      <groupId>org.jboss.resteasy</groupId>
-      <artifactId>resteasy-jaxrs</artifactId>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
+
 </project>

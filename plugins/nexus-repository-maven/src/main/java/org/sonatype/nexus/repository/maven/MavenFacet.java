@@ -12,9 +12,23 @@
  */
 package org.sonatype.nexus.repository.maven;
 
-import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Map;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+import org.sonatype.nexus.common.collect.AttributesMap;
+import org.sonatype.nexus.common.hash.HashAlgorithm;
 import org.sonatype.nexus.repository.Facet;
+import org.sonatype.nexus.repository.storage.Asset;
+import org.sonatype.nexus.repository.storage.AssetBlob;
+import org.sonatype.nexus.repository.storage.TempBlob;
+import org.sonatype.nexus.repository.view.Content;
+import org.sonatype.nexus.repository.view.Payload;
+
+import com.google.common.hash.HashCode;
 
 /**
  * Maven facet, present on all Maven repositories.
@@ -42,11 +56,31 @@ public interface MavenFacet
    */
   LayoutPolicy layoutPolicy();
 
+  // HTTP operations
+
+  @Nullable
+  Content get(MavenPath path) throws IOException;
+
+  Content put(MavenPath path, Payload payload) throws IOException;
+
+  Content put(MavenPath path,
+              Path sourceFile,
+              String contentType,
+              AttributesMap contentAttributes,
+              Map<HashAlgorithm, HashCode> hashes,
+              long size) throws IOException;
+
   /**
-   * @since 3.14
-   *
-   * @param path of the asset to check
-   * @return true if it exists
+   * Puts an artifact held in a temporary blob.
+   * @since 3.1
    */
-  boolean exists(final MavenPath path);
+  Content put(MavenPath path, TempBlob blob, String contentType, AttributesMap contentAttributes) throws IOException;
+
+  boolean delete(MavenPath... paths) throws IOException;
+
+  /**
+   * @since 3.4
+   */
+  Asset put(MavenPath path, AssetBlob assetBlob, AttributesMap contentAttributes) throws IOException;
+
 }

@@ -96,15 +96,6 @@ public interface SecuritySystem
    */
   Set<Role> listRoles(String sourceId) throws NoSuchAuthorizationManagerException;
 
-  /**
-   * Searches the roles that meet the query under the specified auth source
-   *
-   * @param sourceId The identifier of an {@link AuthorizationManager}.
-   * @param query Query to match
-   * @return All the roles that meet the query returned by an {@link AuthorizationManager}.
-   */
-  Set<Role> searchRoles(String sourceId, String query) throws NoSuchAuthorizationManagerException;
-
   // *********************
   // * user management
   // *********************
@@ -133,11 +124,6 @@ public interface SecuritySystem
    * @return The user
    */
   User getUser(String userId, String sourceId) throws UserNotFoundException, NoSuchUserManagerException;
-
-  /**
-   * Optimized version of getUser when roleIds are known, so we don't fetch them again.
-   */
-  User getUser(String userId, String sourceId, Set<String> roleIds) throws UserNotFoundException, NoSuchUserManagerException;
 
   /**
    * Get a User by id. This will search all sources (in order) looking for it. The first one found will be returned.
@@ -209,23 +195,12 @@ public interface SecuritySystem
 
   /**
    * Updates a users password. NOTE: This method does not require the old password to be known, it is meant for
-   * administrators to change a users password.
+   * administrators a users password.
    *
    * @param userId      The id of the user.
    * @param newPassword The user's new password.
    */
   void changePassword(String userId, String newPassword) throws UserNotFoundException;
-
-  /**
-   * Updates a users password. NOTE: This method does not require the old password to be known, it is meant for
-   * administrators to change a users password.
-   *
-   * @param userId      The id of the user.
-   * @param newPassword The user's new password.
-   * @param clearCache  true if the user should be cleared from the authentication cache, false otherwise
-   * @throws UserNotFoundException
-   */
-  void changePassword(String userId, String newPassword, boolean clearCache) throws UserNotFoundException;
 
   // *********************
   // * Authorization Management
@@ -244,18 +219,4 @@ public interface SecuritySystem
    * @since 3.0
    */
   UserManager getUserManager(final String source) throws NoSuchUserManagerException;
-
-  /**
-   * Retrieve list of known authorization sources
-   *
-   * @since 3.19
-   */
-  List<String> listSources();
-
-  /**
-   * Method to validates a realm name by searching in the existing in the current authentication realms
-   * @param realm name to be validated
-   * @return boolean indicating that the realm name was considered a valid authentication realm
-   */
-  boolean isValidRealm(final String realm);
 }

@@ -15,6 +15,8 @@ package org.sonatype.nexus.security.config;
 import java.util.List;
 import java.util.Set;
 
+import org.sonatype.nexus.security.privilege.NoSuchPrivilegeException;
+import org.sonatype.nexus.security.role.NoSuchRoleException;
 import org.sonatype.nexus.security.user.NoSuchRoleMappingException;
 import org.sonatype.nexus.security.user.UserNotFoundException;
 
@@ -41,26 +43,13 @@ public interface SecurityConfigurationManager
 
   /**
    * Create a new user.
-   *
-   * Note: the underlying implementation may throw an exception if the instance of {@link CUser}
-   * was not obtained by calling {@link #newUser}.
    */
   void createUser(CUser user, Set<String> roles);
 
   /**
    * Create a new user and sets the password.
-   *
-   * Note: the underlying implementation may throw an exception if the instance of {@link CUser}
-   * was not obtained by calling {@link #newUser}.
    */
   void createUser(CUser user, String password, Set<String> roles);
-
-  /**
-   * Create a new instance of {@link CUser} suitable for use with the underlying store
-   *
-   * @since 3.20
-   */
-  CUser newUser();
 
   /**
    * Retrieve an existing user
@@ -70,18 +59,12 @@ public interface SecurityConfigurationManager
   /**
    * Update an existing user. Roles are unchanged
    *
-   * Note: the underlying implementation may throw an exception if the instance of {@link CUser}
-   * was not obtained from this configuration.
-   *
    * @param user to update
    */
   void updateUser(CUser user) throws UserNotFoundException;
 
   /**
    * Update an existing user and their roles
-   *
-   * Note: the underlying implementation may throw an exception if the instance of {@link CUser}
-   * was not obtained from this configuration.
    */
   void updateUser(CUser user, Set<String> roles) throws UserNotFoundException;
 
@@ -105,26 +88,19 @@ public interface SecurityConfigurationManager
   void createRole(CRole role);
 
   /**
-   * Create a new instance of {@link CRole} suitable for use with the underlying store
-   *
-   * @since 3.20
-   */
-  CRole newRole();
-
-  /**
    * Retrieve an existing role
    */
-  CRole readRole(String id);
+  CRole readRole(String id) throws NoSuchRoleException;
 
   /**
    * Update an existing role
    */
-  void updateRole(CRole role);
+  void updateRole(CRole role) throws NoSuchRoleException;
 
   /**
    * Delete an existing role
    */
-  void deleteRole(String id);
+  void deleteRole(String id) throws NoSuchRoleException;
 
   //
   // Privileges
@@ -141,65 +117,25 @@ public interface SecurityConfigurationManager
   void createPrivilege(CPrivilege privilege);
 
   /**
-   * Create a new instance of {@link CRole} suitable for use with the underlying store
-   *
-   * @since 3.21
-   */
-  CPrivilege newPrivilege();
-
-  /**
    * Retrieve an existing privilege
    */
-  CPrivilege readPrivilege(String id);
-
-  /**
-   * Retrieve a privilege by its name
-   * @param name the name of the privilege
-   * @return a  {@link CPrivilege} object if found by name
-   */
-  CPrivilege readPrivilegeByName(String name);
-
-  /**
-   * Retrieve an existing privileges
-   */
-  List<CPrivilege> readPrivileges(Set<String> ids);
+  CPrivilege readPrivilege(String id) throws NoSuchPrivilegeException;
 
   /**
    * Update an existing privilege
    */
-  void updatePrivilege(CPrivilege privilege);
-
-  /**
-   * Updates an existing privilege by its name
-   * @param privilege the privilege object to be updated
-   */
-  void updatePrivilegeByName(CPrivilege privilege);
+  void updatePrivilege(CPrivilege privilege) throws NoSuchPrivilegeException;
 
   /**
    * Delete an existing privilege
    */
-  void deletePrivilege(String id);
-
-  /**
-   * Delete an existing privilege by its name
-   * @param name the name of the privilege to be deleted
-   */
-  void deletePrivilegeByName(String name);
-
-  void cleanRemovedPrivilege(String privilegeId);
+  void deletePrivilege(String id) throws NoSuchPrivilegeException;
 
   //
   // User-role mapping
   //
 
   void createUserRoleMapping(CUserRoleMapping userRoleMapping);
-
-  /**
-   * Create a new instance of {@link CUserRoleMapping} suitable for use with the underlying store
-   *
-   * @since 3.20
-   */
-  CUserRoleMapping newUserRoleMapping();
 
   void updateUserRoleMapping(CUserRoleMapping userRoleMapping) throws NoSuchRoleMappingException;
 
@@ -208,4 +144,5 @@ public interface SecurityConfigurationManager
   List<CUserRoleMapping> listUserRoleMappings();
 
   void deleteUserRoleMapping(String userId, String source) throws NoSuchRoleMappingException;
+
 }

@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus</groupId>
     <artifactId>nexus-components</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-siesta</artifactId>
@@ -61,7 +61,7 @@
 
     <dependency>
       <groupId>org.jboss.resteasy</groupId>
-      <artifactId>resteasy-validator-provider</artifactId>
+      <artifactId>resteasy-validator-provider-11</artifactId>
     </dependency>
 
     <dependency>
@@ -85,8 +85,18 @@
     </dependency>
 
     <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-testsupport</artifactId>
+      <groupId>com.orientechnologies</groupId>
+      <artifactId>orientdb-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.orientechnologies</groupId>
+      <artifactId>orientdb-server</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.sonatype.goodies</groupId>
+      <artifactId>goodies-testsupport</artifactId>
       <scope>test</scope>
     </dependency>
 
@@ -109,12 +119,6 @@
     <dependency>
       <groupId>org.sonatype.nexus</groupId>
       <artifactId>nexus-rest-client</artifactId>
-      <scope>test</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>javax.activation</groupId>
-      <artifactId>activation</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

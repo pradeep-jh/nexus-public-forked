@@ -13,24 +13,17 @@
 package org.sonatype.nexus.common.collect;
 
 import java.lang.reflect.Constructor;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.function.Function;
 
 import javax.annotation.Nullable;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 import com.google.common.reflect.TypeToken;
-import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,11 +36,10 @@ import static com.google.common.base.Preconditions.checkState;
  * @since 3.0
  */
 public class AttributesMap
-    implements Iterable<Entry<String, Object>>
+  implements Iterable<Entry<String,Object>>
 {
   private static final Logger log = LoggerFactory.getLogger(AttributesMap.class);
 
-  @JsonProperty
   protected final Map<String, Object> backing;
 
   public AttributesMap(final Map<String, Object> backing) {
@@ -74,42 +66,13 @@ public class AttributesMap
     if (value != null) {
       // TODO: PropertyEditor coercion?
       log.trace("Coerce: {} -> {}", value, type);
-      try {
-        // special handling for when Date has become a long (ms since epoch)
-        if (value instanceof Number) {
-          if (Date.class.equals(type.getRawType())) {
-            return (T) new Date(((Number) value).longValue());
-          }
-          else if (DateTime.class.equals(type.getRawType())) {
-            return (T) new DateTime(((Number) value).longValue());
-          }
-          else if (OffsetDateTime.class.equals(type.getRawType())) {
-            return (T) OffsetDateTime.ofInstant(Instant.ofEpochMilli(((Number) value).longValue()), ZoneOffset.UTC);
-          }
-        }
 
-        // special handling for booleans from string
-        if (Boolean.class.equals(type.getRawType()) && value instanceof String) {
-          T result = (T) Boolean.valueOf((String) value);
-          Throwable stackThrow = null;
-          if (log.isDebugEnabled()) {
-            stackThrow = new Throwable("Unexpected Attribute Coercion. Stack trace output to locate area of concern:");
-          }
-          log.warn("Coerced Boolean Attribute from String. value={}, result={}", value, result, stackThrow);
-          return result;
-        }
+      // special handling for when Date has become a long (ms since epoch)
+      if (Date.class.equals(type.getRawType()) && value instanceof Number) {
+        return (T) new Date(((Number) value).longValue());
+      }
 
-        return (T) type.getRawType().cast(value);
-      }
-      catch (ClassCastException ex) {
-        // Failure is unexpected but should at least be reported.
-        log.warn("Invalid attempt to coerce Attribute into a {}. Original type {}. value={}",
-            type.getType().getTypeName(),
-            value.getClass().getName(),
-            value,
-            log.isDebugEnabled() ? ex : null);
-        return null;
-      }
+      return (T) type.getRawType().cast(value);
     }
     return null;
   }
@@ -279,14 +242,6 @@ public class AttributesMap
   }
 
   /**
-   * Compute new value for keyed attribute based on current value.
-   */
-  @Nullable
-  public Object compute(final String key, final Function<Object, ? extends Object> function) {
-    return set(key, function.apply(get(key)));
-  }
-
-  /**
    * Set type-keyed attribute value.
    */
   @Nullable
@@ -311,7 +266,7 @@ public class AttributesMap
    * Remove attribute for given type-key.
    */
   @Nullable
-  public Object remove(final Class<?> type) {
+  public Object remove(final Class type) {
     return remove(AttributeKey.get(type));
   }
 
@@ -326,7 +281,7 @@ public class AttributesMap
   /**
    * Check if attributes contains given type-key.
    */
-  public boolean contains(final Class<?> type) {
+  public boolean contains(final Class type) {
     return contains(AttributeKey.get(type));
   }
 
@@ -340,7 +295,7 @@ public class AttributesMap
   /**
    * Return all attribute entries.
    */
-  public Set<Entry<String, Object>> entries() {
+  public Set<Entry<String,Object>> entries() {
     return backing.entrySet();
   }
 
@@ -352,7 +307,6 @@ public class AttributesMap
   /**
    * Check if attributes contains any values.
    */
-  @JsonIgnore
   public boolean isEmpty() {
     return backing.isEmpty();
   }

@@ -18,6 +18,8 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.sonatype.nexus.common.entity.Entity;
+import org.sonatype.nexus.common.entity.EntityMetadata;
 import org.sonatype.nexus.common.node.NodeAccess;
 
 /**
@@ -26,7 +28,8 @@ import org.sonatype.nexus.common.node.NodeAccess;
  * @since 3.1
  */
 public class AuditData
-    implements Serializable
+    extends Entity
+    implements Cloneable, Serializable
 {
   private static final long serialVersionUID = 1L;
 
@@ -75,7 +78,7 @@ public class AuditData
   /**
    * Extensible attributes for the change.
    */
-  private Map<String, Object> attributes = new LinkedHashMap<>();
+  private Map<String, String> attributes = new LinkedHashMap<>();
 
   public String getDomain() {
     return domain;
@@ -125,15 +128,38 @@ public class AuditData
     this.initiator = initiator;
   }
 
-  public Map<String, Object> getAttributes() {
+  public Map<String, String> getAttributes() {
     return attributes;
   }
 
   /**
    * @since 3.5
    */
-  public void setAttributes(final Map<String, Object> attributes) {
+  public void setAttributes(final Map<String, String> attributes) {
     this.attributes = attributes;
+  }
+
+  /**
+   * Returns a deeply cloned copy.
+   */
+  public AuditData copy() {
+    try {
+      AuditData copy = (AuditData) clone();
+      copy.attributes = new LinkedHashMap<>(this.attributes);
+      return copy;
+    }
+    catch (CloneNotSupportedException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Returns deeply cloned copy detached from {@link EntityMetadata}.
+   */
+  public AuditData detach() {
+    AuditData copy = copy();
+    copy.setEntityMetadata(null);
+    return copy;
   }
 
   @Override

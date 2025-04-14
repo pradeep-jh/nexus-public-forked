@@ -25,12 +25,10 @@ import org.sonatype.nexus.capability.CapabilityDescriptorSupport;
 import org.sonatype.nexus.capability.CapabilityType;
 import org.sonatype.nexus.capability.Tag;
 import org.sonatype.nexus.capability.Taggable;
-import org.sonatype.nexus.common.upgrade.AvailabilityVersion;
 import org.sonatype.nexus.formfields.CheckboxFormField;
 import org.sonatype.nexus.formfields.FormField;
 import org.sonatype.nexus.formfields.NumberTextFormField;
 import org.sonatype.nexus.formfields.StringTextFormField;
-import org.sonatype.nexus.rapture.settings.RaptureSettings;
 
 import com.google.common.collect.Lists;
 
@@ -39,7 +37,6 @@ import com.google.common.collect.Lists;
  *
  * @since 3.0
  */
-@AvailabilityVersion(from = "1.0")
 @Named(SettingsCapabilityDescriptor.TYPE_ID)
 @Singleton
 public class SettingsCapabilityDescriptor
@@ -81,20 +78,6 @@ public class SettingsCapabilityDescriptor
         "Period of inactivity before session times out (minutes). A value of 0 will mean that a session never expires."
     )
     String sessionTimeoutHelp();
-
-    @DefaultMessage("Standard request timeout")
-    String requestTimeoutLabel();
-
-    @DefaultMessage(
-        "Period of time to keep the connection alive for requests expected to take a normal period of time (seconds)")
-    String requestTimeoutHelp();
-
-    @DefaultMessage("Extended request timeout")
-    String longRequestTimeoutLabel();
-
-    @DefaultMessage(
-        "Period of time to keep the connection alive for requests expected to take an extended period of time (seconds)")
-    String longRequestTimeoutHelp();
 
     @DefaultMessage("Title")
     String titleLabel();
@@ -138,21 +121,7 @@ public class SettingsCapabilityDescriptor
             messages.sessionTimeoutLabel(),
             messages.sessionTimeoutHelp(),
             FormField.MANDATORY
-        ).withInitialValue(RaptureSettings.DEFAULT_SESSION_TIMEOUT),
-        new NumberTextFormField(
-            SettingsCapabilityConfiguration.REQUEST_TIMEOUT,
-            messages.requestTimeoutLabel(),
-            messages.requestTimeoutHelp(),
-            FormField.MANDATORY
-        ).withInitialValue(RaptureSettings.DEFAULT_REQUEST_TIMEOUT)
-            .withMinimumValue(RaptureSettings.MIN_REQUEST_TIMEOUT),
-        new NumberTextFormField(
-            SettingsCapabilityConfiguration.LONG_REQUEST_TIMEOUT,
-            messages.longRequestTimeoutLabel(),
-            messages.longRequestTimeoutHelp(),
-            FormField.MANDATORY
-        ).withInitialValue(RaptureSettings.DEFAULT_LONG_REQUEST_TIMEOUT)
-            .withMinimumValue(RaptureSettings.DEFAULT_LONG_REQUEST_TIMEOUT)
+        ).withInitialValue(RaptureSettings.DEFAULT_SESSION_TIMEOUT)
     );
   }
 
@@ -185,4 +154,5 @@ public class SettingsCapabilityDescriptor
   public Set<Tag> getTags() {
     return Tag.tags(Tag.categoryTag("UI"));
   }
+
 }

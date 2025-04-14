@@ -15,7 +15,6 @@ package org.sonatype.nexus.internal.metrics;
 import javax.inject.Named;
 
 import org.sonatype.goodies.common.ComponentSupport;
-import org.sonatype.nexus.systemchecks.ConditionallyAppliedHealthCheck;
 
 import com.codahale.metrics.health.HealthCheck;
 import com.codahale.metrics.health.HealthCheckRegistry;
@@ -33,14 +32,8 @@ public class HealthCheckMediator
     implements Mediator<Named, HealthCheck, HealthCheckRegistry>
 {
   public void add(final BeanEntry<Named, HealthCheck> entry, final HealthCheckRegistry registry) throws Exception {
-    HealthCheck healthCheck = entry.getValue();
-    if (healthCheck instanceof ConditionallyAppliedHealthCheck) {
-      log.debug("Delay Registry of {} Until Conditional Registration", entry.getKey().value());
-    }
-    else {
-      log.debug("Registering: {}", entry);
-      registry.register(entry.getKey().value(), healthCheck);
-    }
+    log.debug("Registering: {}", entry);
+    registry.register(entry.getKey().value(), entry.getValue());
   }
 
   public void remove(final BeanEntry<Named, HealthCheck> entry, final HealthCheckRegistry registry) throws Exception {
@@ -48,3 +41,4 @@ public class HealthCheckMediator
     registry.unregister(entry.getKey().value());
   }
 }
+

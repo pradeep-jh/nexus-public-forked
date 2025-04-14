@@ -31,12 +31,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link HttpClientManagerImpl}.
@@ -64,8 +59,7 @@ public class HttpClientManagerImplTest
 
   @Before
   public void setUp() {
-    underTest = new HttpClientManagerImpl(eventManager, configStore, TestHttpClientConfiguration::new,
-        connectionManager,
+    underTest = new HttpClientManagerImpl(eventManager, configStore, HttpClientConfiguration::new, connectionManager,
         defaultsCustomizer);
   }
 
@@ -104,12 +98,12 @@ public class HttpClientManagerImplTest
   public void testOnStoreChanged_LocalEvent() {
     when(configEvent.isLocal()).thenReturn(true);
     underTest.onStoreChanged(configEvent);
-    verifyNoInteractions(eventManager, configStore);
+    verifyZeroInteractions(eventManager, configStore);
   }
 
   @Test
   public void testOnStoreChanged_RemoteEvent() {
-    HttpClientConfiguration config = new TestHttpClientConfiguration();
+    HttpClientConfiguration config = new HttpClientConfiguration();
     when(configStore.load()).thenReturn(config);
     when(configEvent.isLocal()).thenReturn(false);
     when(configEvent.getRemoteNodeId()).thenReturn("remote-node-id");

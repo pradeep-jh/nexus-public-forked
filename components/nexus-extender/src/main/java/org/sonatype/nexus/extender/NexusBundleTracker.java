@@ -13,9 +13,9 @@
 package org.sonatype.nexus.extender;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.eclipse.sisu.inject.BindingPublisher;
 import org.eclipse.sisu.inject.MutableBeanLocator;
@@ -39,7 +39,7 @@ public class NexusBundleTracker
 {
   private static final Logger log = LoggerFactory.getLogger(NexusBundleTracker.class);
 
-  private final Set<String> visited = ConcurrentHashMap.newKeySet();
+  private final Set<String> visited = new HashSet<>();
 
   private final Bundle systemBundle;
 
@@ -57,21 +57,20 @@ public class NexusBundleTracker
 
   @Override
   public BindingPublisher prepare(final Bundle bundle) {
-    if (visited.add(bundle.getSymbolicName()) && hasComponents(bundle)) {
+    if (hasComponents(bundle)) {
       if ("org.ops4j.pax.url.mvn".equals(bundle.getSymbolicName())) {
         return null; // false-positive, this doesn't need preparing
       }
       prepareDependencies(bundle);
-      String bundleDetails = bundle.getSymbolicName() + " [" + bundle.getVersion() + "]";
       try {
         BindingPublisher publisher;
-        log.info("ACTIVATING {}", bundleDetails);
+        log.info("ACTIVATING {}", bundle);
         publisher = super.prepare(bundle);
-        log.info("ACTIVATED {}", bundleDetails);
+        log.info("ACTIVATED {}", bundle);
         return publisher;
       }
       catch (final Exception e) {
-        log.warn("BROKEN {}", bundleDetails);
+        log.warn("BROKEN {}", bundle);
         throw e;
       }
     }
@@ -108,7 +107,7 @@ public class NexusBundleTracker
       for (final BundleWire wire : wires) {
         try {
           final Bundle dependency = wire.getProviderWiring().getBundle();
-          if (!visited.contains(dependency.getSymbolicName()) && hasComponents(dependency)) {
+          if (visited.add(dependency.getSymbolicName()) && hasComponents(dependency)) {
             if (!live(dependency)) {
               dependency.start();
             }

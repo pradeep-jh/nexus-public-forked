@@ -28,13 +28,6 @@ import org.sonatype.nexus.script.Script;
 public interface ScriptStore
     extends Lifecycle
 {
-
-  /**
-   * Create a new, unpopulated Script
-   * @since 3.20
-   */
-  Script newScript();
-
   /**
    * @return all stored {@link Script}
    */

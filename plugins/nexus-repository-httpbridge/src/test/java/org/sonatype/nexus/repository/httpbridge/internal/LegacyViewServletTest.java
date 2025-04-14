@@ -44,8 +44,9 @@ import org.mockito.stubbing.Answer;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsEqual.equalTo;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Matchers.isNotNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.sonatype.nexus.repository.http.HttpStatus.NOT_FOUND;
@@ -122,7 +123,7 @@ public class LegacyViewServletTest
   public void sendRequestWhenLegacyEnabled() throws Exception {
     viewServlet.doService(request, response);
 
-    verify(sender).send(nullable(Request.class), nullable(Response.class), eq(response));
+    verify(sender).send(isNotNull(Request.class), any(Response.class), eq(response));
   }
 
   @Test
@@ -156,7 +157,7 @@ public class LegacyViewServletTest
 
   private LegacyViewServlet buildServlet() {
     return new LegacyViewServlet(repositoryManager, httpResponseSenderSelector,
-        descriptionHelper, descriptionRenderer, legacyViewContributors, true);
+        descriptionHelper, descriptionRenderer, legacyViewContributors);
   }
 
   private void mockNames() {
@@ -197,7 +198,7 @@ public class LegacyViewServletTest
   }
 
   private void mockResponseSender() {
-    when(httpResponseSenderSelector.sender(nullable(Repository.class))).thenReturn(sender);
+    when(httpResponseSenderSelector.sender(any(Repository.class))).thenReturn(sender);
     when(httpResponseSenderSelector.defaultSender()).thenReturn(sender);
   }
 }

@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -27,8 +23,7 @@ Ext.define('NX.controller.State', {
     'Ext.direct.Manager',
     'NX.Dialogs',
     'NX.Messages',
-    'NX.I18n',
-    'Ext.Ajax'
+    'NX.I18n'
   ],
 
   models: [
@@ -81,6 +76,15 @@ Ext.define('NX.controller.State', {
         }
       }
     });
+
+    me.addEvents(
+        /**
+         * Fires when any of application context values changes.
+         *
+         * @event changed
+         */
+        'changed'
+    );
   },
 
   /**
@@ -143,44 +147,35 @@ Ext.define('NX.controller.State', {
    */
   setValue: function (key, value, hash) {
     var me = this,
-        store = me.getStore('State'),
-        model = store.getById(key),
-        hasValue = Ext.isDefined(value) && value !== null;
+        model = me.getStore('State').getById(key);
 
-    if (!hasValue && model) {
-      store.remove(model);
-    }
-    else if (hasValue && !model) {
-      store.add(me.getStateModel().create({ key: key, value: value, hash: hash }));
-    }
-    else if (hash && !Ext.Object.equals(hash, model.get('hash'))) {
-      model.set('hash', hash);
-
-      if (key === 'user' && model.get('value').id === value.id) {
-        model.set('value', value, { silent: true });
-        me.fireEvent('userAuthenticated', key, value);
-      }
-
-      if (!Ext.Object.equals(value, model.get('value'))) {
-        model.set('value', value);
+    if (!model) {
+      if (Ext.isDefined(value)) {
+        me.getStore('State').add(me.getStateModel().create({ key: key, value: value, hash: hash }));
       }
     }
-    else if (!hash && hasValue) {
-      model.set('hash', hash);
-      model.set('value', value);
+    else {
+      if (Ext.isDefined(value) && value !== null) {
+        if (!Ext.Object.equals(value, model.get('value'))) {
+          model.set('value', value);
+        }
+        if (!Ext.Object.equals(hash, model.get('hash'))) {
+          model.set('hash', hash);
+        }
+      }
+      else {
+        me.getStore('State').remove(model);
+      }
     }
-
-    store.commitChanges();
-
+    me.getStore('State').commitChanges();
     if (me.statusProvider) {
-      if (hasValue && hash) {
+      if (Ext.isDefined(value) && hash) {
         me.statusProvider.baseParams[key] = hash;
       }
       else {
         delete me.statusProvider.baseParams[key];
       }
     }
-
   },
 
   setValues: function (map) {
@@ -218,10 +213,8 @@ Ext.define('NX.controller.State', {
     }
   },
 
-  onEntryRemoved: function (store, models) {
-    models.forEach(function(model) {
-      this.notifyChange(model.get('key'), undefined, model.get('value'));
-    }, this);
+  onEntryRemoved: function (store, model) {
+    this.notifyChange(model.get('key'), undefined, model.get('value'));
   },
 
   notifyChange: function (key, value, oldValue) {
@@ -242,7 +235,7 @@ Ext.define('NX.controller.State', {
    */
   onUiSettingsChanged: function (uiSettings, oldUiSettings) {
     var me = this,
-        newStatusInterval, newStatusIntervalMs, oldStatusIntervalMs;
+        newStatusInterval, oldStatusInterval;
 
     uiSettings = uiSettings || {};
     oldUiSettings = oldUiSettings || {};
@@ -256,7 +249,7 @@ Ext.define('NX.controller.State', {
     }
 
     if (me.statusProvider) {
-      oldStatusIntervalMs = me.statusProvider.interval;
+      oldStatusInterval = me.statusProvider.interval;
     }
 
     newStatusInterval = uiSettings.statusIntervalAnonymous;
@@ -264,10 +257,8 @@ Ext.define('NX.controller.State', {
       newStatusInterval = uiSettings.statusIntervalAuthenticated;
     }
 
-    newStatusIntervalMs = newStatusInterval * 1000;
-
     if (newStatusInterval > 0) {
-      if (newStatusIntervalMs !== oldStatusIntervalMs) {
+      if (newStatusInterval !== oldStatusInterval) {
         if (me.statusProvider) {
           me.statusProvider.disconnect();
           me.receiving = false;
@@ -275,7 +266,7 @@ Ext.define('NX.controller.State', {
         me.statusProvider = Ext.direct.Manager.addProvider({
           type: 'polling',
           url: NX.direct.api.POLLING_URLS.rapture_State_get,
-          interval: newStatusIntervalMs,
+          interval: newStatusInterval * 1000,
           baseParams: {
           },
           listeners: {
@@ -287,9 +278,6 @@ Ext.define('NX.controller.State', {
         //<if debug>
         me.logDebug('State pooling configured for', newStatusInterval, 'seconds');
         //</if>
-
-        // fire one request for state manually to not wait for the polling interval
-        me.refreshNow();
       }
     }
     else {
@@ -309,18 +297,11 @@ Ext.define('NX.controller.State', {
    * @private
    */
   onUserChanged: function (user, oldUser) {
-    var me = this;
     var uiSettings;
 
     if (Ext.isDefined(user) !== Ext.isDefined(oldUser)) {
       uiSettings = NX.State.getValue('uiSettings');
-
-      // fire one request for state manually on login if the statusInterval is 0
-      if (user && !oldUser && uiSettings) {
-        uiSettings.statusIntervalAuthenticated === 0 && me.refreshNow()
-      }
-
-      me.onUiSettingsChanged(uiSettings, uiSettings);
+      this.onUiSettingsChanged(uiSettings, uiSettings);
     }
   },
 
@@ -358,7 +339,7 @@ Ext.define('NX.controller.State', {
     // re-enable the UI we are now connected again
     if (me.disconnectedTimes > 0) {
       me.disconnectedTimes = 0;
-      NX.Messages.success(NX.I18n.get('State_Reconnected_Message'));
+      NX.Messages.add({text: NX.I18n.get('State_Reconnected_Message'), type: 'success' });
     }
 
     NX.State.setValue('receiving', true);
@@ -391,12 +372,12 @@ Ext.define('NX.controller.State', {
         NX.State.setValue('receiving', false);
 
         if (me.disconnectedTimes <= me.maxDisconnectWarnings) {
-          NX.Messages.warning(NX.I18n.get('State_Disconnected_Message'));
+          NX.Messages.add({ text: NX.I18n.get('State_Disconnected_Message'), type: 'warning' });
         }
 
         // Give up after a few attempts and disable the UI
         if (me.disconnectedTimes > me.maxDisconnectWarnings) {
-          NX.Messages.error(NX.I18n.get('State_Disconnected_Message'));
+          NX.Messages.add({text: NX.I18n.get('State_Disconnected_Message'), type: 'danger' });
 
           // Stop polling
           me.statusProvider.disconnect();
@@ -421,7 +402,7 @@ Ext.define('NX.controller.State', {
       }
     }
     else if (event.type === 'exception') {
-      NX.Messages.error(event.message);
+      NX.Messages.add({ text: event.message, type: 'danger' });
     }
   },
 
@@ -432,20 +413,6 @@ Ext.define('NX.controller.State', {
    */
   refreshNow: function () {
     var me = this;
-
-    // directly query for state
-    Ext.Ajax.request({
-      url: NX.direct.api.POLLING_URLS.rapture_State_get,
-      scope: me,
-      success: function(response) {
-        var text = response && response.responseText;
-
-        if (text != null) {
-          me.onServerData(null, Ext.isObject(text) || Ext.isArray(text) ? text : Ext.decode(text));
-        }
-      }
-    });
-
     if (me.statusProvider) {
       me.statusProvider.disconnect();
       me.statusProvider.connect();
@@ -464,16 +431,16 @@ Ext.define('NX.controller.State', {
   onLicenseChanged: function (license, oldLicense) {
     if (license && oldLicense) {
       if (license.installed && !oldLicense.installed) {
-        NX.Messages.success(NX.I18n.get('State_Installed_Message'));
+        NX.Messages.add({ text: NX.I18n.get('State_Installed_Message'), type: 'success' });
       }
       else if (!license.installed && oldLicense.installed) {
-        NX.Messages.warning(NX.I18n.get('State_Uninstalled_Message'));
+        NX.Messages.add({ text: NX.I18n.get('State_Uninstalled_Message'), type: 'warning' });
       }
     }
   },
 
   reloadWhenServerIdChanged: function (serverId, oldServerId) {
-    if (oldServerId && (serverId !== oldServerId) && !Ext.String.startsWith(serverId, 'ignore')) {
+    if (oldServerId && (serverId !== oldServerId) && !serverId.startsWith('ignore')) {
       // FIXME: i18n
       NX.Dialogs.showInfo(
           'Server restarted',

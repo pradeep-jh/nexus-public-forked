@@ -17,7 +17,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.logging.task.TaskLoggerFactory;
 import org.sonatype.nexus.logging.task.TaskLoggerHelper;
-import org.sonatype.nexus.scheduling.spi.TaskResultStateStore;
 
 import com.google.common.base.Strings;
 
@@ -26,10 +25,10 @@ import static org.sonatype.nexus.logging.task.TaskLoggingMarkers.TASK_LOG_ONLY;
 
 /**
  * Support for {@link Task} implementations.
- * <p>
+ *
  * Subclasses may implement {@link Cancelable} interface if they are implemented to periodically check for
  * {@link #isCanceled()} or {@link CancelableHelper#checkCancellation()} methods.
- * <p>
+ *
  * Task implementations should be {@code @Named} components but must not be {@code @Singletons}.
  *
  * @since 3.0
@@ -42,18 +41,7 @@ public abstract class TaskSupport
 
   private final AtomicBoolean canceledFlag;
 
-  private final boolean taskLoggingEnabled;
-
-  private TaskInfo taskInfo;
-
-  protected static final String TIMESTAMP_FORMAT = "%1$tY-%1$tm-%1$td-%1$tH-%1$tM-%1$tS";
-
   public TaskSupport() {
-    this(true);
-  }
-
-  public TaskSupport(final boolean taskLoggingEnabled) {
-    this.taskLoggingEnabled = taskLoggingEnabled;
     this.configuration = createTaskConfiguration();
     this.canceledFlag = new AtomicBoolean(false);
   }
@@ -104,10 +92,6 @@ public abstract class TaskSupport
     try {
       return execute();
     }
-    catch (TaskInterruptedException e) {
-      log.warn(TASK_LOG_ONLY, "Task '{}' was canceled", getMessage());
-      throw e;
-    }
     catch (Exception e) {
       log.error(TASK_LOG_ONLY, "Failed to run task '{}'", getMessage(), e);
       throw e;
@@ -119,15 +103,11 @@ public abstract class TaskSupport
   }
 
   private void startTaskLogging() {
-    if (taskLoggingEnabled) {
-      TaskLoggerHelper.start(TaskLoggerFactory.create(this, log, configuration));
-    }
+    TaskLoggerHelper.start(TaskLoggerFactory.create(this, log, configuration));
   }
 
   private void finishTaskLogging() {
-    if (taskLoggingEnabled) {
-      TaskLoggerHelper.finish();
-    }
+    TaskLoggerHelper.finish();
   }
 
   /**
@@ -156,20 +136,5 @@ public abstract class TaskSupport
   @Override
   public String toString() {
     return String.format("%s(id=%s, name=%s)", getClass().getSimpleName(), getId(), getName());
-  }
-
-  @Override
-  public TaskInfo getTaskInfo() {
-    return taskInfo;
-  }
-
-  @Override
-  public void setTaskInfo(final TaskInfo taskInfo) {
-    this.taskInfo = taskInfo;
-  }
-
-  protected void updateProgress(final TaskResultStateStore taskResultStateStore, final String progress) {
-    taskInfo.getConfiguration().setProgress(progress);
-    taskResultStateStore.updateJobDataMap(taskInfo);
   }
 }

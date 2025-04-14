@@ -19,12 +19,15 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
-import org.sonatype.nexus.common.app.Freezable;
 import org.sonatype.nexus.common.app.ManagedLifecycle;
 import org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport;
-import org.sonatype.nexus.scheduling.TaskConfiguration;
+import org.sonatype.nexus.common.event.EventAware;
+import org.sonatype.nexus.orient.freeze.DatabaseFreezeChangeEvent;
+import org.sonatype.nexus.orient.freeze.DatabaseFreezeService;
 import org.sonatype.nexus.scheduling.TaskInfo;
 import org.sonatype.nexus.scheduling.spi.SchedulerSPI;
+
+import com.google.common.eventbus.Subscribe;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.TASKS;
@@ -40,20 +43,21 @@ import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.TASKS;
 @Singleton
 public class TaskActivation
     extends StateGuardLifecycleSupport
-    implements Freezable
+    implements EventAware
 {
   private final SchedulerSPI scheduler;
 
-  private volatile boolean frozen;
+  private final DatabaseFreezeService databaseFreezeService;
 
   @Inject
-  public TaskActivation(final SchedulerSPI scheduler) {
+  public TaskActivation(final SchedulerSPI scheduler, final DatabaseFreezeService databaseFreezeService) {
     this.scheduler = checkNotNull(scheduler);
+    this.databaseFreezeService = checkNotNull(databaseFreezeService);
   }
 
   @Override
   protected void doStart() throws Exception {
-    if (!isFrozen()) {
+    if (!databaseFreezeService.isFrozen()) {
       scheduler.resume();
     }
   }
@@ -63,38 +67,24 @@ public class TaskActivation
     scheduler.pause();
   }
 
-  @Override
-  public boolean isFrozen() {
-    return frozen;
-  }
-
-  @Override
-  public void freeze() {
-    frozen = true;
-    if (isStarted()) {
+  /**
+   * @since 3.2.1
+   */
+  @Subscribe
+  public void onDatabaseFreezeChangeEvent(final DatabaseFreezeChangeEvent databaseFreezeChangeEvent) {
+    if (databaseFreezeChangeEvent.isFrozen()) {
       scheduler.pause();
       scheduler.listsTasks().stream()
-          .filter(this::cancelOnFreeze)
           .filter(taskInfo -> !maybeCancel(taskInfo))
           .forEach(taskInfo -> log.warn("Unable to cancel task: {}", taskInfo.getName()));
     }
-  }
-
-  private boolean cancelOnFreeze(final TaskInfo taskInfo) {
-    return taskInfo.getConfiguration() == null
-        || !taskInfo.getConfiguration().getBoolean(TaskConfiguration.RUN_WHEN_FROZEN, false);
-  }
-
-  @Override
-  public void unfreeze() {
-    frozen = false;
-    if (isStarted()) {
+    else {
       scheduler.resume();
     }
   }
 
   private boolean maybeCancel(final TaskInfo taskInfo) {
-    Future<?> future = taskInfo.getCurrentState().getFuture();
+    Future future = taskInfo.getCurrentState().getFuture();
     return future == null || future.cancel(false);
   }
 }

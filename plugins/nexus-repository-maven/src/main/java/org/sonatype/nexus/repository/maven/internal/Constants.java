@@ -40,15 +40,10 @@ public class Constants
   public static final String ARCHETYPE_CATALOG_FILENAME = "archetype-catalog.xml";
 
   /**
-   * Layout to be used for a DateTimeFormatter, which maven typically uses in snapshot versions.
-   */
-  public static final String DOTTED_TIMESTAMP_VERSION_FORMAT = "YYYYMMdd.HHmmss";
-
-  /**
    * {@link DateTimeFormatter} for dotted timestamps used in Maven2 repository metadata.
    */
-  public static final DateTimeFormatter METADATA_DOTTED_TIMESTAMP = DateTimeFormat
-      .forPattern(DOTTED_TIMESTAMP_VERSION_FORMAT).withZoneUTC().withLocale(Locale.ENGLISH);
+  public static final DateTimeFormatter METADATA_DOTTED_TIMESTAMP = DateTimeFormat.forPattern("YYYYMMdd.HHmmss")
+      .withZoneUTC().withLocale(Locale.ENGLISH);
 
   /**
    * {@link DateTimeFormatter} for dotless timestamps used in Maven2 repository metadata.
@@ -65,19 +60,4 @@ public class Constants
    * The suffix of base version for snapshots.
    */
   public static final String SNAPSHOT_VERSION_SUFFIX = "SNAPSHOT";
-
-  /**
-   * The base path and name of maven index file assets.
-   */
-  public static final String INDEX_FILE_BASE_PATH = ".index/nexus-maven-repository-index";
-
-  /**
-   * The full path of maven index property file assets.
-   */
-  public static final String INDEX_PROPERTY_FILE_PATH = INDEX_FILE_BASE_PATH + ".properties";
-
-  /**
-   * The full path of maven index chunk file assets.
-   */
-  public static final String INDEX_MAIN_CHUNK_FILE_PATH = INDEX_FILE_BASE_PATH + ".gz";
 }

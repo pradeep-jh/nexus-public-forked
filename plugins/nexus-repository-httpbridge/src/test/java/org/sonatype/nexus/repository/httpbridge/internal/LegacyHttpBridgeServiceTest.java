@@ -27,7 +27,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -62,10 +62,8 @@ public class LegacyHttpBridgeServiceTest
   @Before
   public void setup() throws Exception {
     when(legacyUrlEnabledHelper.isEnabled()).thenReturn(true);
-    when(locator.locate(any())).thenReturn(null);
 
     underTest = new LegacyHttpBridgeService(locator, legacyUrlEnabledHelper);
-    underTest.doStart();
 
     when(capabilityEvent.getReference()).thenReturn(capabilityReference);
     when(capabilityReference.context()).thenReturn(capabilityContext);
@@ -83,7 +81,6 @@ public class LegacyHttpBridgeServiceTest
     when(legacyUrlEnabledHelper.isEnabled()).thenReturn(false);
 
     underTest = new LegacyHttpBridgeService(locator, legacyUrlEnabledHelper);
-    underTest.doStart();
 
     verify(locator, never()).add(any());
   }

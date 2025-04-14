@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -22,13 +18,11 @@
  * @since 3.0
  */
 Ext.define('NX.ext.SearchBox', {
-  extend: 'Ext.form.field.Text',
+  extend: 'Ext.form.field.Trigger',
   alias: 'widget.nx-searchbox',
   requires: [
     'Ext.util.KeyNav'
   ],
-
-  cls: 'nx-searchbox',
 
   emptyText: 'search',
   submitValue: false,
@@ -40,55 +34,48 @@ Ext.define('NX.ext.SearchBox', {
    */
   searchDelay: 1000,
 
-  triggers: {
-    clear: {
-      cls: 'nx-form-fa-times-circle-trigger',
-      handler: function() {
-        this.clearSearch();
-      }
-    }
-  },
-
-  listeners: {
-    change: 'onValueChange',
-    keypress: 'updateTriggerVisibility'
-  },
-
-  maskOnDisable: false,
+  // TODO: Only show clear trigger if we have text
+  trigger1Cls: 'nx-form-fa-times-circle-trigger',
 
   /**
    * @override
    */
   initComponent: function () {
-    var config = {
-      checkChangeBuffer: this.searchDelay,
-      ariaLabel: this.emptyText
-    },
-    fieldSubTpl = '<span class="nx-searchbox-icon x-fa ' + this.iconClass + '"></span>';
+    var me = this;
 
-    if (this.iconClass) {
-      config.inputWrapCls = 'has-icon';
+    Ext.apply(me, {
+      checkChangeBuffer: me.searchDelay
+    });
 
-      if (this.fieldSubTpl instanceof Ext.XTemplate) {
-        config.fieldSubTpl = [fieldSubTpl].concat(this.fieldSubTpl.html);
-        this.fieldSubTpl.destroy();
-      } else {
-        config.fieldSubTpl = [fieldSubTpl].concat(this.fieldSubTpl);
-      }
+    me.callParent(arguments);
 
-      config.listeners = {
-        afterrender: function() {
-          var icon = this.getEl().down('span.nx-searchbox-icon');
-          if (icon) {
-            icon.on('click', this.focus.bind(this));
-          }
-        }.bind(this)
-      };
-    }
+    me.on('change', me.onValueChange, me);
 
-    Ext.apply(this, config);
+    me.addEvents(
+        /**
+         * Fires before a search is performed.
+         *
+         * @event beforesearch
+         */
+        'beforesearch',
 
-    this.callParent(arguments);
+        /**
+         * Fires when a search values was typed. Fires with a delay of **{@link #searchDelay}**.
+         *
+         * @event search
+         * @param {NX.ext.SearchBox} this search box
+         * @param {String} search value
+         */
+        'search',
+
+        /**
+         * Fires when a search value had been cleared.
+         *
+         * @event searchcleared
+         * @param {NX.ext.SearchBox} this search box
+         */
+        'searchcleared'
+    );
   },
 
   /**
@@ -99,8 +86,7 @@ Ext.define('NX.ext.SearchBox', {
 
     me.callParent();
 
-    me.keyNav = new Ext.util.KeyNav({
-      target: me.inputEl,
+    me.keyNav = new Ext.util.KeyNav(me.inputEl, {
       esc: {
         handler: me.clearSearch,
         scope: me,
@@ -117,6 +103,15 @@ Ext.define('NX.ext.SearchBox', {
   },
 
   /**
+   * Clear search.
+   *
+   * @private
+   */
+  onTrigger1Click: function () {
+    this.clearSearch();
+  },
+
+  /**
    * Search on ENTER.
    *
    * @private
@@ -124,12 +119,7 @@ Ext.define('NX.ext.SearchBox', {
   onEnter: function () {
     var me = this;
 
-    //me.lastValue is used to check for changes in the delayed checkchanges task, so we fake it out here
-    //otherwise, the onValueChange will get triggered regardless when timeout occurs
-    //(causing undesired page transition if page is changed prior to this delayed check)
-    me.lastValue = me.getValue();
-    me.search(me.lastValue);
-    me.resetOriginalValue();
+    me.search(me.getValue());
   },
 
   /**
@@ -180,16 +170,6 @@ Ext.define('NX.ext.SearchBox', {
       me.setValue(undefined);
     }
     me.fireEvent('searchcleared', me);
-  },
-
-  onEnable: function() {
-    this.show();
-    this.callParent();
-  },
-
-  onDisable: function() {
-    this.hide();
-    this.callParent();
   }
 
 });

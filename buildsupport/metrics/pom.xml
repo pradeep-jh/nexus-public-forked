@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus.buildsupport</groupId>
     <artifactId>nexus-buildsupport</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-buildsupport-metrics</artifactId>
@@ -28,32 +28,37 @@
   <packaging>pom</packaging>
 
   <properties>
-    <metrics.version>4.1.0</metrics.version>
-    <prometheus.version>0.6.0</prometheus.version>
+    <metrics.version>3.0.2</metrics.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
+        <groupId>com.codahale.metrics</groupId>
         <artifactId>metrics-core</artifactId>
         <version>${metrics.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
+        <groupId>com.codahale.metrics</groupId>
         <artifactId>metrics-annotation</artifactId>
         <version>${metrics.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
+        <groupId>com.palominolabs.metrics</groupId>
+        <artifactId>metrics-guice</artifactId>
+        <version>${metrics.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.codahale.metrics</groupId>
         <artifactId>metrics-servlets</artifactId>
         <version>${metrics.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
+        <groupId>com.codahale.metrics</groupId>
         <artifactId>metrics-jetty9</artifactId>
         <version>${metrics.version}</version>
         <exclusions>
@@ -65,45 +70,21 @@
       </dependency>
 
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
-        <artifactId>metrics-healthchecks</artifactId>
-        <version>${metrics.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
+        <groupId>com.codahale.metrics</groupId>
         <artifactId>metrics-httpclient</artifactId>
         <version>${metrics.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
+        <groupId>com.codahale.metrics</groupId>
         <artifactId>metrics-logback</artifactId>
         <version>${metrics.version}</version>
       </dependency>
 
       <dependency>
-        <groupId>io.dropwizard.metrics</groupId>
+        <groupId>com.codahale.metrics</groupId>
         <artifactId>metrics-servlet</artifactId>
         <version>${metrics.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>com.palominolabs.metrics</groupId>
-        <artifactId>metrics-guice</artifactId>
-        <version>3.2.2</version>
-      </dependency>
-
-      <dependency>
-        <groupId>io.prometheus</groupId>
-        <artifactId>simpleclient_dropwizard</artifactId>
-        <version>${prometheus.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>io.prometheus</groupId>
-        <artifactId>simpleclient_servlet</artifactId>
-        <version>${prometheus.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

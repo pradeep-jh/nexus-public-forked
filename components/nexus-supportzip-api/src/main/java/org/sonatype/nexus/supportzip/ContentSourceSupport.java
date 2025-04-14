@@ -28,6 +28,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public abstract class ContentSourceSupport
     implements ContentSource
 {
+  public static final String PASSWORD_TOKEN = "****";
+
+  public static final String EMAIL_TOKEN = "user@domain";
+
   protected final Logger log = LoggerFactory.getLogger(getClass());
 
   private final Type type;
@@ -41,7 +45,7 @@ public abstract class ContentSourceSupport
    */
   public ContentSourceSupport(final Type type, final String path, final Priority priority) {
     this.type = checkNotNull(type);
-    this.path = normalize(checkNotNull(path));
+    this.path = checkNotNull(path);
     setPriority(priority);
   }
 
@@ -82,9 +86,5 @@ public abstract class ContentSourceSupport
         ", path='" + path + '\'' +
         ", priority=" + priority +
         '}';
-  }
-
-  private String normalize(final String path) {
-    return path.replace("\\", "/");
   }
 }

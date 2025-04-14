@@ -47,7 +47,4 @@ public class ErrorResponse
     this.message = checkNotNull(message);
   }
 
-  public String getMessage() {
-    return message;
-  }
 }

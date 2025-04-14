@@ -26,7 +26,7 @@ public interface SSLContextSelector
   // TODO: If this is only ever used as context attribute name, consider better naming strategy.
 
   /**
-   * {@link HttpContext} attribute to be used to enable usage of Nexus Repository Truststore.
+   * {@link HttpContext} attribute to be used to enable usage of nexus truststore.
    *
    * @since 3.0
    */

@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -49,12 +45,6 @@ Ext.define('NX.controller.Content', {
       controller: {
         '#Menu': {
           featureselected: me.onFeatureSelected
-        },
-        '#State': {
-          userchanged: me.onUpdate
-        },
-        '#Permissions': {
-          changed: me.onUpdate
         }
       },
       component: {
@@ -85,7 +75,6 @@ Ext.define('NX.controller.Content', {
         view = feature.get('view'),
         text = feature.get('text'),
         iconName = feature.get('iconName'),
-        iconCls = feature.get('iconCls'),
         description = feature.get('description'),
         cmp;
 
@@ -107,11 +96,7 @@ Ext.define('NX.controller.Content', {
 
     // update title and icon
     content.setTitle(text);
-    if (iconCls) {
-      content.setIconCls(iconCls + " nx-icon");
-    } else {
-      content.setIconCls(NX.Icons.cls(iconName, 'x32'));
-    }
+    content.setIconCls(NX.Icons.cls(iconName, 'x32'));
 
     // Reset unsaved changes flag
     content.resetUnsavedChangesFlag();
@@ -128,8 +113,6 @@ Ext.define('NX.controller.Content', {
     // Update the breadcrumb
     content.showRoot();
 
-    content.maybeShowMaliciousRiskOnDisk();
-
     // install new feature view
     content.add(cmp);
 
@@ -139,13 +122,6 @@ Ext.define('NX.controller.Content', {
     //<if debug>
     me.logInfo('Content changed to:', text, 'class:', cmp.self.getName());
     //</if>
-  },
-
-  onUpdate: function () {
-    const me = this;
-    const content = me.getFeatureContent();
-
-    content.maybeShowMaliciousRiskOnDisk();
   }
 
 });

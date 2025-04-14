@@ -34,7 +34,6 @@ public class UnitOfWorkTest
     UnitOfWork.end();
   }
 
-  @SuppressWarnings("java:S2699") // sonar expects assertions, but best to let this exception bubble up
   @Test
   public void testCanPauseNoWork() {
     UnitOfWork.resume(UnitOfWork.pause());
@@ -42,7 +41,7 @@ public class UnitOfWorkTest
 
   @Test(expected = IllegalStateException.class)
   public void testCannotResumeTwice() {
-    UnitOfWork.begin(Suppliers.<TransactionalSession<Transaction>> ofInstance(null));
+    UnitOfWork.begin(Suppliers.<Transaction> ofInstance(null));
     try {
       UnitOfWork work = UnitOfWork.pause();
       UnitOfWork.resume(work);

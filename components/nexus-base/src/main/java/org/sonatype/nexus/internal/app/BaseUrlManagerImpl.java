@@ -17,8 +17,6 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
 import javax.inject.Singleton;
-import javax.servlet.DispatcherType;
-import javax.servlet.RequestDispatcher;
 import javax.servlet.http.HttpServletRequest;
 
 import org.sonatype.goodies.common.ComponentSupport;
@@ -37,8 +35,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 @Named
 @Singleton
 public class BaseUrlManagerImpl
-    extends ComponentSupport
-    implements BaseUrlManager
+  extends ComponentSupport
+  implements BaseUrlManager
 {
   private final Provider<HttpServletRequest> requestProvider;
 
@@ -47,10 +45,8 @@ public class BaseUrlManagerImpl
   private volatile boolean force;
 
   @Inject
-  public BaseUrlManagerImpl(
-      final Provider<HttpServletRequest> requestProvider,
-      @Named("${org.sonatype.nexus.internal.app.BaseUrlManagerImpl.force:-false}") final boolean force)
-  {
+  public BaseUrlManagerImpl(final Provider<HttpServletRequest> requestProvider,
+                            @Named("${org.sonatype.nexus.internal.app.BaseUrlManagerImpl.force:-false}") final boolean force) {
     this.requestProvider = checkNotNull(requestProvider);
     this.force = force;
     log.debug("Force: {}", force);
@@ -120,70 +116,13 @@ public class BaseUrlManagerImpl
   }
 
   /**
-   * Detect base-url from forced settings, request or non-forced settings.
-   */
-  @Nullable
-  public String detectRelativePath() {
-    // attempt to detect from HTTP request
-    HttpServletRequest request = httpRequest();
-    if (request != null) {
-      String contextPath = null;
-      String requestUri = null;
-      if (DispatcherType.FORWARD == request.getDispatcherType()) {
-        contextPath = (String) request.getAttribute(RequestDispatcher.FORWARD_CONTEXT_PATH);
-        requestUri = (String) request.getAttribute(RequestDispatcher.FORWARD_REQUEST_URI);
-      }
-      else if (DispatcherType.ERROR == request.getDispatcherType()) {
-        requestUri = (String) request.getAttribute(RequestDispatcher.ERROR_REQUEST_URI);
-      }
-      contextPath = contextPath == null ? request.getContextPath() : contextPath;
-      requestUri = requestUri == null ? request.getRequestURI() : requestUri;
-      // Remove the context path
-      String path = requestUri.substring(contextPath.length());
-      return createRelativePath(countSlashes(path));
-    }
-
-    // unable to determine base-url
-    return "";
-  }
-
-  private static String createRelativePath(final int length) {
-    if (length == 0) {
-      return ".";
-    }
-
-    StringBuilder sb = new StringBuilder();
-    for (int i = 0; i < length; i++) {
-      sb.append("../");
-    }
-    // guarantee it does not end in a slash
-    return sb.substring(0, sb.length() - 1);
-  }
-
-  private static int countSlashes(final String path) {
-    int count = 0;
-    // we start at 1 to avoid leading slashes
-    int previousIndex = 0;
-    for (int i = 1; i < path.length(); i++) {
-      if (path.charAt(i) == '/') {
-        // skip double slashes
-        if (previousIndex != (i - 1)) {
-          ++count;
-        }
-        previousIndex = i;
-      }
-    }
-    return count;
-  }
-
-  /**
    * Detect and set (if non-null) the base-url.
    */
   @Override
   public void detectAndHoldUrl() {
     String url = detectUrl();
     if (url != null) {
-      BaseUrlHolder.set(url, detectRelativePath());
+      BaseUrlHolder.set(url);
     }
   }
 }

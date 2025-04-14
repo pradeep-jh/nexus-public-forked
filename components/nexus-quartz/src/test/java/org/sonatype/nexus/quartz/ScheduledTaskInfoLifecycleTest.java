@@ -17,12 +17,13 @@ import java.util.concurrent.Future;
 
 import org.sonatype.nexus.scheduling.TaskConfiguration;
 import org.sonatype.nexus.scheduling.TaskInfo;
-import org.sonatype.nexus.scheduling.CurrentState;
-import org.sonatype.nexus.scheduling.LastRunState;
-import org.sonatype.nexus.scheduling.TaskState;
+import org.sonatype.nexus.scheduling.TaskInfo.CurrentState;
+import org.sonatype.nexus.scheduling.TaskInfo.EndState;
+import org.sonatype.nexus.scheduling.TaskInfo.LastRunState;
+import org.sonatype.nexus.scheduling.TaskInfo.RunState;
+import org.sonatype.nexus.scheduling.TaskInfo.State;
 
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -35,7 +36,6 @@ import static org.hamcrest.Matchers.nullValue;
 /**
  * Tests for scheduled tasks and their TaskInfo.
  */
-@Ignore("NEXUS-43375")
 public class ScheduledTaskInfoLifecycleTest
     extends QuartzTestSupport
 {
@@ -70,8 +70,8 @@ public class ScheduledTaskInfoLifecycleTest
 
     final CurrentState currentState = taskInfo.getCurrentState();
     assertThat(currentState, notNullValue());
-    assertThat(currentState.getState(), equalTo(TaskState.RUNNING));
-    assertThat(currentState.getRunState(), equalTo(TaskState.RUNNING));
+    assertThat(currentState.getState(), equalTo(State.RUNNING));
+    assertThat(currentState.getRunState(), equalTo(RunState.RUNNING));
     assertThat(currentState.getRunStarted(), notNullValue());
     assertThat(currentState.getRunStarted().getTime(), lessThan(System.currentTimeMillis()));
     final Future<?> future = currentState.getFuture();
@@ -86,7 +86,7 @@ public class ScheduledTaskInfoLifecycleTest
     assertThat(result, equalTo(RESULT));
 
     // done
-    assertTaskState(taskInfo, TaskState.OK);
+    assertTaskState(taskInfo, State.DONE);
     assertRunningTaskCount(0);
   }
 
@@ -120,8 +120,8 @@ public class ScheduledTaskInfoLifecycleTest
     {
       final CurrentState currentState = taskInfo.getCurrentState();
       assertThat(currentState, notNullValue());
-      assertThat(currentState.getState(), equalTo(TaskState.RUNNING));
-      assertThat(currentState.getRunState(), equalTo(TaskState.RUNNING));
+      assertThat(currentState.getState(), equalTo(State.RUNNING));
+      assertThat(currentState.getRunState(), equalTo(RunState.RUNNING));
       runStarted = currentState.getRunStarted();
       assertThat(runStarted, notNullValue());
       // started in past
@@ -141,7 +141,7 @@ public class ScheduledTaskInfoLifecycleTest
       assertThat(result, equalTo(RESULT));
     }
 
-    assertTaskState(taskInfo, TaskState.WAITING);
+    assertTaskState(taskInfo, State.WAITING);
     assertRunningTaskCount(0);
 
     // repeating tasks when done are waiting, call for state is okay at any time
@@ -156,7 +156,7 @@ public class ScheduledTaskInfoLifecycleTest
 
       final CurrentState currentState = ti.getCurrentState();
       assertThat(currentState, notNullValue());
-      assertThat(currentState.getState(), equalTo(TaskState.WAITING));
+      assertThat(currentState.getState(), equalTo(State.WAITING));
       assertThat(currentState.getRunState(), nullValue());
       assertThat(currentState.getRunStarted(), nullValue());
       // task future is last future
@@ -167,7 +167,7 @@ public class ScheduledTaskInfoLifecycleTest
     {
       final CurrentState currentState = taskInfo.getCurrentState();
       assertThat(currentState, notNullValue());
-      assertThat(currentState.getState(), equalTo(TaskState.WAITING));
+      assertThat(currentState.getState(), equalTo(State.WAITING));
       assertThat(currentState.getRunState(), nullValue());
       assertThat(currentState.getRunStarted(), nullValue());
       // task future is last future
@@ -178,7 +178,7 @@ public class ScheduledTaskInfoLifecycleTest
     {
       final LastRunState lastRunState = taskInfo.getLastRunState();
       assertThat(lastRunState, notNullValue());
-      assertThat(lastRunState.getEndState(), equalTo(TaskState.OK));
+      assertThat(lastRunState.getEndState(), equalTo(EndState.OK));
       assertThat(lastRunState.getRunStarted().getTime(), equalTo(runStarted.getTime()));
       assertThat(lastRunState.getRunDuration(), greaterThan(0L));
     }

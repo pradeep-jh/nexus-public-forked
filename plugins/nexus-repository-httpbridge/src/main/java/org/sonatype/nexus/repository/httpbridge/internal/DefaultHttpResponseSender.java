@@ -31,6 +31,8 @@ import org.sonatype.nexus.repository.view.Request;
 import org.sonatype.nexus.repository.view.Response;
 import org.sonatype.nexus.repository.view.Status;
 
+import com.google.common.io.ByteStreams;
+
 /**
  * Default {@link HttpResponseSender}.
  *
@@ -57,13 +59,15 @@ public class DefaultHttpResponseSender
     Status status = response.getStatus();
     String statusMessage = status.getMessage();
     try (Payload payload = response.getPayload()) {
-      if (statusMessage == null) {
-        httpResponse.setStatus(status.getCode());
-      }
-      else {
-        httpResponse.setStatus(status.getCode(), statusMessage);
-      }
       if (status.isSuccessful() || payload != null) {
+
+        if (statusMessage == null) {
+          httpResponse.setStatus(status.getCode());
+        }
+        else {
+          httpResponse.setStatus(status.getCode(), statusMessage);
+        }
+
         if (payload != null) {
           log.trace("Attaching payload: {}", payload);
 
@@ -76,7 +80,7 @@ public class DefaultHttpResponseSender
 
           if (request != null && !HttpMethods.HEAD.equals(request.getAction())) {
             try (InputStream input = payload.openInputStream(); OutputStream output = httpResponse.getOutputStream()) {
-              payload.copy(input, output);
+              ByteStreams.copy(input, output);
             }
           }
         }

@@ -50,7 +50,7 @@ public class AnonymousAuditor
       data.setType(CHANGED_TYPE);
       data.setContext(SYSTEM_CONTEXT);
 
-      Map<String, Object> attributes = data.getAttributes();
+      Map<String, String> attributes = data.getAttributes();
       attributes.put("enabled", string(configuration.isEnabled()));
       attributes.put("userId", configuration.getUserId());
       attributes.put("realm", configuration.getRealmName());

@@ -50,14 +50,16 @@ public class EmailAuditor
       data.setType(CHANGED_TYPE);
       data.setContext(SYSTEM_CONTEXT);
 
-      Map<String, Object> attributes = data.getAttributes();
+      Map<String, String> attributes = data.getAttributes();
       attributes.put("enabled", string(configuration.isEnabled()));
       attributes.put("host", configuration.getHost());
       attributes.put("port", string(configuration.getPort()));
       attributes.put("username", configuration.getUsername());
       attributes.put("fromAddress", configuration.getFromAddress());
       attributes.put("subjectPrefix", configuration.getSubjectPrefix());
-      
+
+      // TODO: various ssl/tls/trust-store shit
+
       record(data);
     }
   }

@@ -12,104 +12,95 @@
  */
 package com.sonatype.nexus.ssl.plugin.internal.keystore;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.util.Optional;
+import java.util.Collection;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 
-import org.sonatype.nexus.common.entity.EntityVersion;
+import org.sonatype.nexus.common.app.ManagedLifecycle;
 import org.sonatype.nexus.common.event.EventManager;
-import org.sonatype.nexus.datastore.ConfigStoreSupport;
-import org.sonatype.nexus.datastore.api.DataSessionSupplier;
+import org.sonatype.nexus.common.stateguard.Guarded;
+import org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport;
+import org.sonatype.nexus.orient.DatabaseInstance;
+import org.sonatype.nexus.orient.DatabaseInstanceNames;
 import org.sonatype.nexus.ssl.spi.KeyStoreStorage;
 import org.sonatype.nexus.ssl.spi.KeyStoreStorageManager;
-import org.sonatype.nexus.transaction.Transactional;
+
+import com.orientechnologies.orient.core.db.document.ODatabaseDocumentTx;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
+import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.SCHEMAS;
+import static org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport.State.STARTED;
+import static org.sonatype.nexus.orient.transaction.OrientTransactional.inTx;
+import static org.sonatype.nexus.orient.transaction.OrientTransactional.inTxRetry;
 
 /**
- * MyBatis {@link KeyStoreStorageManager} implementation.
- *
- * @since 3.21
+ * Implementation of {@link KeyStoreStorageManager} for the SSL trust store. Uses OrientDB as backing storage to
+ * facilitate distribution of data across cluster.
+ * 
+ * @since 3.1
  */
 @Named(KeyStoreManagerImpl.NAME)
 @Singleton
+@ManagedLifecycle(phase = SCHEMAS)
 public class KeyStoreStorageManagerImpl
-    extends ConfigStoreSupport<KeyStoreDAO>
+    extends StateGuardLifecycleSupport
     implements KeyStoreStorageManager
 {
+  private final Provider<DatabaseInstance> databaseInstance;
+
+  private final KeyStoreDataEntityAdapter entityAdapter;
+
   private final EventManager eventManager;
 
+  private final Collection<OrientKeyStoreStorage> storages = new ConcurrentLinkedQueue<>();
+
   @Inject
-  public KeyStoreStorageManagerImpl(final DataSessionSupplier sessionSupplier, final EventManager eventManager) {
-    super(sessionSupplier);
+  public KeyStoreStorageManagerImpl(@Named(DatabaseInstanceNames.CONFIG) final Provider<DatabaseInstance> databaseInstance,
+                                    final KeyStoreDataEntityAdapter entityAdapter,
+                                    final EventManager eventManager)
+  {
+    this.databaseInstance = checkNotNull(databaseInstance);
+    this.entityAdapter = checkNotNull(entityAdapter);
     this.eventManager = checkNotNull(eventManager);
   }
 
   @Override
+  protected void doStart() throws Exception {
+    try (ODatabaseDocumentTx db = databaseInstance.get().connect()) {
+      entityAdapter.register(db);
+    }
+  }
+
+  @Override
+  protected void doStop() throws Exception {
+    storages.forEach(eventManager::unregister);
+  }
+
+  @Override
+  @Guarded(by = STARTED)
   public KeyStoreStorage createStorage(final String keyStoreName) {
-    return new KeyStoreStorageImpl(this, keyStoreName);
+    checkNotNull(keyStoreName);
+    OrientKeyStoreStorage storage = new OrientKeyStoreStorage(this, KeyStoreManagerImpl.NAME + '/' + keyStoreName);
+    eventManager.register(storage);
+    storages.add(storage);
+    return storage;
   }
 
-  @Transactional
+  @Guarded(by = STARTED)
   @Nullable
-  public boolean exists(final String keyStoreName) {
-    return dao().load(keyStoreName).isPresent();
+  public KeyStoreData load(final String keyStoreName) {
+    checkNotNull(keyStoreName);
+    return inTx(databaseInstance).call(db -> entityAdapter.load(db, keyStoreName));
   }
 
-  public ByteArrayInputStream load(final String keyStoreName) {
-    Optional<KeyStoreData> data = doLoad(keyStoreName);
-    checkState(data.isPresent(), "key store %s does not exist", keyStoreName);
-    postEvent(keyStoreName);
-    return new ByteArrayInputStream(data.get().getBytes());
-  }
-
-  @Transactional
-  protected Optional<KeyStoreData> doLoad(final String keyStoreName) {
-    return dao().load(keyStoreName);
-  }
-
-  public void save(final String keyStoreName, final ByteArrayOutputStream out) {
-    KeyStoreData data = new KeyStoreData();
-    data.setName(keyStoreName);
-    data.setBytes(out.toByteArray());
-    doSave(data);
-    postEvent(keyStoreName);
-  }
-
-  @Transactional
-  protected void doSave(final KeyStoreData data) {
-    dao().save(data);
-  }
-
-  private void postEvent(final String keyStoreName) {
-    // trigger invalidation of TrustStoreImpl context
-    eventManager.post(new KeyStoreDataEvent()
-    {
-      @Override
-      public boolean isLocal() {
-        return true;
-      }
-
-      @Override
-      public EntityVersion getVersion() {
-        return null;
-      }
-
-      @Override
-      public String getRemoteNodeId() {
-        return null;
-      }
-
-      @Override
-      public String getKeyStoreName() {
-        return keyStoreName;
-      }
-    });
+  @Guarded(by = STARTED)
+  public void save(final KeyStoreData entity) {
+    checkNotNull(entity);
+    inTxRetry(databaseInstance).run(db -> entityAdapter.save(db, entity));
   }
 }

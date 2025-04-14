@@ -12,7 +12,8 @@
  */
 package org.sonatype.nexus.repository.maven.internal.group;
 
-import java.io.OutputStream;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 
@@ -23,8 +24,8 @@ import org.sonatype.nexus.repository.maven.internal.group.RepositoryMetadataMerg
 import org.sonatype.nexus.repository.view.Content;
 
 import com.google.common.base.Function;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import org.apache.maven.artifact.repository.metadata.Metadata;
@@ -32,6 +33,7 @@ import org.apache.maven.artifact.repository.metadata.Plugin;
 import org.apache.maven.artifact.repository.metadata.Snapshot;
 import org.apache.maven.artifact.repository.metadata.SnapshotVersion;
 import org.apache.maven.artifact.repository.metadata.Versioning;
+import org.fest.util.Strings;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -45,6 +47,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.Mockito.when;
 
 /**
  * UT for {@link RepositoryMetadataMerger}
@@ -58,7 +61,7 @@ public class RepositoryMetadataMergerTest
   public ExpectedException exception = ExpectedException.none();
 
   @Mock
-  OutputStream outputStream;
+  Path path;
 
   @Mock
   MavenPath mavenPath;
@@ -150,21 +153,6 @@ public class RepositoryMetadataMergerTest
     mv.getSnapshotVersions().add(sources);
 
     return m;
-  }
-
-  @Test
-  public void metadataWithNullAndEmptyAreEqual() throws Exception {
-    final Metadata nullClassifier = v("org.foo", "some-project", "v-", "20150324121700", 1);
-    final Metadata emptyClassifier = v("org.foo", "some-project", "v-", "20150324121700", 1);
-    final Metadata spaceClassifier = v("org.foo", "some-project", "v-", "20150324121700", 1);
-
-    nullClassifier.getVersioning().getSnapshotVersions().get(0).setClassifier(null);
-    emptyClassifier.getVersioning().getSnapshotVersions().get(0).setClassifier("");
-    spaceClassifier.getVersioning().getSnapshotVersions().get(0).setClassifier("   ");
-
-    assertThat(merger.metadataEquals(nullClassifier, emptyClassifier), is(true));
-    assertThat(merger.metadataEquals(emptyClassifier, spaceClassifier), is(true));
-    assertThat(merger.metadataEquals(spaceClassifier, nullClassifier), is(true));
   }
 
   @Test
@@ -260,6 +248,22 @@ public class RepositoryMetadataMergerTest
     assertThat(prefixes, containsInAnyOrder("foo-maven-plugin", "bar-maven-plugin"));
   }
 
+  @Test
+  public void ioExceptionIncludesMetadataOrigin() throws Exception {
+    IOException cause = new IOException("original-message");
+
+    when(mavenPath.getPath()).thenReturn("/some/path");
+    when(repository.getName()).thenReturn("repository-name");
+    when(content.openInputStream()).thenThrow(cause);
+
+    exception.expectMessage("/some/path");
+    exception.expectMessage("repository-name");
+    exception.expectMessage("original-message");
+    exception.expectCause(is(cause));
+
+    merger.merge(path, mavenPath, ImmutableMap.of(repository, content));
+  }
+
   /**
    * NEXUS-13085
    * Some maven-metadata.xml files are contrary to the present spec 
@@ -280,24 +284,5 @@ public class RepositoryMetadataMergerTest
     assertThat(m.getVersioning().getRelease(), is(m2.getVersion()));
     assertThat(m.getVersioning().getLastUpdated(), is(m2.getVersioning().getLastUpdated()));
     assertThat(m.getVersioning().getVersions(), contains("1.0.0", "1.0.1"));
-  }
-
-  @Test
-  public void handleNullSnapshotTimestamps() {
-    Metadata m1 = v("org.foo", "some-project", "1.0.0", "20150322.121500", 1);
-    m1.getVersioning().getSnapshot().setTimestamp(null);
-    Metadata m2 = v("org.foo", "some-project", "1.0.0", "20150323.121500", 2);
-
-    final Metadata m = merger.merge(
-        ImmutableList.of(new Envelope("1", m1), new Envelope("2", m2))
-    );
-    assertThat(m, notNullValue());
-    assertThat(m.getModelVersion(), equalTo("1.1.0"));
-    assertThat(m.getGroupId(), equalTo("org.foo"));
-    assertThat(m.getArtifactId(), equalTo("some-project"));
-    assertThat(m.getVersioning().getLastUpdated(), equalTo("20150323121500"));
-    assertThat(m.getVersioning().getSnapshot(), notNullValue());
-    assertThat(m.getVersioning().getSnapshot().getTimestamp(), equalTo("20150323.121500"));
-    assertThat(m.getVersioning().getSnapshot().getBuildNumber(), equalTo(2));
   }
 }

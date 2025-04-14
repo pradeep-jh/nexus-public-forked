@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -48,11 +44,12 @@ Ext.define('NX.coreui.controller.HealthCheckRepositoryConfiguration', {
     me.listen({
       component: {
         'nx-coreui-repository-feature button[action=toggleHealthCheck]': {
+          afterrender: me.bindHealthCheckButton,
           click: me.toggleHealthCheck,
           show: me.updateLabel
         },
         'nx-coreui-repository-settings-form': {
-          recordloaded: me.updateHealthCheckButton
+          recordloaded: me.updateLabel
         }
       }
     });
@@ -88,24 +85,41 @@ Ext.define('NX.coreui.controller.HealthCheckRepositoryConfiguration', {
    *
    * @private
    */
-  updateHealthCheckButton: function (e, model) {
+  bindHealthCheckButton: function () {
     var me = this,
-        button = me.getButton();
-
-    if (model.get('type') !== 'proxy' || model.get('format') === 'maven2'
-            && model.get('attributes').maven.versionPolicy !== 'RELEASE') {
-      button.hide();
-      return;
-    }
-    button.show();
-
-    if (NX.Permissions.check('nexus:repository-admin:' + model.get('format') + ':' + model.get('name') + ':edit')) {
-      button.enable();
-    }
-    else {
-      button.disable();
-    }
-    me.updateLabel();
+        button = me.getButton(),
+        permittedCondition;
+    button.mon(
+        NX.Conditions.and(
+            permittedCondition = NX.Conditions.isPermitted('nexus:repository-admin:*:*:edit'),
+            NX.Conditions.formHasRecord('nx-coreui-repository-settings-form', function (model) {
+              permittedCondition.setPermission(
+                  'nexus:repository-admin:' + model.get('format') + ':' + model.get('name') + ':edit'
+              );
+              return true;
+            })
+        ),
+        {
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
+        }
+    );
+    button.mon(
+        NX.Conditions.formHasRecord('nx-coreui-repository-settings-form', function (model) {
+          if (model.get('format') === 'maven2' && model.get('attributes').maven.versionPolicy !== 'RELEASE') {
+            return false;
+          }
+          else {
+            return model.get('type') === 'proxy';
+          }
+        }),
+        {
+          satisfied: button.show,
+          unsatisfied: button.hide,
+          scope: button
+        }
+    );
   },
 
   /**

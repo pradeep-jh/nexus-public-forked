@@ -12,14 +12,13 @@
  */
 package org.sonatype.nexus.scheduling;
 
-import java.util.Map;
+import java.util.Date;
+import java.util.concurrent.Future;
 
 import javax.annotation.Nullable;
 
 import org.sonatype.nexus.scheduling.schedule.Now;
 import org.sonatype.nexus.scheduling.schedule.Schedule;
-
-import static java.util.Collections.emptyMap;
 
 /**
  * The class holding information about task at the moment the instance of task info was created.
@@ -30,7 +29,7 @@ import static java.util.Collections.emptyMap;
  * (ie. by some other thread). In that case, some of the methods will throw {@link TaskRemovedException} on invocation
  * to signal that state.
  *
- * For task entering {@link TaskState.Group#DONE}, this class will behave a bit differently:
+ * For task entering {@link State#DONE}, this class will behave a bit differently:
  * they will never throw {@link TaskRemovedException}, and upon they are done, the task info will cache
  * task configuration, schedule, current and last run state forever.
  *
@@ -51,15 +50,6 @@ public interface TaskInfo
    * Shorthand method for {@link #getConfiguration()#getName()}
    */
   String getName();
-
-  /**
-   * Returns a type id of the task instance.
-   *
-   * Shorthand method for {@link #getConfiguration()#getTypeId()}
-   *
-   * @since 3.8
-   */
-  String getTypeId();
 
   /**
    * Returns a message of the task instance.
@@ -86,6 +76,95 @@ public interface TaskInfo
   Schedule getSchedule();
 
   /**
+   * Task instance might be waiting (to be run, either by schedule or manually), or might be running, or might be
+   * done (will never run again, is "done"). The "done" state is ending state for task, it will according to it's
+   * {@link Schedule} not execute anymore.
+   *
+   * Scheduler will never give out "fresh" task info instances with state "done" as done task is also removed.
+   * These states might be get into only by having a "single shot" task ended. Instances in
+   * this "ending" state, while still holding valid configuration and schedule, might be used to reschedule a
+   * NEW task instance, but the reference to this instance should be dropped and let for GC to collect it, and
+   * continue with the newly returned task info.
+   *
+   * Transitions:
+   * {@link #WAITING} -> {@link #RUNNING}
+   * {@link #RUNNING} -> {@link #WAITING}
+   * {@link #RUNNING} -> {@link #DONE}
+   */
+  enum State
+  {
+    WAITING, RUNNING, DONE
+  }
+
+  /**
+   * Running task instance might be running okay, being blocked (by other tasks), or might be canceled but the
+   * cancellation was not yet detected or some cleanup is being done.
+   *
+   * Possible transitions: currentRunState.ordinal <= newRunState.ordinal
+   * Ending states are {@link #RUNNING} and {@link #CANCELED}.
+   */
+  enum RunState
+  {
+    STARTING, BLOCKED, RUNNING, CANCELED
+  }
+
+  interface CurrentState
+  {
+    /**
+     * Returns the state of task, never {@code null}.
+     */
+    State getState();
+
+    /**
+     * Returns the date of next run, if applicable, or {@code null}.
+     */
+    @Nullable
+    Date getNextRun();
+
+    /**
+     * If task is running, returns it's run state, otherwise {@code null}.
+     */
+    @Nullable
+    Date getRunStarted();
+
+    /**
+     * If task is running, returns it's run state, otherwise {@code null}.
+     */
+    @Nullable
+    RunState getRunState();
+
+    /**
+     * If task is in states {@link State#RUNNING} or {@link State#DONE}, returns it's future, otherwise {@code null}.
+     * In case of {@link State#DONE} the future is done too.
+     */
+    @Nullable
+    Future<?> getFuture();
+  }
+
+  enum EndState
+  {
+    OK, FAILED, CANCELED
+  }
+
+  interface LastRunState
+  {
+    /**
+     * Returns the last end state.
+     */
+    EndState getEndState();
+
+    /**
+     * Returns the date of last run start.
+     */
+    Date getRunStarted();
+
+    /**
+     * Returns the last run duration.
+     */
+    long getRunDuration();
+  }
+
+  /**
    * Returns the task current state, never {@code null}.
    *
    * For tasks scheduled with {@link Now} schedule, or having manually started with {@link #runNow()} method,
@@ -98,15 +177,7 @@ public interface TaskInfo
    * Returns the task last run state, if there was any, otherwise {@code null}.
    */
   @Nullable
-  default LastRunState getLastRunState() {
-    return getConfiguration().getLastRunState();
-  }
-
-  /**
-   * Returns the result object last returned by the task.
-   */
-  @Nullable
-  Object getLastResult();
+  LastRunState getLastRunState();
 
   /**
    * Removes (with canceling if runs) the task.
@@ -119,8 +190,8 @@ public interface TaskInfo
   boolean remove();
 
   /**
-   * Executes the scheduled task now, unrelated to it's actual schedule. Already running task cannot have this method
-   * executed, will throw {@link IllegalStateException}.
+   * Executes the scheduled task now, unrelated to it's actual schedule. Already running task or disabled task
+   * cannot have this method executed, will throw {@link IllegalStateException}.
    *
    * This also implies that this method will NOT change the state of tasks "original" schedule!
    *
@@ -130,7 +201,7 @@ public interface TaskInfo
    * @param triggerSource the source that triggered this task
    *
    * @throws TaskRemovedException  if task with this ID has been removed from scheduler.
-   * @throws IllegalStateException if task is already running
+   * @throws IllegalStateException if task is already running, or, if is disabled.
    *
    * @since 3.1
    */
@@ -150,13 +221,4 @@ public interface TaskInfo
    */
   @Nullable
   String getTriggerSource();
-
-  /**
-   * Currently this context is passed through as-is to analytics, keep this in mind when adding data to the map
-   *
-   * @since 3.24
-   */
-  default Map<String, Object> getContext() {
-    return emptyMap();
-  }
 }

@@ -12,8 +12,6 @@
  */
 package org.sonatype.nexus.common.time;
 
-import java.time.OffsetDateTime;
-
 import org.joda.time.DateTime;
 
 /**
@@ -21,31 +19,26 @@ import org.joda.time.DateTime;
  *
  * @since 3.0
  */
-public interface Clock
+public class Clock
 {
   /**
    * Current time in milli-seconds.
    */
-  default long millis() {
+  public long millis(){
     return System.currentTimeMillis();
-  };
+  }
 
   /**
    * Current time in nano-seconds.
    */
-  default long nanos() {
+  public long nanos() {
     return System.nanoTime();
   }
 
   /**
    * Current date-time.
    */
-  default DateTime dateTime() {
+  public DateTime dateTime(){
     return new DateTime(millis());
   }
-
-  /**
-   * Returns an {@link OffsetDateTime} for the Nexus cluster.
-   */
-  OffsetDateTime clusterTime();
 }

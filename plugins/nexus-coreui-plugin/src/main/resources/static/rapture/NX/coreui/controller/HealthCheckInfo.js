@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -27,8 +23,7 @@ Ext.define('NX.coreui.controller.HealthCheckInfo', {
     'NX.Conditions',
     'NX.util.Url',
     'NX.I18n',
-    'NX.coreui.util.HealthCheckUtil',
-    'NX.State'
+    'NX.coreui.util.HealthCheckUtil'
   ],
 
   /**
@@ -66,10 +61,7 @@ Ext.define('NX.coreui.controller.HealthCheckInfo', {
     var me = this,
         components = [];
 
-    if (!NX.State.getUser()) {
-      me.renderHealthCheckFields(panel, model);
-    }
-    else if (me.healthCheckAllowed) {
+    if (me.healthCheckAllowed) {
       if (model && model.get('healthCheckLoading') === undefined) {
         model.beginEdit();
         model.set('healthCheckLoading', true);
@@ -285,11 +277,7 @@ Ext.define('NX.coreui.controller.HealthCheckInfo', {
   renderPreconditions: function(model, metadata) {
     var util = NX.coreui.util.HealthCheckUtil;
 
-    if (!NX.State.getUser()) {
-      metadata.attr = 'data-qtip="' + NX.I18n.get('HealthCheckInfo_LoggedInOnly_Tooltip') + '"';
-      return util.iconSpan('fa-lock', 'opacity: 0.33;');
-    }
-    else if (model.get('healthCheckLoading')) {
+    if (model.get('healthCheckLoading')) {
       return NX.I18n.get('HealthCheckInfo_Loading_Text');
     }
     else if (model.get('healthCheckDisabled')) {

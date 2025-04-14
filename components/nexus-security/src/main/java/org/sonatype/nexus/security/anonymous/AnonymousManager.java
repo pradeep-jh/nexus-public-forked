@@ -27,13 +27,6 @@ public interface AnonymousManager
   AnonymousConfiguration getConfiguration();
 
   /**
-   * Provide a new instance of an AnonymousConfiguration.
-   *
-   * @since 3.20
-   */
-  AnonymousConfiguration newConfiguration();
-
-  /**
    * Installs new anonymous configuration.
    */
   void setConfiguration(AnonymousConfiguration configuration);
@@ -47,11 +40,4 @@ public interface AnonymousManager
    * Build anonymous subject.
    */
   Subject buildSubject();
-
-  /**
-   * Check whether the system has been configured
-   *
-   * @since 3.17
-   */
-  boolean isConfigured();
 }

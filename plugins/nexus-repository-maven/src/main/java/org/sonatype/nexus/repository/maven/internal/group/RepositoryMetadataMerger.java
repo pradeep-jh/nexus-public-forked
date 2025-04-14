@@ -14,15 +14,14 @@ package org.sonatype.nexus.repository.maven.internal.group;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
-import java.util.function.BiPredicate;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -32,19 +31,19 @@ import org.sonatype.nexus.common.app.VersionComparator;
 import org.sonatype.nexus.repository.Repository;
 import org.sonatype.nexus.repository.maven.MavenPath;
 import org.sonatype.nexus.repository.maven.internal.Constants;
+import org.sonatype.nexus.repository.maven.internal.MavenFacetUtils;
+import org.sonatype.nexus.repository.maven.internal.MavenMimeRulesSource;
 import org.sonatype.nexus.repository.maven.internal.MavenModels;
 import org.sonatype.nexus.repository.view.Content;
 
 import com.google.common.base.Strings;
 import org.apache.maven.artifact.repository.metadata.Metadata;
 import org.apache.maven.artifact.repository.metadata.Plugin;
-import org.apache.maven.artifact.repository.metadata.Snapshot;
 import org.apache.maven.artifact.repository.metadata.SnapshotVersion;
 import org.apache.maven.artifact.repository.metadata.Versioning;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.sonatype.nexus.common.app.VersionComparator.version;
 
 /**
@@ -56,47 +55,46 @@ public class RepositoryMetadataMerger
     extends ComponentSupport
 {
   /**
-   * Merges the contents of passed in metadata.
+   * Merges the contents of passed in metadata and returns the {@link Content} of the resulting merge. The content
+   * returned by this method is kept in memory, and is reusable.
+   *
+   * @return {@code null} if no merge possible for various reasons (ie. corrupted metadata). If non-null is returned,
+   * the {@link Content} contains merged metadata and is reusable.
    */
-  public void merge(final OutputStream outputStream,
-                    final MavenPath mavenPath,
-                    final Map<Repository, Content> contents)
+  @Nullable
+  public Content merge(final Path path,
+      final MavenPath mavenPath,
+      final Map<Repository, Content> contents) throws IOException
   {
     log.debug("Merge metadata for {}", mavenPath.getPath());
-    List<Envelope> metadatas = new ArrayList<>(contents.size());
-    try {
-      for (Map.Entry<Repository, Content> entry : contents.entrySet()) {
-        addReadMetadata(mavenPath, metadatas, entry);
+    ArrayList<Envelope> metadatas = new ArrayList<>(contents.size());
+    for (Map.Entry<Repository, Content> entry : contents.entrySet()) {
+      final String origin = entry.getKey().getName() + " @ " + mavenPath.getPath();
+      try {
+        final Metadata metadata = MavenModels.readMetadata(entry.getValue().openInputStream());
+        if (metadata == null) {
+          log.debug("Corrupted repository metadata: {}, source: {}", origin, entry.getValue());
+          continue;
+        }
+        metadatas.add(new Envelope(origin, metadata));
       }
+      catch (IOException e) {
+        log.debug("Error downloading repository metadata: {}, source: {}", origin, entry.getValue());
+        throw new IOException("Error downloading repository metadata for " + origin + ": " + e.getMessage(), e);
+      }
+    }
 
-      final Metadata mergedMetadata = merge(metadatas);
-      if (mergedMetadata == null) {
-        return;
-      }
-      MavenModels.writeMetadata(outputStream, mergedMetadata);
+    final Metadata mergedMetadata = merge(metadatas);
+    if (mergedMetadata == null) {
+      return null;
     }
-    catch (IOException e) {
-      log.error("Unable to merge {}", mavenPath, e);
-    }
-  }
-
-  private void addReadMetadata(final MavenPath mavenPath,
-                               final List<Envelope> metadatas,
-                               final Entry<Repository, Content> entry) throws IOException
-  {
-    final String origin = entry.getKey().getName() + " @ " + mavenPath.getPath();
-    try {
-      final Metadata metadata = MavenModels.readMetadata(entry.getValue().openInputStream());
-      if (metadata == null) {
-        log.debug("Corrupted repository metadata: {}, source: {}", origin, entry.getValue());
-        return;
-      }
-      metadatas.add(new Envelope(origin, metadata));
-    }
-    catch (IOException e) {
-      log.debug("Error downloading repository metadata: {}, source: {}", origin, entry.getValue());
-      throw new IOException("Error downloading repository metadata for " + origin + ": " + e.getMessage(), e);
-    }
+    return MavenFacetUtils.createTempContent(
+        path,
+        MavenMimeRulesSource.METADATA_TYPE,
+        (OutputStream outputStream) -> {
+          MavenModels.writeMetadata(outputStream, mergedMetadata);
+        }
+    );
   }
 
   /**
@@ -174,89 +172,6 @@ public class RepositoryMetadataMerger
         i.remove();
       }
     }
-  }
-
-  /**
-   * Test metadata for equality.  Note timestamp is not considered.
-   */
-  public boolean metadataEquals(final Metadata md1, final Metadata md2) {
-    checkNotNull(md1);
-    checkNotNull(md2);
-    return
-        stringEquals(md1.getGroupId(), md2.getGroupId()) && // NOSONAR
-        stringEquals(md1.getArtifactId(), md2.getArtifactId()) &&
-        stringEquals(md1.getVersion(), md2.getVersion()) &&
-        versioningEquals(md1.getVersioning(), md2.getVersioning()) &&
-        listComparison(md1.getPlugins(), md2.getPlugins(), this::pluginEquals); // NOSONAR
-  }
-
-  /**
-   * Compute equality of two strings, treating all blank strings as equal.
-   * e.g. null, "", " " are all empty
-   */
-  private static final boolean stringEquals(final String l, final String r) {
-    return (isBlank(l) && isBlank(r)) || Objects.equals(l, r);
-  }
-
-  private boolean versioningEquals(@Nullable final Versioning v1,
-                                   @Nullable final Versioning v2) { // NOSONAR
-    if (v1 == null || v2 == null) {
-      return v1 == v2; // NOSONAR
-    }
-    else {
-      return
-          stringEquals(v1.getLatest(), v2.getLatest()) && // NOSONAR
-          stringEquals(v1.getRelease(), v2.getRelease()) &&
-          snapshotEquals(v1.getSnapshot(), v2.getSnapshot()) &&
-          listComparison(v1.getVersions(), v2.getVersions(), RepositoryMetadataMerger::stringEquals) &&
-          listComparison(v1.getSnapshotVersions(), v2.getSnapshotVersions(), this::snapshotVersionEquals);
-    }
-  }
-
-  private <T> boolean listComparison(final List<T> a, final List<T> b, BiPredicate<T,T> equality) {
-    if (a == null || b == null) {
-      return a == b; // NOSONAR
-    }
-    else if (a.size() != b.size()) {
-      return false;
-    }
-    else {
-      Iterator<T> aIter = a.iterator();
-      Iterator<T> bIter = b.iterator();
-      boolean allEqual = true;
-      while (aIter.hasNext() && allEqual) {
-        allEqual = equality.test(aIter.next(), bIter.next());
-      }
-      return allEqual;
-    }
-  }
-
-  private boolean snapshotEquals(@Nullable final Snapshot s1,
-                                 @Nullable final Snapshot s2) {
-    if (s1 == null || s2 == null) {
-      return s1 == s2; // NOSONAR
-    }
-    else {
-      return
-          stringEquals(s1.getTimestamp(), s2.getTimestamp()) &&
-          s1.getBuildNumber() == s2.getBuildNumber() &&
-          s1.isLocalCopy() == s2.isLocalCopy();
-    }
-  }
-
-  private boolean snapshotVersionEquals(final SnapshotVersion s1, final SnapshotVersion s2) {
-    return
-        stringEquals(s1.getClassifier(), s2.getClassifier()) && // NOSONAR
-        stringEquals(s1.getExtension(), s2.getExtension()) &&
-        stringEquals(s1.getVersion(), s2.getVersion()) &&
-        stringEquals(s1.getUpdated(), s2.getUpdated());
-  }
-
-  private boolean pluginEquals(final Plugin p1, final Plugin p2) {
-    return
-        stringEquals(p1.getName(), p2.getName()) &&
-        stringEquals(p1.getPrefix(), p2.getPrefix()) &&
-        stringEquals(p1.getArtifactId(), p2.getArtifactId());
   }
 
   /**
@@ -344,7 +259,7 @@ public class RepositoryMetadataMerger
       log.warn("Merging with version mismatch for GA={}:{}, {} vs {}", target.getGroupId(), target.getArtifactId(),
           targetVersion, sourceVersion);
     }
-
+    
     mergePlugins(target, source);
     mergeVersioning(target, source);
     return target;
@@ -457,18 +372,14 @@ public class RepositoryMetadataMerger
 
   /**
    * Parses string into a long (accepts strings with dots too, like maven timestamp is, where dot is between date and
-   * time). If fails or is null, returns -1.
+   * time). If fails, returns -1.
    */
   private long ts(final String ts) {
     try {
-      if (ts != null) {
-        return Long.parseLong(ts.replace(".", ""));
-      }
+      return Long.parseLong(ts.replace(".", ""));
     }
     catch (NumberFormatException e) {
-      // Just fall through and return -1 just as if ts were null
+      return -1;
     }
-
-    return -1;
   }
 }

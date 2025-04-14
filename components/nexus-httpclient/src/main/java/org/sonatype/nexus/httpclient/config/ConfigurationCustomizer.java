@@ -27,9 +27,7 @@ import javax.annotation.Nullable;
 
 import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.common.text.Strings2;
-import org.sonatype.nexus.crypto.secrets.Secret;
 import org.sonatype.nexus.httpclient.HttpClientPlan;
-import org.sonatype.nexus.httpclient.PreemptiveAuthHttpRequestInterceptor;
 import org.sonatype.nexus.httpclient.SSLContextSelector;
 import org.sonatype.nexus.httpclient.internal.NexusHttpRoutePlanner;
 
@@ -43,15 +41,11 @@ import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.auth.NTCredentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.AuthenticationStrategy;
-import org.apache.http.client.RedirectStrategy;
 import org.apache.http.client.config.CookieSpecs;
 import org.apache.http.impl.client.StandardHttpRequestRetryHandler;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
-import static java.util.Collections.emptyList;
-import static java.util.Optional.ofNullable;
 import static org.apache.http.client.config.AuthSchemes.BASIC;
 import static org.apache.http.client.config.AuthSchemes.DIGEST;
 import static org.apache.http.client.config.AuthSchemes.NTLM;
@@ -126,37 +120,6 @@ public class ConfigurationCustomizer
     if (configuration.getAuthentication() != null) {
       apply(configuration.getAuthentication(), plan, null);
     }
-    if (configuration.getRedirectStrategy() != null) {
-      apply(configuration.getRedirectStrategy(), plan);
-    }
-    if (configuration.getAuthenticationStrategy() != null) {
-      apply(configuration.getAuthenticationStrategy(), plan);
-    }
-    if (configuration.getNormalizeUri() != null) {
-      plan.getRequest().setNormalizeUri(configuration.getNormalizeUri());
-    }
-    if (Boolean.TRUE.equals(configuration.getDisableContentCompression())) {
-      plan.getClient().disableContentCompression();
-    }
-  }
-
-  /**
-   * Apply selected AuthenticationStrategy to plan.
-   */
-  private void apply(final AuthenticationStrategy authenticationStrategy, final HttpClientPlan plan) {
-    if (authenticationStrategy != null) {
-      plan.getClient().setTargetAuthenticationStrategy(authenticationStrategy);
-    }
-  }
-
-  @VisibleForTesting
-  void setRetryHandler(final ConnectionConfiguration connection, final HttpClientPlan plan) {
-    if (connection.getRetries() != null) {
-      plan.getClient().setRetryHandler(new StandardHttpRequestRetryHandler(connection.getRetries(), false));
-      if (log.isTraceEnabled()) {
-        log.trace("Set retry handler with {} retries", connection.getRetries());
-      }
-    }
   }
 
   /**
@@ -170,7 +133,9 @@ public class ConfigurationCustomizer
       plan.getRequest().setSocketTimeout(timeout);
     }
 
-    setRetryHandler(connection, plan);
+    if (connection.getMaximumRetries() != null) {
+      plan.getClient().setRetryHandler(new StandardHttpRequestRetryHandler(connection.getMaximumRetries(), false));
+    }
 
     if (connection.getUserAgentSuffix() != null) {
       checkState(plan.getUserAgentBase() != null, "Default User-Agent not set");
@@ -212,13 +177,6 @@ public class ConfigurationCustomizer
       }
     }
     plan.getClient().setRoutePlanner(createRoutePlanner(proxy));
-  }
-
-  /**
-   * Apply redirect strategy to plan.
-   */
-  private void apply(final RedirectStrategy redirectStrategy, final HttpClientPlan plan) {
-    plan.getClient().setRedirectStrategy(redirectStrategy);
   }
 
   /**
@@ -274,37 +232,24 @@ public class ConfigurationCustomizer
     if (authentication instanceof UsernameAuthenticationConfiguration) {
       UsernameAuthenticationConfiguration auth = (UsernameAuthenticationConfiguration) authentication;
       authSchemes = ImmutableList.of(DIGEST, BASIC);
-      credentials = new UsernamePasswordCredentials(auth.getUsername(),
-          ofNullable(auth.getPassword()).map(Secret::decrypt).map(String::new).orElse(null));
+      credentials = new UsernamePasswordCredentials(auth.getUsername(), auth.getPassword());
     }
     else if (authentication instanceof NtlmAuthenticationConfiguration) {
       NtlmAuthenticationConfiguration auth = (NtlmAuthenticationConfiguration) authentication;
       authSchemes = ImmutableList.of(NTLM, DIGEST, BASIC);
-      credentials = new NTCredentials(auth.getUsername(),
-          ofNullable(auth.getPassword()).map(Secret::decrypt).map(String::new).orElse(null), auth.getHost(),
-          auth.getDomain());
-    }
-    else if (authentication instanceof BearerTokenAuthenticationConfiguration) {
-      credentials = null;
-      authSchemes = emptyList();
+      credentials = new NTCredentials(auth.getUsername(), auth.getPassword(), auth.getHost(), auth.getDomain());
     }
     else {
       throw new IllegalArgumentException("Unsupported authentication configuration: " + authentication);
     }
 
-    if (credentials != null) {
-      if (proxyHost != null) {
-        plan.addCredentials(new AuthScope(proxyHost), credentials);
-        plan.getRequest().setProxyPreferredAuthSchemes(authSchemes);
-      }
-      else {
-        plan.addCredentials(AuthScope.ANY, credentials);
-        plan.getRequest().setTargetPreferredAuthSchemes(authSchemes);
-      }
-
-      if (authentication.isPreemptive()) {
-        plan.getClient().addInterceptorFirst(new PreemptiveAuthHttpRequestInterceptor());
-      }
+    if (proxyHost != null) {
+      plan.addCredentials(new AuthScope(proxyHost), credentials);
+      plan.getRequest().setProxyPreferredAuthSchemes(authSchemes);
+    }
+    else {
+      plan.addCredentials(AuthScope.ANY, credentials);
+      plan.getRequest().setTargetPreferredAuthSchemes(authSchemes);
     }
   }
 }

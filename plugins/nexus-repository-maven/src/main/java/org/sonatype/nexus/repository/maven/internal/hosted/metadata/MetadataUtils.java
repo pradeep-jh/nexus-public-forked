@@ -12,42 +12,49 @@
  */
 package org.sonatype.nexus.repository.maven.internal.hosted.metadata;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.Objects;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+import java.util.Map;
 
 import javax.annotation.Nullable;
 
-import org.sonatype.nexus.common.io.InputStreamSupplier;
+import org.sonatype.nexus.common.hash.HashAlgorithm;
+import org.sonatype.nexus.repository.Repository;
+import org.sonatype.nexus.repository.maven.MavenFacet;
 import org.sonatype.nexus.repository.maven.MavenPath;
+import org.sonatype.nexus.repository.maven.MavenPath.HashType;
 import org.sonatype.nexus.repository.maven.internal.Constants;
+import org.sonatype.nexus.repository.maven.internal.MavenFacetUtils;
+import org.sonatype.nexus.repository.maven.internal.MavenMimeRulesSource;
 import org.sonatype.nexus.repository.maven.internal.MavenModels;
+import org.sonatype.nexus.repository.view.Content;
+import org.sonatype.nexus.repository.view.payloads.BytesPayload;
+import org.sonatype.nexus.repository.view.payloads.StringPayload;
 
-import org.codehaus.plexus.util.xml.Xpp3Dom;
+import com.google.common.hash.HashCode;
+import org.apache.maven.artifact.repository.metadata.Metadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
- * Utility class containing shared general methods for Maven metadata.
+ * Utility class containing shared methods for Maven metadata.
  *
- * @since 3.25
+ * @since 3.0
  */
 public final class MetadataUtils
 {
-  private static final Logger log = LoggerFactory.getLogger(MetadataUtils.class);
+  private static Logger log = LoggerFactory.getLogger(MetadataUtils.class);
 
   private MetadataUtils() {
-    //no op
   }
 
   /**
    * Builds a Maven path for the specified metadata.
    */
-  public static MavenPath metadataPath(
-      final String groupId,
+  public static MavenPath metadataPath(final String groupId,
       @Nullable final String artifactId,
       @Nullable final String baseVersion)
   {
@@ -64,52 +71,56 @@ public final class MetadataUtils
   }
 
   /**
-   * Returns the plugin prefix of a Maven plugin, by opening up the plugin JAR, and reading the Maven Plugin
-   * Descriptor. If fails, falls back to mangle artifactId (ie. extract XXX from XXX-maven-plugin or
-   * maven-XXX-plugin).
+   * Reads content stored at given path as {@link Metadata}. Returns null if the content does not exist.
    */
-  public static String getPluginPrefix(final MavenPath mavenPath, final InputStreamSupplier inputSupplier) {
-    // sanity checks: is artifact and extension is "jar", only possibility for maven plugins currently
-    checkArgument(mavenPath.getCoordinates() != null);
-    checkArgument(Objects.equals(mavenPath.getCoordinates().getExtension(), "jar"));
-    String prefix = null;
-    try {
-      if (inputSupplier != null) {
-        try (ZipInputStream zip = new ZipInputStream(inputSupplier.get())) {
-          ZipEntry entry;
-          while ((entry = zip.getNextEntry()) != null) {
-            if (!entry.isDirectory() && "META-INF/maven/plugin.xml".equals(entry.getName())) {
-              final Xpp3Dom dom = MavenModels.parseDom(zip);
-              prefix = getChildValue(dom, "goalPrefix", null);
-              break;
-            }
-            zip.closeEntry();
-          }
-        }
-      }
-    }
-    catch (IOException e) {
-      log.warn("Unable to read plugin.xml of {}", mavenPath, e);
-    }
-    if (prefix != null) {
-      return prefix;
-    }
-    if ("maven-plugin-plugin".equals(mavenPath.getCoordinates().getArtifactId())) {
-      return "plugin";
+  @Nullable
+  public static Metadata read(final Repository repository, final MavenPath mavenPath) throws IOException {
+    final Content content = repository.facet(MavenFacet.class).get(mavenPath);
+    if (content == null) {
+      return null;
     }
     else {
-      return mavenPath.getCoordinates().getArtifactId().replaceAll("-?maven-?", "").replaceAll("-?plugin-?", "");
+      Metadata metadata = MavenModels.readMetadata(content.openInputStream());
+      if (metadata == null) {
+        log.warn("Corrupted metadata {} @ {}", repository.getName(), mavenPath.getPath());
+      }
+      return metadata;
     }
   }
 
-  /*
-   * Helper method to get node's immediate child or default.
+  /**
+   * Writes passed in metadata as XML.
    */
-  private static String getChildValue(final Xpp3Dom doc, final String childName, final String defaultValue) {
-    Xpp3Dom child = doc.getChild(childName);
-    if (child == null) {
-      return defaultValue;
+  public static void write(final Repository repository, final MavenPath mavenPath, final Metadata metadata)
+      throws IOException
+  {
+    MavenFacet mavenFacet = repository.facet(MavenFacet.class);
+    final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+    MavenModels.writeMetadata(buffer, metadata);
+    mavenFacet.put(mavenPath, new BytesPayload(buffer.toByteArray(),
+        MavenMimeRulesSource.METADATA_TYPE));
+    final Map<HashAlgorithm, HashCode> hashCodes = mavenFacet.get(mavenPath).getAttributes()
+        .require(Content.CONTENT_HASH_CODES_MAP, Content.T_CONTENT_HASH_CODES_MAP);
+    checkState(hashCodes != null, "hashCodes");
+    for (HashType hashType : HashType.values()) {
+      MavenPath checksumPath = mavenPath.hash(hashType);
+      HashCode hashCode = hashCodes.get(hashType.getHashAlgorithm());
+      checkState(hashCode != null, "hashCode: type=%s", hashType);
+      mavenFacet.put(checksumPath, new StringPayload(hashCode.toString(), Constants.CHECKSUM_CONTENT_TYPE));
     }
-    return child.getValue();
+  }
+
+  /**
+   * Deletes metadata.
+   */
+  public static void delete(final Repository repository, final MavenPath mavenPath) {
+    checkNotNull(repository);
+    checkNotNull(mavenPath);
+    try {
+      MavenFacetUtils.deleteWithHashes(repository.facet(MavenFacet.class), mavenPath);
+    }
+    catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

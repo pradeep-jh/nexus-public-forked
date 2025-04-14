@@ -12,33 +12,27 @@
  */
 package org.sonatype.nexus.blobstore.file;
 
-import java.util.function.Supplier;
-
-import org.sonatype.nexus.blobstore.BlobStoreConfigurationBuilder;
 import org.sonatype.nexus.blobstore.api.BlobStoreConfiguration;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * A builder to configure a file blob store.
- *
+ * 
  * @since 3.1
  */
 public class FileBlobStoreConfigurationBuilder
-    extends BlobStoreConfigurationBuilder
 {
+  private String name;
+
   private String path;
 
   /**
    * Creates a new builder using the specified name for the resulting blob store. Unless customized, the name is also
    * used as the path for the blob store.
    */
-  public FileBlobStoreConfigurationBuilder(
-      final String name,
-      final Supplier<BlobStoreConfiguration> configurationSupplier)
-  {
-    super(name, configurationSupplier);
-    type(FileBlobStore.TYPE);
+  public FileBlobStoreConfigurationBuilder(final String name) {
+    this.name = checkNotNull(name);
     this.path = name;
   }
 
@@ -53,9 +47,10 @@ public class FileBlobStoreConfigurationBuilder
   /**
    * Creates the configuration for the desired file blob store.
    */
-  @Override
   public BlobStoreConfiguration build() {
-    final BlobStoreConfiguration configuration = super.build();
+    BlobStoreConfiguration configuration = new BlobStoreConfiguration();
+    configuration.setName(name);
+    configuration.setType(FileBlobStore.TYPE);
     configuration.attributes(FileBlobStore.CONFIG_KEY).set(FileBlobStore.PATH_KEY, path);
     return configuration;
   }

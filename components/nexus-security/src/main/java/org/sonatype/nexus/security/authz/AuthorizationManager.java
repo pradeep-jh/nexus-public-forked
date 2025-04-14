@@ -12,11 +12,11 @@
  */
 package org.sonatype.nexus.security.authz;
 
-import java.util.List;
 import java.util.Set;
 
 import org.sonatype.nexus.security.privilege.NoSuchPrivilegeException;
 import org.sonatype.nexus.security.privilege.Privilege;
+import org.sonatype.nexus.security.role.NoSuchRoleException;
 import org.sonatype.nexus.security.role.Role;
 
 /**
@@ -41,16 +41,9 @@ public interface AuthorizationManager
   Set<Role> listRoles();
 
   /**
-   * Returns the roles from this AuthorizationManager that meet the query
-   * @param query query to search
-   * @return the set of matching roles
-   */
-  Set<Role> searchRoles(String query);
-
-  /**
    * Returns a Role base on an Id.
    */
-  Role getRole(String roleId);
+  Role getRole(String roleId) throws NoSuchRoleException;
 
   /**
    * Adds a role to this AuthorizationManager.
@@ -60,12 +53,12 @@ public interface AuthorizationManager
   /**
    * Updates a role in this AuthorizationManager.
    */
-  Role updateRole(Role role);
+  Role updateRole(Role role) throws NoSuchRoleException;
 
   /**
    * Removes a role in this AuthorizationManager.
    */
-  void deleteRole(String roleId);
+  void deleteRole(String roleId) throws NoSuchRoleException;
 
   // Privilege CRUDS
 
@@ -75,22 +68,9 @@ public interface AuthorizationManager
   Set<Privilege> listPrivileges();
 
   /**
-   * Returns a Privilege based on its id.
+   * Returns a Privilege base on an Id.
    */
   Privilege getPrivilege(String privilegeId) throws NoSuchPrivilegeException;
-
-  /**
-   * Returns a Privilege based on its name
-   * @param privilegeName the name of the privilege to be queried
-   * @return a {@link Privilege} object if present
-   * @throws NoSuchPrivilegeException if there is no privilege with such name
-   */
-  Privilege getPrivilegeByName(String privilegeName) throws NoSuchPrivilegeException;
-
-  /**
-   * Returns Privileges base on Ids.
-   */
-  List<Privilege> getPrivileges(Set<String> privilegeIds);
 
   /**
    * Adds a Privilege to this AuthorizationManager.
@@ -103,26 +83,7 @@ public interface AuthorizationManager
   Privilege updatePrivilege(Privilege privilege) throws NoSuchPrivilegeException;
 
   /**
-   *  Updates a Privilege by its name in this AuthorizationManager
-   * @param privilege the privilege to be updated
-   * @return a {@link Privilege} object if updated successfully
-   * @throws NoSuchPrivilegeException if there is no privilege with the name sent on the input parameter
-   */
-  Privilege updatePrivilegeByName(Privilege privilege) throws NoSuchPrivilegeException;
-
-  /**
    * Removes a Privilege in this AuthorizationManager.
    */
   void deletePrivilege(String privilegeId) throws NoSuchPrivilegeException;
-
-  /**
-   * Removes a Privilege in this AuthorizationManager.
-   * @param privilegeName the name of the privilege to be deleted
-   * @throws NoSuchPrivilegeException if there is no privilege with such name
-   */
-  void deletePrivilegeByName(String privilegeName) throws NoSuchPrivilegeException;
-
-  default String getRealmName() {
-    return null;
-  }
 }

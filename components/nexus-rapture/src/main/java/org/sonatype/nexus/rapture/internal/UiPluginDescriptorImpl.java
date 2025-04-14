@@ -30,7 +30,7 @@ import org.eclipse.sisu.Priority;
 @Singleton
 @Priority(Integer.MAX_VALUE) // always load first
 public class UiPluginDescriptorImpl
-    extends UiPluginDescriptorSupport
+  extends UiPluginDescriptorSupport
 {
   @Inject
   public UiPluginDescriptorImpl() {

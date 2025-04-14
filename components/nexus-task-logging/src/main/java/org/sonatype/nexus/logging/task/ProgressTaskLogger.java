@@ -64,11 +64,10 @@ public class ProgressTaskLogger
     this(log, INTERVAL_MINUTES, INTERVAL_MINUTES, MINUTES);
   }
 
-  ProgressTaskLogger(
-      final Logger log,
-      final long initialDelay,
-      final long progressInterval,
-      final TimeUnit timeUnit)
+  ProgressTaskLogger(final Logger log,
+                     final long initialDelay,
+                     final long progressInterval,
+                     final TimeUnit timeUnit)
   {
     this.log = checkNotNull(log);
     this.initialDelay = initialDelay;
@@ -96,13 +95,6 @@ public class ProgressTaskLogger
   @Override
   public void flush() {
     logProgress();
-  }
-
-  /**
-   * @since 3.16
-   */
-  public static void shutdown() {
-    executorService.shutdown();
   }
 
   @VisibleForTesting

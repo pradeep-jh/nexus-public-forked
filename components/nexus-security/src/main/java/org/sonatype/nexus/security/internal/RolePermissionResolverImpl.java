@@ -26,9 +26,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 import org.sonatype.goodies.common.ComponentSupport;
-import org.sonatype.nexus.common.event.EventHelper;
 import org.sonatype.nexus.common.event.EventManager;
-import org.sonatype.nexus.distributed.event.service.api.common.AuthorizationChangedDistributedEvent;
 import org.sonatype.nexus.security.authz.AuthorizationConfigurationChanged;
 import org.sonatype.nexus.security.config.CPrivilege;
 import org.sonatype.nexus.security.config.CRole;
@@ -108,14 +106,6 @@ public class RolePermissionResolverImpl
     invalidate();
   }
 
-  @AllowConcurrentEvents
-  @Subscribe
-  public void on(final AuthorizationChangedDistributedEvent event) {
-    if (EventHelper.isReplicating()) {
-      invalidate();
-    }
-  }
-
   @Override
   public Collection<Permission> resolvePermissionsInRole(final String roleString) {
     checkNotNull(roleString);
@@ -181,7 +171,7 @@ public class RolePermissionResolverImpl
    */
   @Nullable
   private PrivilegeDescriptor descriptor(final String privilegeType) {
-    checkNotNull(privilegeType);
+    assert privilegeType != null;
 
     for (PrivilegeDescriptor descriptor : privilegeDescriptors) {
       if (privilegeType.equals(descriptor.getType())) {
@@ -198,7 +188,7 @@ public class RolePermissionResolverImpl
    */
   @Nullable
   private Permission permission(final String privilegeId) {
-    checkNotNull(privilegeId);
+    assert privilegeId != null;
 
     Permission permission = permissionsCache.getIfPresent(privilegeId);
     if (permission == null) {

@@ -82,9 +82,4 @@ public class CapabilityConditionsImpl
   public Condition evaluable(final Evaluable condition) {
     return new EvaluableCondition(eventManager, condition);
   }
-
-  @Override
-  public Condition capabilityHasNoDuplicates() {
-    return new CapabilityHasNoDuplicatesCondition(eventManager);
-  }
 }

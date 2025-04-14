@@ -57,9 +57,4 @@ public interface HttpClientManager
    */
   @Deprecated
   HttpClientBuilder prepare(@Nullable final Customizer customizer);
-
-  /**
-   * Provides a new instance of {@link HttpClientConfiguration} applicable for use with this backing store
-   */
-  HttpClientConfiguration newConfiguration();
 }

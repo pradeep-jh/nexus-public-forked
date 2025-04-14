@@ -15,7 +15,6 @@ package org.sonatype.nexus.repository.maven.tasks;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
-import org.sonatype.nexus.common.upgrade.AvailabilityVersion;
 import org.sonatype.nexus.formfields.CheckboxFormField;
 import org.sonatype.nexus.formfields.NumberTextFormField;
 import org.sonatype.nexus.formfields.RepositoryCombobox;
@@ -27,7 +26,6 @@ import org.sonatype.nexus.scheduling.TaskDescriptorSupport;
  * Configuration definition for {@link RemoveSnapshotsTask}
  * @since 3.0
  */
-@AvailabilityVersion(from = "1.0")
 @Named
 @Singleton
 public class RemoveSnapshotsTaskDescriptor
@@ -49,7 +47,7 @@ public class RemoveSnapshotsTaskDescriptor
   {
     super(TYPE_ID,
         RemoveSnapshotsTask.class,
-        "Maven - Delete SNAPSHOT",
+        "Remove snapshots from Maven repository",
         VISIBLE,
         EXPOSED,
         new RepositoryCombobox(REPOSITORY_NAME_FIELD_ID,
@@ -64,14 +62,14 @@ public class RemoveSnapshotsTaskDescriptor
             true).withInitialValue(1).withMinimumValue(-1),
         new NumberTextFormField(SNAPSHOT_RETENTION_DAYS,
             "Snapshot retention (days)",
-            "Delete all snapshots older than this, provided we still keep the minimum number specified.",
+            "Purge all snapshots older than this, provided we still keep the minimum number specified.",
             true).withInitialValue(30).withMinimumValue(0),
         new CheckboxFormField(REMOVE_IF_RELEASED,
             "Remove if released",
-            "Delete all snapshots that have a corresponding release", false),
+            "Purge all snapshots that have a corresponding release", false),
         new NumberTextFormField(GRACE_PERIOD,
             "Grace period after release (days)",
-            "The grace period during which snapshots with an associated release will not be deleted.",
+            "The grace period during which snapshots with an associated release will not be purged.",
             false).withMinimumValue(0));
   }
 }

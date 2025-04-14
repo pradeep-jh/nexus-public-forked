@@ -27,9 +27,6 @@ import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.assertFalse;
-import static org.sonatype.nexus.repository.maven.internal.Constants.INDEX_MAIN_CHUNK_FILE_PATH;
-import static org.sonatype.nexus.repository.maven.internal.Constants.INDEX_PROPERTY_FILE_PATH;
 
 /**
  * UT for {@link Maven2MavenPathParser}
@@ -327,28 +324,6 @@ public class Maven2MavenPathParserTest
   }
 
   @Test
-  public void badlyBuiltSnapshot() throws Exception {
-    MavenPath mavenPath = pathParser
-        .parsePath("/org/jruby/jruby/1.0RC1-SNAPSHOT/jruby-1.0RC1-SNAPSHOT-20070504.160758-25-javadoc.jar");
-    assertThat(mavenPath, notNullValue());
-    assertThat(mavenPath.getPath(), equalTo(
-        "org/jruby/jruby/1.0RC1-SNAPSHOT/jruby-1.0RC1-SNAPSHOT-20070504.160758-25-javadoc.jar"));
-    assertThat(mavenPath.getFileName(), equalTo("jruby-1.0RC1-SNAPSHOT-20070504.160758-25-javadoc.jar"));
-    assertThat(mavenPath.getHashType(), nullValue());
-    assertThat(mavenPath.getCoordinates(), notNullValue());
-    assertThat(mavenPath.getCoordinates().getGroupId(), equalTo("org.jruby"));
-    assertThat(mavenPath.getCoordinates().getArtifactId(), equalTo("jruby"));
-    assertThat(mavenPath.getCoordinates().getBaseVersion(), equalTo("1.0RC1-SNAPSHOT"));
-    assertThat(mavenPath.getCoordinates().getVersion(), equalTo("1.0RC1-20070504.160758-25"));
-    assertThat(mavenPath.getCoordinates().getTimestamp(), equalTo(parseTimestamp("20070504.160758")));
-    assertThat(mavenPath.getCoordinates().getBuildNumber(), equalTo(25));
-    assertThat(mavenPath.getCoordinates().getBaseVersion(), equalTo("1.0RC1-SNAPSHOT"));
-    assertThat(mavenPath.getCoordinates().getClassifier(), equalTo("javadoc"));
-    assertThat(mavenPath.getCoordinates().getExtension(), equalTo("jar"));
-    assertThat(mavenPath.getCoordinates().getSignatureType(), nullValue());
-  }
-
-  @Test
   public void metadata() throws Exception
   {
     MavenPath mavenPath;
@@ -356,42 +331,22 @@ public class Maven2MavenPathParserTest
     mavenPath = pathParser.parsePath("/something/that/looks/maven-metadata.xml");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(true));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath = pathParser.parsePath("/something/that/looks/like-SNAPSHOT/maven-metadata.xml.sha1");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(true));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath = pathParser.parsePath("/org/codehaus/plexus/plexus-container-default/maven-metadata.xml.md5");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(true));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath = pathParser.parsePath("/org/jruby/jruby/1.0/maven-metadata.xml");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(true));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath = pathParser.parsePath("/org/jruby/jruby/1.0-SNAPSHOT/maven-metadata.xml");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(true));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
-  }
-
-  @Test
-  public void index() {
-    MavenPath mavenPath;
-
-    mavenPath = pathParser.parsePath(INDEX_PROPERTY_FILE_PATH);
-    assertThat(mavenPath.getCoordinates(), nullValue());
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(true));
-    assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(false));
-
-    mavenPath = pathParser.parsePath(INDEX_MAIN_CHUNK_FILE_PATH);
-    assertThat(mavenPath.getCoordinates(), nullValue());
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(true));
-    assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(false));
   }
 
   @Test
@@ -404,55 +359,44 @@ public class Maven2MavenPathParserTest
         "/com/electrabel/connection-register-ear/1.2-SNAPSHOT/connection-register-ear-1.2-20101214.143755.ear");
     assertThat(mavenPath.getCoordinates(), nullValue()); // filename lacks the -BBB build number
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(false));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath =
         pathParser.parsePath(
             "/org/apache/maven/plugins/maven-dependency-plugin/2.0-SNAPSHOT/maven-dependency-plugin-2.0-alpha-1-20070109.165112-13.jar");
-    assertThat(mavenPath.getCoordinates(), notNullValue()); // baseVersion != version mismatch
-    assertFalse(mavenPath.getCoordinates().getBaseVersion().startsWith("2.0-alpha"));
+    assertThat(mavenPath.getCoordinates(), nullValue()); // baseVersion != version mismatch
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(false));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath = pathParser.parsePath("/");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(false));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath = pathParser.parsePath("/some/stupid/path");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(false));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath = pathParser.parsePath("/some/stupid/path/more/in/it");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(false));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath = pathParser.parsePath("/something/that/looks/");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(false));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath = pathParser.parsePath("/something/that/looks/like-an-artifact.blah");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(false));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath = pathParser.parsePath("/something/that/looks/like-an-artifact.pom");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(false));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath = pathParser.parsePath("org/apache/maven/scm/maven-scm");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(false));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
 
     mavenPath = pathParser.parsePath("org/apache/geronimo/javamail/geronimo-javamail_1.4_mail");
     assertThat(mavenPath.getCoordinates(), nullValue());
     assertThat(pathParser.isRepositoryMetadata(mavenPath), equalTo(false));
-    assertThat(pathParser.isRepositoryIndex(mavenPath), equalTo(false));
   }
 
 
@@ -539,62 +483,6 @@ public class Maven2MavenPathParserTest
   }
 
   @Test
-  public void parseExtension() {
-    MavenPath mavenPath;
-
-    mavenPath =
-        pathParser.parsePath(
-            "/org/sonatype/nexus/tools/nexus-migration-app/1.0.0-beta-6-SNAPSHOT/nexus-migration-app-1.0.0-beta-6-20080809.181715-2-cli.anyext");
-    assertThat(mavenPath.getCoordinates().getExtension(), equalTo("anyext"));
-
-    mavenPath =
-        pathParser.parsePath(
-            "/org/sonatype/nexus/tools/nexus-migration-app/1.0.0-beta-6-SNAPSHOT/nexus-migration-app-1.0.0-beta-6-20080809.181715-2-cli.anyext.sha1");
-    assertThat(mavenPath.getCoordinates().getExtension(), equalTo("anyext.sha1"));
-
-    mavenPath =
-        pathParser.parsePath(
-            "/org/sonatype/nexus/tools/nexus-migration-app/1.0.0-beta-6-SNAPSHOT/nexus-migration-app-1.0.0-beta-6-20080809.181715-2-cli.anyext.md5");
-    assertThat(mavenPath.getCoordinates().getExtension(), equalTo("anyext.md5"));
-
-    mavenPath =
-        pathParser.parsePath(
-            "/org/sonatype/nexus/tools/nexus-migration-app/1.0.0-beta-6-SNAPSHOT/nexus-migration-app-1.0.0-beta-6-20080809.181715-2-cli.anyext.asc");
-    assertThat(mavenPath.getCoordinates().getExtension(), equalTo("anyext.asc"));
-
-    mavenPath =
-        pathParser.parsePath(
-            "/org/sonatype/nexus/tools/nexus-migration-app/1.0.0-beta-6-SNAPSHOT/nexus-migration-app-1.0.0-beta-6-20080809.181715-2-cli.anyext.asc.md5");
-    assertThat(mavenPath.getCoordinates().getExtension(), equalTo("anyext.asc.md5"));
-
-    mavenPath =
-        pathParser.parsePath(
-            "/org/sonatype/nexus/tools/nexus-migration-app/1.0.0-beta-6-SNAPSHOT/nexus-migration-app-1.0.0-beta-6-20080809.181715-2-cli.tar.anyext");
-    assertThat(mavenPath.getCoordinates().getExtension(), equalTo("tar.anyext"));
-
-    mavenPath =
-        pathParser.parsePath(
-            "/org/sonatype/nexus/tools/nexus-migration-app/1.0.0-beta-6-SNAPSHOT/nexus-migration-app-1.0.0-beta-6-20080809.181715-2-cli.cpio.anyext");
-    assertThat(mavenPath.getCoordinates().getExtension(), equalTo("cpio.anyext"));
-
-    mavenPath =
-        pathParser.parsePath(
-            "/org/sonatype/nexus/tools/nexus-migration-app/1.0.0-beta-6-SNAPSHOT/nexus-migration-app-1.0.0-beta-6-20080809.181715-2-cli.anyext.zip");
-    assertThat(mavenPath.getCoordinates().getExtension(), equalTo("zip"));
-
-    mavenPath =
-        pathParser.parsePath(
-            "/org/sonatype/nexus/tools/nexus-migration-app/1.0.0-beta-6-SNAPSHOT/nexus-migration-app-1.0.0-beta-6-20080809.181715-2-cli.nk.os");
-    assertThat(mavenPath.getCoordinates().getExtension(), equalTo("nk.os"));
-
-    mavenPath =
-        pathParser.parsePath(
-            "/org/sonatype/nexus/tools/nexus-migration-app/1.0.0-beta-6-SNAPSHOT/nexus-migration-app-1.0.0-beta-6-20080809.181715-2-cli.unknown.os");
-    assertThat(mavenPath.getCoordinates().getExtension(), equalTo("os"));
-  }
-
-
-  @Test
   public void extremeSnapshot() throws Exception
   {
     MavenPath mavenPath;
@@ -646,39 +534,5 @@ public class Maven2MavenPathParserTest
     assertThat(mavenPath.getCoordinates().getVersion(), equalTo("1.0.20100111.064938-1"));
     assertThat(mavenPath.getCoordinates().getBaseVersion(), equalTo("1.0.SNAPSHOT"));
     assertThat(mavenPath.getCoordinates().isSnapshot(), equalTo(true));
-  }
-
-  @Test
-  public void snapshot_validFormat() throws Exception
-  {
-    MavenPath mavenPath = pathParser.parsePath(
-        "org/sonatype/nexus/nexus-webapp/1.0.0-beta-5-SNAPSHOT/nexus-webapp-1.0.0-beta-5-20171208.202054-1.tar.gz");
-    assertThat(mavenPath.getCoordinates(), notNullValue());
-    assertThat(mavenPath.getCoordinates().getExtension(), equalTo("tar.gz"));
-    assertThat(mavenPath.getCoordinates().getClassifier(), nullValue());
-    assertThat(mavenPath.getCoordinates().getVersion(), equalTo("1.0.0-beta-5-20171208.202054-1"));
-    assertThat(mavenPath.getCoordinates().getBaseVersion(), equalTo("1.0.0-beta-5-SNAPSHOT"));
-    assertThat(mavenPath.getCoordinates().isSnapshot(), equalTo(true));
-    assertThat(mavenPath.getCoordinates().getTimestamp(), notNullValue());
-    assertThat(mavenPath.getCoordinates().getBuildNumber(), notNullValue());
-  }
-
-  @Test
-  public void snapshot_invalidFormat() throws Exception
-  {
-    MavenPath mavenPath = pathParser.parsePath(
-        "org/sonatype/nexus/nexus-webapp/1.0.0-beta-5-SNAPSHOT/nexus-webapp-1.0.0-beta-5-20171208-test.tar.gz");
-    assertThat(mavenPath, notNullValue());
-    assertThat(mavenPath.getPath(), equalTo(
-        "org/sonatype/nexus/nexus-webapp/1.0.0-beta-5-SNAPSHOT/nexus-webapp-1.0.0-beta-5-20171208-test.tar.gz"));
-    assertThat(mavenPath.getFileName(), equalTo("nexus-webapp-1.0.0-beta-5-20171208-test.tar.gz"));
-    assertThat(mavenPath.getCoordinates(), notNullValue());
-    assertThat(mavenPath.getCoordinates().getExtension(), notNullValue());
-    assertThat(mavenPath.getCoordinates().getClassifier(), nullValue());
-    assertThat(mavenPath.getCoordinates().getVersion(), notNullValue());
-    assertThat(mavenPath.getCoordinates().getBaseVersion(), equalTo("1.0.0-beta-5-SNAPSHOT"));
-    assertThat(mavenPath.getCoordinates().isSnapshot(), equalTo(true));
-    assertThat(mavenPath.getCoordinates().getTimestamp(), nullValue());
-    assertThat(mavenPath.getCoordinates().getBuildNumber(), nullValue());
   }
 }

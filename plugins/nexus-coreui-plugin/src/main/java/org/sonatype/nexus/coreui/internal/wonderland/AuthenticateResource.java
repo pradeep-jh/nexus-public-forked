@@ -12,8 +12,6 @@
  */
 package org.sonatype.nexus.coreui.internal.wonderland;
 
-import java.util.Optional;
-
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -28,7 +26,6 @@ import javax.ws.rs.core.Response.Status;
 import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.common.text.Strings2;
 import org.sonatype.nexus.common.wonderland.AuthTicketService;
-import org.sonatype.nexus.rest.NotCacheable;
 import org.sonatype.nexus.rest.Resource;
 
 import org.apache.shiro.SecurityUtils;
@@ -70,7 +67,6 @@ public class AuthenticateResource
   @POST
   @Consumes({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})
   @Produces({MediaType.APPLICATION_XML, MediaType.APPLICATION_JSON})
-  @NotCacheable
   public AuthTicketXO post(final AuthTokenXO token) {
     checkNotNull(token);
 
@@ -103,7 +99,6 @@ public class AuthenticateResource
     }
 
     // At this point we should be authenticated, return a new ticket
-    Optional<String> realmName = subject.getPrincipals().getRealmNames().stream().findFirst();
-    return new AuthTicketXO().withT(authTickets.createTicket(username, realmName.orElse(null)));
+    return new AuthTicketXO().withT(authTickets.createTicket());
   }
 }

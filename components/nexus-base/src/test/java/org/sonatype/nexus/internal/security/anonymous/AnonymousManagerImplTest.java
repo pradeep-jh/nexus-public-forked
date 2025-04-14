@@ -15,7 +15,6 @@ package org.sonatype.nexus.internal.security.anonymous;
 import javax.inject.Provider;
 
 import org.sonatype.goodies.testsupport.TestSupport;
-import org.sonatype.nexus.common.event.EventHelper;
 import org.sonatype.nexus.common.event.EventManager;
 import org.sonatype.nexus.security.anonymous.AnonymousConfiguration;
 import org.sonatype.nexus.security.anonymous.AnonymousConfigurationChangedEvent;
@@ -27,12 +26,11 @@ import org.mockito.Mock;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 public class AnonymousManagerImplTest
@@ -67,9 +65,7 @@ public class AnonymousManagerImplTest
   @Before
   public void setUp() {
     when(defaults.get()).thenReturn(defaultConfig);
-    when(store.newConfiguration()).thenReturn(defaultConfig);
     when(storeConfig.copy()).thenReturn(storeConfigCopy);
-    when(storeConfigCopy.copy()).thenReturn(storeConfigCopy);
     when(defaultConfig.copy()).thenReturn(defaultConfigCopy);
     manager = new AnonymousManagerImpl(eventManager, store, defaults);
   }
@@ -83,7 +79,7 @@ public class AnonymousManagerImplTest
   public void testGetConfiguration_FromStore() {
     when(store.load()).thenReturn(storeConfig);
     assertThat(manager.getConfiguration(), is(storeConfigCopy));
-    verifyNoInteractions(defaults);
+    verifyZeroInteractions(defaults);
   }
 
   @Test
@@ -110,23 +106,11 @@ public class AnonymousManagerImplTest
   @Test
   public void testHandleConfigurationEvent_FromRemoteNode() {
     when(configurationEvent.isLocal()).thenReturn(false);
-    when(configurationEvent.getAnonymousConfiguration()).thenReturn(storeConfig);
-    assertThat(manager.getConfiguration(), is(defaultConfigCopy));
-    EventHelper.asReplicating(() -> manager.onStoreChanged(configurationEvent));
-    assertThat(manager.getConfiguration(), is(storeConfigCopy));
-    verify(store).load();
-    verify(store, never()).save(storeConfigCopy);
-    verify(eventManager).post(any(AnonymousConfigurationChangedEvent.class));
-  }
-
-  @Test
-  public void testIsConfigured() {
     when(store.load()).thenReturn(defaultConfig, storeConfig);
-    assertTrue(manager.isConfigured());
-  }
-
-  @Test
-  public void testIsConfigured_unconfigured() {
-    assertFalse(manager.isConfigured());
+    assertThat(manager.getConfiguration(), is(defaultConfigCopy));
+    manager.onStoreChanged(configurationEvent);
+    assertThat(manager.getConfiguration(), is(storeConfigCopy));
+    verify(store, times(2)).load();
+    verify(eventManager).post(any(AnonymousConfigurationChangedEvent.class));
   }
 }

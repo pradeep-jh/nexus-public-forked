@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -42,13 +38,6 @@ Ext.define('NX.coreui.migration.RepositoryCustomizeWindow', {
     recordId: undefined,
 
     /**
-     * The default data store to display.
-     *
-     * @cfg {String}
-     */
-    dataStore: 'nexus',
-
-    /**
      * The default blob store to display.
      *
      * @cfg {String}
@@ -74,7 +63,7 @@ Ext.define('NX.coreui.migration.RepositoryCustomizeWindow', {
       closable: true,
       width: NX.view.ModalDialog.SMALL_MODAL,
 
-      title: NX.I18n.render(me, 'Title', me.getRepository()),
+      title: NX.I18n.render(me, 'Title', me.repository),
 
       items: {
         xtype: 'form',
@@ -86,7 +75,7 @@ Ext.define('NX.coreui.migration.RepositoryCustomizeWindow', {
           {
             xtype: 'hiddenfield',
             name: 'id',
-            value: me.getRecordId()
+            value: me.recordId
           },
           {
             xtype: 'combo',
@@ -100,7 +89,7 @@ Ext.define('NX.coreui.migration.RepositoryCustomizeWindow', {
             displayField: 'name',
             valueField: 'name',
             readOnlyOnUpdate: true,
-            value: me.getBlobStore()
+            value: me.blobStore
           },
           {
             xtype: 'combo',
@@ -114,7 +103,7 @@ Ext.define('NX.coreui.migration.RepositoryCustomizeWindow', {
               ['FS_COPY', NX.I18n.render(me, 'IngestMethod_Copy')],
               ['DOWNLOAD', NX.I18n.render(me, 'IngestMethod_Download')]
             ],
-            value: me.getIngestMethod()
+            value: me.ingestMethod
           }
         ],
 
@@ -125,18 +114,6 @@ Ext.define('NX.coreui.migration.RepositoryCustomizeWindow', {
         ]
       }
     });
-
-    if (NX.State.getValue('datastores')) {
-      me.items.items.splice(1, 0,
-          {
-            xtype: 'hiddenfield',
-            name: 'dataStore',
-            editable: false,
-            readOnlyOnUpdate: true,
-            value: 'nexus',
-            hidden: true
-          });
-    }
 
     me.callParent();
   },

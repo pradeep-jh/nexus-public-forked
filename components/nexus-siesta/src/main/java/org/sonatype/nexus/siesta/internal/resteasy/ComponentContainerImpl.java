@@ -24,7 +24,6 @@ import javax.ws.rs.ext.RuntimeDelegate;
 
 import org.sonatype.nexus.rest.Resource;
 import org.sonatype.nexus.siesta.ComponentContainer;
-import org.sonatype.nexus.siesta.SiestaResourceMethodFinder;
 
 import org.eclipse.sisu.BeanEntry;
 import org.jboss.resteasy.plugins.server.servlet.HttpServletDispatcher;
@@ -69,15 +68,11 @@ public class ComponentContainerImpl
     deployment.start();
 
     servletConfig.getServletContext().setAttribute(ResteasyDeployment.class.getName(), deployment);
-    servletConfig.getServletContext().setAttribute(
-        SiestaResourceMethodFinder.class.getName(), new SiestaResourceMethodFinder(this, deployment));
 
     super.init(servletConfig);
 
-    ResteasyProviderFactory providerFactory = getDispatcher().getProviderFactory();
-    providerFactory.getContainerResponseFilterRegistry().registerClass(NotCacheableResponseFilter.class);
-
     if (log.isDebugEnabled()) {
+      ResteasyProviderFactory providerFactory = getDispatcher().getProviderFactory();
       log.debug("Provider factory: {}", providerFactory);
       log.debug("Configuration: {}", providerFactory.getConfiguration());
       log.debug("Runtime type: {}", providerFactory.getRuntimeType());

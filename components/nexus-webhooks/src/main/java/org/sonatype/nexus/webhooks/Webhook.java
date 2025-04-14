@@ -43,7 +43,7 @@ public abstract class Webhook
 {
   private EventManager eventManager;
 
-  protected final Set<SubscriptionImpl> subscriptions = new CopyOnWriteArraySet<>();
+  private final Set<SubscriptionImpl> subscriptions = new CopyOnWriteArraySet<>();
 
   @Inject
   public void setEventManager(final EventManager eventManager) {
@@ -74,7 +74,7 @@ public abstract class Webhook
     return ImmutableSet.copyOf(subscriptions);
   }
 
-  protected class SubscriptionImpl
+  private class SubscriptionImpl
       implements WebhookSubscription
   {
     private final WebhookConfiguration configuration;
@@ -130,7 +130,7 @@ public abstract class Webhook
     checkNotNull(subscription);
 
     synchronized (subscriptions) {
-      // noinspection SuspiciousMethodCalls
+      //noinspection SuspiciousMethodCalls
       subscriptions.remove(subscription);
       log.debug("Removed subscription: {}", subscription);
 

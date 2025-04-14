@@ -14,6 +14,7 @@ package org.sonatype.nexus.repository.httpbridge.internal;
 
 import java.io.IOException;
 import java.util.Enumeration;
+
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -43,8 +44,6 @@ import org.sonatype.nexus.repository.view.payloads.StringPayload;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.net.HttpHeaders;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.shiro.authz.AuthorizationException;
 import org.jboss.logging.MDC;
 import org.slf4j.Logger;
@@ -64,8 +63,6 @@ public class ViewServlet
 {
   private static final Logger log = LoggerFactory.getLogger(ViewServlet.class);
 
-  private static final String SANDBOX = "sandbox allow-forms allow-modals allow-popups allow-presentation allow-scripts allow-top-navigation";
-
   @VisibleForTesting
   static final String P_DESCRIBE = "describe";
 
@@ -79,21 +76,17 @@ public class ViewServlet
 
   private final DescriptionRenderer descriptionRenderer;
 
-  private final boolean sandboxEnabled;
-
   @Inject
   public ViewServlet(final RepositoryManager repositoryManager,
                      final HttpResponseSenderSelector httpResponseSenderSelector,
                      final DescriptionHelper descriptionHelper,
-                     final DescriptionRenderer descriptionRenderer,
-                     @Named("${nexus.repository.sandbox.enable:-true}") final boolean sandboxEnabled)
+                     final DescriptionRenderer descriptionRenderer)
   {
 
     this.repositoryManager = checkNotNull(repositoryManager);
     this.httpResponseSenderSelector = checkNotNull(httpResponseSenderSelector);
     this.descriptionHelper = checkNotNull(descriptionHelper);
     this.descriptionRenderer = checkNotNull(descriptionRenderer);
-    this.sandboxEnabled = sandboxEnabled;
   }
 
   @Override
@@ -145,11 +138,6 @@ public class ViewServlet
   protected void doService(final HttpServletRequest httpRequest, final HttpServletResponse httpResponse)
       throws Exception
   {
-    if (sandboxEnabled) {
-      httpResponse.setHeader(HttpHeaders.CONTENT_SECURITY_POLICY, SANDBOX);
-    }
-    httpResponse.setHeader(HttpHeaders.X_XSS_PROTECTION, "1; mode=block");
-
     // resolve repository for request
     RepositoryPath path = RepositoryPath.parse(httpRequest.getPathInfo());
     log.debug("Parsed path: {}", path);
@@ -231,9 +219,8 @@ public class ViewServlet
 
   @VisibleForTesting
   Response describe(final Request request, final Response response, final Exception exception, final String flags) {
-    final Description description = new Description(ImmutableMap.of(
-        // placeholder for the describeHtml.vm
-        "path", StringEscapeUtils.escapeHtml(request.getPath()),
+    final Description description = new Description(ImmutableMap.<String, Object>of(
+        "path", request.getPath(),
         "nexusUrl", BaseUrlHolder.get()
     ));
     if (exception != null) {

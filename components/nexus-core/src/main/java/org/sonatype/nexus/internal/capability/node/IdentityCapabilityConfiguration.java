@@ -19,7 +19,7 @@ import org.sonatype.nexus.capability.CapabilityConfigurationSupport;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * Configuration adapter for {@code [Orient]IdentityCapability}.
+ * Configuration adapter for {@link IdentityCapability}.
  *
  * @since 3.0
  */

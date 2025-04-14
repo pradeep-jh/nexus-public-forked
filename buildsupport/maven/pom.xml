@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus.buildsupport</groupId>
     <artifactId>nexus-buildsupport</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-buildsupport-maven</artifactId>
@@ -28,21 +28,21 @@
   <packaging>pom</packaging>
 
   <properties>
-    <apache-maven.version>3.9.5</apache-maven.version>
-    <aether.version>1.1.0</aether.version>
+    <apache-maven.version>3.3.3</apache-maven.version>
+    <aether.version>1.0.2.v20150114</aether.version>
   </properties>
 
   <dependencyManagement>
     <dependencies>
       <dependency>
         <groupId>org.apache.maven</groupId>
-        <artifactId>maven-model</artifactId>
+        <artifactId>maven-aether-provider</artifactId>
         <version>${apache-maven.version}</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.maven</groupId>
-        <artifactId>maven-model-builder</artifactId>
+        <artifactId>maven-model</artifactId>
         <version>${apache-maven.version}</version>
       </dependency>
 
@@ -91,19 +91,19 @@
       <dependency>
         <groupId>org.apache.maven.plugin-tools</groupId>
         <artifactId>maven-plugin-annotations</artifactId>
-        <version>3.6.1</version>
+        <version>3.4</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.maven.shared</groupId>
         <artifactId>maven-shared-utils</artifactId>
-        <version>3.3.4</version>
+        <version>0.8</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.maven.shared</groupId>
         <artifactId>maven-verifier</artifactId>
-        <version>1.7.2</version>
+        <version>1.6</version>
         <exclusions>
           <exclusion>
             <groupId>junit</groupId>
@@ -143,13 +143,13 @@
       <dependency>
         <groupId>org.apache.maven.indexer</groupId>
         <artifactId>indexer-reader</artifactId>
-        <version>5.1.2-202109</version>
+        <version>5.1.2-816025a</version>
       </dependency>
 
       <dependency>
         <groupId>org.apache.maven.archetype</groupId>
         <artifactId>archetype-catalog</artifactId>
-        <version>3.2.0</version>
+        <version>2.4</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

@@ -19,7 +19,7 @@
   <parent>
     <groupId>org.sonatype.nexus.assemblies</groupId>
     <artifactId>nexus-assemblies</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-core-feature</artifactId>
@@ -44,26 +44,17 @@
 
     <dependency>
       <groupId>org.sonatype.nexus</groupId>
+      <artifactId>nexus-orient</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.sonatype.nexus</groupId>
       <artifactId>nexus-security</artifactId>
       <scope>provided</scope>
     </dependency>
 
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-quartz</artifactId>
-      <scope>provided</scope>
-    </dependency>
-
     <!-- bundles and sub-features belonging to nexus-core-feature -->
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-repository-content</artifactId>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus</groupId>
-      <artifactId>nexus-cleanup</artifactId>
-    </dependency>
 
     <dependency>
       <groupId>org.sonatype.nexus</groupId>
@@ -71,8 +62,20 @@
     </dependency>
 
     <dependency>
+      <groupId>org.sonatype.nexus</groupId>
+      <artifactId>nexus-quartz</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>org.sonatype.nexus.plugins</groupId>
       <artifactId>nexus-audit-plugin</artifactId>
+      <classifier>features</classifier>
+      <type>xml</type>
+    </dependency>
+
+    <dependency>
+      <groupId>org.sonatype.nexus.plugins</groupId>
+      <artifactId>nexus-blobstore-tasks</artifactId>
       <classifier>features</classifier>
       <type>xml</type>
     </dependency>
@@ -100,49 +103,7 @@
 
     <dependency>
       <groupId>org.sonatype.nexus.plugins</groupId>
-      <artifactId>nexus-script-plugin</artifactId>
-      <classifier>features</classifier>
-      <type>xml</type>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus.plugins</groupId>
-      <artifactId>nexus-task-log-cleanup</artifactId>
-      <classifier>features</classifier>
-      <type>xml</type>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus.plugins</groupId>
-      <artifactId>nexus-blobstore-s3</artifactId>
-      <classifier>features</classifier>
-      <type>xml</type>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus.plugins</groupId>
-      <artifactId>nexus-blobstore-tasks</artifactId>
-      <classifier>features</classifier>
-      <type>xml</type>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus.plugins</groupId>
-      <artifactId>nexus-onboarding-plugin</artifactId>
-      <classifier>features</classifier>
-      <type>xml</type>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus.plugins</groupId>
-      <artifactId>nexus-default-role-plugin</artifactId>
-      <classifier>features</classifier>
-      <type>xml</type>
-    </dependency>
-
-    <dependency>
-      <groupId>org.sonatype.nexus.plugins</groupId>
-      <artifactId>nexus-repository-apt</artifactId>
+      <artifactId>nexus-repository-maven</artifactId>
       <classifier>features</classifier>
       <type>xml</type>
     </dependency>
@@ -156,20 +117,23 @@
 
     <dependency>
       <groupId>org.sonatype.nexus.plugins</groupId>
-      <artifactId>nexus-repository-maven</artifactId>
+      <artifactId>nexus-restore-maven</artifactId>
       <classifier>features</classifier>
       <type>xml</type>
     </dependency>
 
-    <!-- make sure commons-compress and xz are installed at the same time -->
     <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-compress</artifactId>
+      <groupId>org.sonatype.nexus.plugins</groupId>
+      <artifactId>nexus-script-plugin</artifactId>
+      <classifier>features</classifier>
+      <type>xml</type>
     </dependency>
 
     <dependency>
-      <groupId>org.tukaani</groupId>
-      <artifactId>xz</artifactId>
+      <groupId>org.sonatype.nexus.plugins</groupId>
+      <artifactId>nexus-task-log-cleanup</artifactId>
+      <classifier>features</classifier>
+      <type>xml</type>
     </dependency>
 
   </dependencies>
@@ -180,7 +144,6 @@
         <groupId>org.apache.karaf.tooling</groupId>
         <artifactId>karaf-maven-plugin</artifactId>
         <configuration>
-          <enableGeneration>true</enableGeneration>
           <aggregateFeatures>true</aggregateFeatures>
         </configuration>
       </plugin>

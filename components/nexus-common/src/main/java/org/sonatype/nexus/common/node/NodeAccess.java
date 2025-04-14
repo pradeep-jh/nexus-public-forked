@@ -12,39 +12,41 @@
  */
 package org.sonatype.nexus.common.node;
 
+import java.security.cert.Certificate;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.Future;
 
 import org.sonatype.goodies.lifecycle.Lifecycle;
 
 /**
  * Provides access to node details.
- *
+ * 
  * @since 3.1
  */
 public interface NodeAccess
     extends Lifecycle
 {
   /**
-   * Returns the local-node identifier.
-   * <p/>
-   * ID is based on certificate fingerprint digest encoded with "-" every 8 characters for better human readability
-   * while
-   * remaining terse:
-   * <p/>
-   * 
-   * <pre>
-   * 05F4743F-A7565846-43FDF9D0-577BE4FB-079289C6
-   * </pre>
+   * Returns the local-node certificate.
    */
-  String getId();
+  Certificate getCertificate();
 
   /**
-   * Retrieve the cluster id, implementations may simply return the ID if they do not support it.
+   * Returns the local-node fingerprint.
+   *
+   * This is the SHA1 of the certificate.
    */
-  String getClusterId();
+  String getFingerprint();
+
+  /**
+   * Returns the local-node identifier.
+   * <p/>
+   * ID is based on certificate fingerprint digest encoded with "-" every 8 characters for better human readability while
+   * remaining terse:
+   * <p/>
+   * <pre>05F4743F-A7565846-43FDF9D0-577BE4FB-079289C6</pre>
+   */
+  String getId();
 
   /**
    * Returns true if the node is clustered.
@@ -55,6 +57,13 @@ public interface NodeAccess
    * Returns identifiers of clustered nodes.
    */
   Set<String> getMemberIds();
+
+  /**
+   * Is this a newly created node?
+   *
+   * @since 3.3
+   */
+  boolean isFreshNode();
 
   /**
    * Is this the oldest node in the cluster?
@@ -71,10 +80,4 @@ public interface NodeAccess
    * @since 3.6.1
    */
   Map<String, String> getMemberAliases();
-
-  /**
-   * Returns a {@link Future} which will eventually resolve to the hostname. While loading of this value is initiated
-   * during startup callers should use care when joining to avoid blocking.
-   */
-  CompletionStage<String> getHostName();
 }

@@ -26,8 +26,8 @@ import org.junit.Test;
 import org.mockito.Mock;
 
 import static org.junit.Assert.fail;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -71,12 +71,9 @@ public class MavenSecurityFacetTest
         .isPermitted(eq("MavenSecurityFacetTest"), eq(Maven2Format.NAME), eq(BreadActions.READ), any()))
         .thenReturn(true);
 
-    try {
-      mavenSecurityFacet.ensurePermitted(request);
-    }
-    catch (AuthorizationException e) {
-      fail("expected permitted operation to succeed");
-    }
+    mavenSecurityFacet.ensurePermitted(request);
+
+    //validation is no AuthorizationException is thrown
   }
 
   @Test

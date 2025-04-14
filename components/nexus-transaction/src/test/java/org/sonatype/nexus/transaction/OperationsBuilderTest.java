@@ -13,6 +13,7 @@
 package org.sonatype.nexus.transaction;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.InvocationTargetException;
@@ -25,6 +26,7 @@ import org.sonatype.goodies.testsupport.TestSupport;
 import org.junit.Test;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.arrayContainingInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.fail;
@@ -43,19 +45,17 @@ public class OperationsBuilderTest
     @Transactional(commitOn = IOException.class)
     void customCommitOn();
 
-    @Transactional(retryOn = {InvocationTargetException.class, IllegalStateException.class})
+    @Transactional(retryOn = { InvocationTargetException.class, IllegalStateException.class })
     void customRetryOn();
 
-    @Transactional(swallow = {RuntimeException.class, MalformedURLException.class})
+    @Transactional(swallow = { RuntimeException.class, MalformedURLException.class })
     void customSwallow();
 
-    @Transactional(commitOn = IllegalStateException.class, retryOn = RuntimeException.class,
-        swallow = IOException.class)
+    @Transactional(commitOn = IllegalStateException.class, retryOn = RuntimeException.class, swallow = IOException.class)
     void customValues();
 
     @Retention(RetentionPolicy.RUNTIME)
-    @Transactional(commitOn = IllegalStateException.class, retryOn = RuntimeException.class,
-        swallow = IOException.class)
+    @Transactional(commitOn = IllegalStateException.class, retryOn = RuntimeException.class, swallow = IOException.class)
     @interface Stereotype
     {
       // meta-annotated with @Transactional
@@ -154,9 +154,7 @@ public class OperationsBuilderTest
         sample("customSwallow"));
 
     assertBehaviour(
-        new Operations().commitOn(IllegalStateException.class)
-            .retryOn(RuntimeException.class)
-            .swallow(IOException.class).spec,
+        new Operations().commitOn(IllegalStateException.class).retryOn(RuntimeException.class).swallow(IOException.class).spec,
         sample("customValues"));
 
     assertBehaviour(
@@ -164,18 +162,13 @@ public class OperationsBuilderTest
         sample("customValues"));
   }
 
-  private static void assertBehaviour(final Transactional lhs, final Transactional rhs) {
+  private static void assertBehaviour(final Annotation lhs, final Annotation rhs) {
     assertThat(lhs.equals(null), is(rhs.equals(null)));
     assertThat(lhs.equals(Operations.DEFAULT_SPEC), is(rhs.equals(Operations.DEFAULT_SPEC)));
     assertThat(lhs.equals(rhs), is(rhs.equals(lhs)));
     assertThat(lhs.hashCode(), is(rhs.hashCode()));
-
-    assertThat(lhs.commitOn(), is(rhs.commitOn()));
-    assertThat(lhs.isolation(), is(rhs.isolation()));
-    assertThat(lhs.reason(), is(rhs.reason()));
-    assertThat(lhs.retryOn(), is(rhs.retryOn()));
-    assertThat(lhs.swallow(), is(rhs.swallow()));
-
+    // cope with random order of properties in the JDK's default annotation toString() implementation
+    assertThat(lhs.toString().split("[(), ]"), arrayContainingInAnyOrder(rhs.toString().split("[(), ]")));
     assertThat(lhs.annotationType(), is(equalTo(rhs.annotationType())));
   }
 

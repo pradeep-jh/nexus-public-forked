@@ -33,10 +33,9 @@ public class KeyStoreManagerImpl
   public static final String NAME = "ssl";
 
   @Inject
-  public KeyStoreManagerImpl(
-      final CryptoHelper crypto,
-      @Named(NAME) final KeyStoreStorageManager storageManager,
-      @Named(NAME) final KeyStoreManagerConfiguration config)
+  public KeyStoreManagerImpl(final CryptoHelper crypto,
+                             @Named(NAME) final KeyStoreStorageManager storageManager,
+                             @Named(NAME) final KeyStoreManagerConfiguration config)
   {
     super(crypto, storageManager, config);
   }

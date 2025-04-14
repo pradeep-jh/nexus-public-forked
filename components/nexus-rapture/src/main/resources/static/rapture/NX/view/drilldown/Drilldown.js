@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -34,17 +30,9 @@ Ext.define('NX.view.drilldown.Drilldown', {
   masters: null,
 
   // List of actions to use in the detail view
-  nxActions: null,
+  actions: null,
 
   items: [],
-
-  scrollable: 'vertical',
-
-  layout: {
-    type: 'vbox',
-    align: 'stretch',
-    pack: 'start'
-  },
 
   /**
    * @override
@@ -96,7 +84,7 @@ Ext.define('NX.view.drilldown.Drilldown', {
               },
 
               tabs: Ext.clone(me.tabs),
-              nxActions: Ext.isArray(me.nxActions) ? Ext.Array.clone(me.nxActions) : me.nxActions
+              actions: Ext.isArray(me.actions) ? Ext.Array.clone(me.actions) : me.actions
             }
         );
       }
@@ -111,17 +99,20 @@ Ext.define('NX.view.drilldown.Drilldown', {
     me.add({
       xtype: 'container',
 
-      itemId: 'drilldown-container',
-
-      height: '100%',
+      defaults: {
+        flex: 1
+      },
 
       layout: {
-        type: 'card',
-        animate: true
+        type: 'hbox',
+        align: 'stretch'
       },
 
       items: items
     });
+
+    // Add resize events
+    me.addEvents('syncsize');
   },
 
   /**
@@ -131,7 +122,7 @@ Ext.define('NX.view.drilldown.Drilldown', {
   createDrilldownItem: function(index, browsePanel, createPanel) {
     return {
       xtype: 'nx-drilldown-item',
-      itemClass: this.iconCls || NX.Icons.cls(this.iconName) + (index === 0 ? '-x32' : '-x16'),
+      itemClass: NX.Icons.cls(this.iconName) + (index === 0 ? '-x32' : '-x16'),
       items: [
         {
           xtype: 'container',

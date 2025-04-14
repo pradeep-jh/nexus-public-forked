@@ -38,11 +38,6 @@ public final class Strings2
    */
   public static final String MASK = "****";
 
-  /**
-   * Empty string
-   */
-  public static final String EMPTY = "";
-
   private Strings2() {
     // empty
   }
@@ -60,13 +55,6 @@ public final class Strings2
   public static boolean isBlank(@Nullable final String value) {
     // TODO: Consider using Character.isWhitespace() to determine blank-ness for commons-lang/plexus-utils impl parity
     return value == null || value.trim().length() == 0;
-  }
-
-  /**
-   * Returns {@code true} if given string is not null, or length is greater tan zero after {@link String#trim()}.
-   */
-  public static boolean notBlank(@Nullable final String value) {
-    return !isBlank(value);
   }
 
   /**

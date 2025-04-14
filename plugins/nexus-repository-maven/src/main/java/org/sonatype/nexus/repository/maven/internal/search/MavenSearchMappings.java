@@ -18,17 +18,10 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 import org.sonatype.goodies.common.ComponentSupport;
-import org.sonatype.nexus.repository.rest.SearchMapping;
-import org.sonatype.nexus.repository.rest.SearchMappings;
+import org.sonatype.nexus.repository.search.SearchMapping;
+import org.sonatype.nexus.repository.search.SearchMappings;
 
 import com.google.common.collect.ImmutableList;
-
-import static org.sonatype.nexus.repository.rest.sql.SearchField.FORMAT_FIELD_1;
-import static org.sonatype.nexus.repository.rest.sql.SearchField.FORMAT_FIELD_2;
-import static org.sonatype.nexus.repository.rest.sql.SearchField.FORMAT_FIELD_3;
-import static org.sonatype.nexus.repository.rest.sql.SearchField.FORMAT_FIELD_4;
-import static org.sonatype.nexus.repository.rest.sql.SearchField.NAME;
-import static org.sonatype.nexus.repository.rest.sql.SearchField.NAMESPACE;
 
 /**
  * @since 3.7
@@ -39,17 +32,13 @@ public class MavenSearchMappings
     extends ComponentSupport
     implements SearchMappings
 {
-  public static final String GAVEC = "gavec";
-
   private static final List<SearchMapping> MAPPINGS = ImmutableList.of(
-      new SearchMapping("maven.groupId", "attributes.maven2.groupId", "Maven groupId", NAMESPACE),
-      new SearchMapping("maven.artifactId", "attributes.maven2.artifactId", "Maven artifactId", NAME),
-      new SearchMapping("maven.baseVersion", "attributes.maven2.baseVersion", "Maven base version", FORMAT_FIELD_1),
-      new SearchMapping("maven.extension", "assets.attributes.maven2.extension", "Maven extension of component's asset",
-          FORMAT_FIELD_2),
-      new SearchMapping("maven.classifier", "assets.attributes.maven2.classifier",
-          "Maven classifier of component's asset", FORMAT_FIELD_3),
-      new SearchMapping(GAVEC, GAVEC, "Group asset version extension classifier", FORMAT_FIELD_4));
+      new SearchMapping("maven.groupId", "attributes.maven2.groupId", "Maven groupId"),
+      new SearchMapping("maven.artifactId", "attributes.maven2.artifactId", "Maven artifactId"),
+      new SearchMapping("maven.baseVersion", "attributes.maven2.baseVersion", "Maven base version"),
+      new SearchMapping("maven.extension", "assets.attributes.maven2.extension", "Maven extension of component's asset"),
+      new SearchMapping("maven.classifier", "assets.attributes.maven2.classifier", "Maven classifier of component's asset")
+  );
 
   @Override
   public Iterable<SearchMapping> get() {

@@ -18,6 +18,7 @@ import javax.annotation.Nonnull;
 import javax.script.Bindings;
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 /**
@@ -28,12 +29,33 @@ import javax.script.ScriptException;
 public interface ScriptService
 {
   /**
+   * Expose the underlying engine-manager.
+   */
+  ScriptEngineManager getEngineManager();
+
+  /**
    * Return engine for given language.
    *
-   * @throws IllegalStateException Missing engine
+   * @throws IllegalStateException  Missing engine
    */
   @Nonnull
   ScriptEngine engineForLanguage(String language);
+
+  /**
+   * Return engine for given extension.
+   *
+   * @throws IllegalStateException  Missing engine
+   */
+  @Nonnull
+  ScriptEngine engineForExtension(String extension);
+
+  /**
+   * Return engine for given mime-type.
+   *
+   * @throws IllegalStateException  Missing engine
+   */
+  @Nonnull
+  ScriptEngine engineForMimeType(String mimeType);
 
   /**
    * Apply default bindings.

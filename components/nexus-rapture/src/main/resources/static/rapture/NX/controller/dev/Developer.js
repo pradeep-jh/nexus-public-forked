@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -83,6 +79,9 @@ Ext.define('NX.controller.dev.Developer', {
         },
         'nx-dev-tests button[action=toggleUnsupportedBrowser]': {
           click: me.toggleUnsupportedBrowser
+        },
+        'nx-dev-tests button[action=showLicenseWarning]': {
+          click: me.showLicenseWarning
         },
         'nx-dev-tests button[action=showQuorumWarning]': {
           click: me.showQuorumWarning
@@ -189,11 +188,12 @@ Ext.define('NX.controller.dev.Developer', {
    * @private
    */
   testMessages: function () {
-    NX.Messages.success('Success');
-    NX.Messages.info( 'Test of a long info message. Lorem ipsum dolor sit amet, consectetur adipiscing elit, ' +
-        'sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.');
-    NX.Messages.warning('A warning test');
-    NX.Messages.error('Test of an error message');
+    Ext.each(['default', 'primary', 'danger', 'warning', 'success'], function (type) {
+      NX.Messages.add({
+        type: type,
+        text: 'test of ' + type
+      });
+    });
   },
 
   /**
@@ -203,6 +203,17 @@ Ext.define('NX.controller.dev.Developer', {
    */
   toggleUnsupportedBrowser: function() {
     NX.State.setBrowserSupported(!NX.State.isBrowserSupported());
+  },
+
+  /**
+   * Set state such that a License warning element is shown in the UI.
+   */
+  showLicenseWarning : function() {
+    var me = this,
+        licenseWarnings = me.getController('NX.proui.controller.LicenseWarnings');
+
+    licenseWarnings.daysToWarn = 10000;
+    licenseWarnings.updateLicenseExpiryWarning();
   },
 
   /**

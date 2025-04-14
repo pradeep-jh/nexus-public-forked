@@ -41,7 +41,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Swagger model component.
- *
+ * 
  * @since 3.3
  */
 @Named
@@ -56,9 +56,8 @@ public class SwaggerModel
   private final List<SwaggerContributor> contributors;
 
   @Inject
-  public SwaggerModel(
-      final ApplicationVersion applicationVersion,
-      final List<SwaggerContributor> contributors)
+  public SwaggerModel(final ApplicationVersion applicationVersion,
+                      final List<SwaggerContributor> contributors)
   {
     this.applicationVersion = checkNotNull(applicationVersion);
     this.contributors = checkNotNull(contributors);
@@ -92,10 +91,9 @@ public class SwaggerModel
     );
 
     @Override
-    public Model resolve(
-        final Type type,
-        final ModelConverterContext context,
-        final Iterator<ModelConverter> chain)
+    public Model resolve(final Type type,
+                         final ModelConverterContext context,
+                         final Iterator<ModelConverter> chain)
     {
       if (!BANNED_TYPE_NAMES.contains(type.getTypeName()) && chain.hasNext()) {
         return chain.next().resolve(type, context, chain);
@@ -104,11 +102,10 @@ public class SwaggerModel
     }
 
     @Override
-    public Property resolveProperty(
-        final Type type,
-        final ModelConverterContext context,
-        final Annotation[] annotations,
-        final Iterator<ModelConverter> chain)
+    public Property resolveProperty(final Type type,
+                                    final ModelConverterContext context,
+                                    final Annotation[] annotations,
+                                    final Iterator<ModelConverter> chain)
     {
       if (!BANNED_TYPE_NAMES.contains(type.getTypeName()) && chain.hasNext()) {
         return chain.next().resolveProperty(type, context, annotations, chain);

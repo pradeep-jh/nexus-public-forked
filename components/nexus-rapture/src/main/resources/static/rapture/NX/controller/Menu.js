@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -31,8 +27,7 @@ Ext.define('NX.controller.Menu', {
     'NX.Security',
     'NX.State',
     'NX.view.header.Mode',
-    'NX.I18n',
-    'Ext.state.Manager'
+    'NX.I18n'
   ],
 
   views: [
@@ -121,7 +116,7 @@ Ext.define('NX.controller.Menu', {
     me.listen({
       controller: {
         '#Permissions': {
-          changed: me.onPermissionsChange
+          changed: me.refreshMenu
         },
         '#State': {
           changed: me.onStateChange
@@ -139,10 +134,10 @@ Ext.define('NX.controller.Menu', {
       },
       component: {
         'nx-feature-menu': {
+          select: me.onSelection,
           itemclick: me.onItemClick,
           afterrender: me.onAfterRender,
-          beforecellclick: me.warnBeforeMenuSelect,
-          beforeselect: me.onBeforeSelect
+          beforecellclick: me.warnBeforeMenuSelect
         },
         'nx-main #quicksearch': {
           beforesearch: me.warnBeforeSearch
@@ -168,6 +163,16 @@ Ext.define('NX.controller.Menu', {
         }
       }
     });
+
+    me.addEvents(
+        /**
+         * Fires when a feature is selected.
+         *
+         * @event featureselected
+         * @param {NX.model.Feature} selected feature
+         */
+        'featureselected'
+    );
 
     // Warn people about refreshing or closing their browser when there are unsaved changes
     me.warnBeforeUnload();
@@ -204,38 +209,38 @@ Ext.define('NX.controller.Menu', {
     var me = this,
         selection = me.getFeatureMenu().getSelectionModel().getSelection();
 
-    if (!selection.length) {
-      me.getFeatureMenu().setSelection(me.getFeatureMenu().getStore().first());
-      selection = me.getFeatureMenu().getSelectionModel().getSelection();
-    }
-
     return NX.Bookmarks.fromToken(selection.length ? selection[0].get('bookmark') : me.mode);
   },
 
   /**
    * Select a feature when the associated menu item is clicked
    *
-   * @param panel - the panel that was clicked
-   * @param featureMenuModel - the model of the record that was clicked
-   * @param forceReselectOrHtmlElement - if generic event fired by ext, this will simply be the htmlElement
-   *        otherwise if fired by navigateTo function of this class (in case of browser url-tweaking or
-   *        back/forward buttons) will be a boolean stating to not force a reselect
+   * @private
+   */
+  onItemClick: function (panel, featureMenuModel) {
+    this.selectMenuItem(featureMenuModel, true);
+  },
+
+  /**
+   * Select a feature when the associated menu item is selected. This differs
+   * from onItemClick in that an already selected feature will not be reselected.
    *
    * @private
    */
-  onItemClick: function (panel, featureMenuModel, forceReselectOrHtmlElement) {
-    var me = this,
-        path = featureMenuModel.get('path'),
-        forceReselect = forceReselectOrHtmlElement,
-        pathIsChanging = path !== me.currentSelectedPath,
-        isGroup = featureMenuModel.get('group'),
-        externalLink = featureMenuModel.get('hrefTarget') === '_blank',
-        separator = featureMenuModel.get('separator');
+  onSelection: function (panel, featureMenuModel) {
+    this.selectMenuItem(featureMenuModel, false);
+  },
 
-    if (externalLink || separator) {
-      return;
-    }
-    else if (forceReselect || pathIsChanging || isGroup) {
+  /**
+   * (Re)select a feature
+   *
+   * @private
+   */
+  selectMenuItem: function (featureMenuModel, reselect) {
+    var me = this,
+      path = featureMenuModel.get('path');
+
+    if (reselect || path !== me.currentSelectedPath || featureMenuModel.get('group')) {
       me.currentSelectedPath = path;
 
       //<if debug>
@@ -245,17 +250,8 @@ Ext.define('NX.controller.Menu', {
       if (me.bookmarkingEnabled) {
         me.bookmark(featureMenuModel);
       }
-      me.selectFeature(me.getStore('Feature').getById(featureMenuModel.get('id')));
+      me.selectFeature(me.getStore('Feature').getById(featureMenuModel.get('path')));
       me.populateFeatureGroupStore(featureMenuModel);
-    }
-  },
-
-  onBeforeSelect: function(panel, featureMenuModel) {
-    var externalLink = featureMenuModel.get('hrefTarget') === '_blank',
-        separator = featureMenuModel.get('separator');
-
-    if (externalLink || separator) {
-      return false;
     }
   },
 
@@ -287,7 +283,7 @@ Ext.define('NX.controller.Menu', {
     // add all children of the record to the group store, but do not include the node for the current record
     record.eachChild(function (node) {
       node.cascadeBy(function (child) {
-        features.push(featureStore.getById(child.get('id')));
+        features.push(featureStore.getById(child.get('path')));
       });
     });
 
@@ -319,7 +315,6 @@ Ext.define('NX.controller.Menu', {
 
       mode = me.getMode(bookmark);
       // if we are navigating to a new mode, sync it
-
       if (me.mode !== mode) {
         me.mode = mode;
         me.refreshModes();
@@ -337,22 +332,16 @@ Ext.define('NX.controller.Menu', {
         node = me.getStore('FeatureMenu').getRootNode().firstChild;
 
         //<if debug>
-        if (node) {
-          me.logDebug('Automatically selected:', node.get('bookmark'));
-        }
-        else {
-          me.logDebug('No menu nodes available, none automatically selected');
-        }
+        me.logDebug('Automatically selected:', node.get('bookmark'));
         //</if>
       }
       // select the bookmarked feature in menu, if available
       if (node) {
         me.bookmarkingEnabled = me.navigateToFirstFeature;
-
-        me.getFeatureMenu().selectPath(node.getPath('text'), 'text', '/', function () {
+        me.navigateToFirstFeature = false;
+        me.getFeatureMenu().selectPath(node.getPath('text'), 'text', undefined, function () {
           me.bookmarkingEnabled = true;
         });
-        me.getFeatureMenu().fireEvent('itemclick', me.getFeatureMenu(), node, false);
       }
       else {
         delete me.currentSelectedPath;
@@ -396,12 +385,10 @@ Ext.define('NX.controller.Menu', {
         shouldRefresh = false;
 
     me.getStore('Feature').each(function (feature) {
-      var visible, previousVisible, featureId;
+      var visible, previousVisible;
       if (feature.get('mode') === me.mode) {
-        visible = Boolean(feature.get('visible')());
-        featureId = feature.getId();
-
-        previousVisible = Boolean(me.getStore('FeatureMenu').getNodeById(featureId));
+        visible = feature.get('visible')();
+        previousVisible = me.getStore('FeatureMenu').getRootNode().findChild('path', feature.get('path'), true) !== null;
         shouldRefresh = (visible !== previousVisible);
       }
       return !shouldRefresh;
@@ -439,12 +426,6 @@ Ext.define('NX.controller.Menu', {
     me.refreshVisibleModes();
     me.refreshTree();
     me.navigateTo(NX.Bookmarks.getBookmark());
-  },
-
-  onPermissionsChange: function () {
-    var me = this;
-    me.refreshMenu();
-    me.navigateToFirstFeature = false;
   },
 
   /**
@@ -529,7 +510,6 @@ Ext.define('NX.controller.Menu', {
     var me = this,
         menuTitle = me.mode,
         groupsToRemove = [],
-        nodeExpandMap = Ext.state.Manager.get("MenuExpandMap") || {},
         feature, segments, parent, child, mode;
 
     //<if debug>
@@ -574,27 +554,11 @@ Ext.define('NX.controller.Menu', {
             }
             else {
               // create the leaf
-              child = parent.appendChild({
+              child = parent.appendChild(Ext.apply(feature, {
                 leaf: true,
-                iconCls: feature.iconCls || NX.Icons.cls(feature.iconName, 'x16'),
-                qtip: feature.description,
-                authenticationRequired: feature.authenticationRequired,
-                bookmark: feature.bookmark,
-                expanded: nodeExpandMap[feature.path] === undefined ? feature.expanded : nodeExpandMap[feature.path],
-                helpKeyword: feature.helpKeyword,
-                iconName: feature.iconName,
-                id: feature.id,
-                mode: feature.mode,
-                path: feature.path,
-                text: feature.text + feature.textComplement,
-                view: feature.view,
-                weight: feature.weight,
-                grouped: feature.group
-              });
-
-              child.phantom = true;
-
-              me.addExpandCollapseHandlers(child, feature.path);
+                iconCls: NX.Icons.cls(feature.iconName, 'x16'),
+                qtip: feature.description
+              }));
             }
           }
           parent = child;
@@ -604,7 +568,7 @@ Ext.define('NX.controller.Menu', {
 
     // remove all groups without children
     me.getStore('FeatureMenu').getRootNode().cascadeBy(function (node) {
-      if (node.get('grouped') && !node.hasChildNodes()) {
+      if (node.get('group') && !node.hasChildNodes()) {
         groupsToRemove.push(node);
       }
     });
@@ -617,26 +581,7 @@ Ext.define('NX.controller.Menu', {
       { property: 'text', direction: 'ASC' }
     ]);
 
-    me.addExternalLinks();
-
     Ext.resumeLayouts(true);
-  },
-
-  /**
-   * @private
-   */
-  addExpandCollapseHandlers: function (node, path) {
-    node.on('expand', function(path) {
-      var nodeExpandMap = Ext.state.Manager.get("MenuExpandMap") || {};
-      nodeExpandMap[path] = true;
-      Ext.state.Manager.set("MenuExpandMap", nodeExpandMap);
-    }.bind(this, path));
-
-    node.on('collapse', function(path) {
-      var nodeExpandMap = Ext.state.Manager.get("MenuExpandMap") || {};
-      nodeExpandMap[path] = false;
-      Ext.state.Manager.set("MenuExpandMap", nodeExpandMap);
-    }.bind(this, path));
   },
 
   /**
@@ -644,7 +589,6 @@ Ext.define('NX.controller.Menu', {
    */
   createNotAvailableFeature: function (feature) {
     return this.getFeatureModel().create({
-      id: feature.get('id'),
       text: feature.get('text'),
       path: feature.get('path'),
       description: feature.get('description'),
@@ -757,18 +701,12 @@ Ext.define('NX.controller.Menu', {
    * @private
    */
   warnBeforeMenuSelect: function(tree, td, cellIndex, record) {
-    var me = this,
-    featurePath = record.data.path,
-    currentPath = me.currentSelectedPath;
+    var me = this;
 
     return me.warnBeforeNavigate(
       function () {
         me.getFeatureMenu().getSelectionModel().select(record);
         me.getFeatureMenu().fireEvent('itemclick', me.getFeatureMenu(), record);
-
-        if(featurePath === currentPath) {
-          me.fireEvent('refresh');
-        }
       }
     );
   },
@@ -802,11 +740,11 @@ Ext.define('NX.controller.Menu', {
    */
   warnBeforeSearch: function() {
     var me = this,
-      quickSearch = me.getHeaderPanel().down('nx-header-quicksearch');
+      button = me.getHeaderPanel().down('nx-header-quicksearch');
 
     return me.warnBeforeNavigate(
       function() {
-        quickSearch.triggerSearch();
+        button.fireEvent('search', button, button.getValue());
       }
     );
   },
@@ -900,7 +838,6 @@ Ext.define('NX.controller.Menu', {
 
         // Reset the unsaved changes flag
         content.resetUnsavedChangesFlag();
-        window.dirty = [];
       }
     });
   },
@@ -912,8 +849,7 @@ Ext.define('NX.controller.Menu', {
    */
   hasDirt: function() {
     var dirty = false,
-      forms = Ext.ComponentQuery.query('form[settingsForm=true]'),
-      reactDirty = window.dirty || [];
+      forms = Ext.ComponentQuery.query('form[settingsForm=true]');
 
     // Check for dirty content
     if (forms.length !== 0) {
@@ -925,7 +861,7 @@ Ext.define('NX.controller.Menu', {
       });
     }
 
-    return dirty || reactDirty.length > 0;
+    return dirty;
   },
 
   /**
@@ -941,32 +877,5 @@ Ext.define('NX.controller.Menu', {
         return NX.I18n.get('Menu_Browser_Title');
       }
     };
-  },
-
-  addExternalLinks: function() {
-    var rootNode = this.getStore('FeatureMenu').getRootNode(),
-        clmState = NX.State.getValue('clm'),
-        showDashboardUrl = clmState && clmState.enabled && clmState.url,
-        shouldShowDashboardLink = showDashboardUrl && clmState.showLink;
-
-    if (this.mode === 'browse' && shouldShowDashboardLink) {
-      rootNode.appendChild({
-        leaf: true,
-        separator: true,
-        cls: 'separator',
-        iconCls: ' ',
-        text: ' '
-      });
-      rootNode.appendChild({
-        leaf: true,
-        qtip: NX.I18n.get('Clm_Dashboard_Description'),
-        authenticationRequired: false,
-        mode: 'browse',
-        text: NX.I18n.get('Clm_Dashboard_Link_Text'),
-        href: showDashboardUrl,
-        hrefTarget: '_blank',
-        cls: 'iq-dashboard-link'
-      });
-    }
   }
 });

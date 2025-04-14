@@ -20,7 +20,6 @@ import javax.cache.CacheManager;
 import javax.inject.Inject;
 import javax.servlet.ServletContext;
 
-import org.sonatype.goodies.testsupport.TestSupport;
 import org.sonatype.goodies.testsupport.TestUtil;
 import org.sonatype.nexus.common.app.ApplicationDirectories;
 import org.sonatype.nexus.common.event.EventManager;
@@ -29,9 +28,7 @@ import org.sonatype.nexus.security.anonymous.AnonymousManager;
 import org.sonatype.nexus.security.config.PreconfiguredSecurityConfigurationSource;
 import org.sonatype.nexus.security.config.SecurityConfiguration;
 import org.sonatype.nexus.security.config.SecurityConfigurationSource;
-import org.sonatype.nexus.security.internal.AuthorizingRealmImpl;
 import org.sonatype.nexus.security.realm.RealmConfiguration;
-import org.sonatype.nexus.security.realm.TestRealmConfiguration;
 import org.sonatype.nexus.security.user.UserManager;
 import org.sonatype.nexus.testcommon.event.SimpleEventManager;
 
@@ -52,7 +49,6 @@ import org.junit.Before;
 import static org.mockito.Mockito.mock;
 
 public abstract class AbstractSecurityTest
-  extends TestSupport
 {
   protected final TestUtil util = new TestUtil(this);
 
@@ -85,23 +81,18 @@ public abstract class AbstractSecurityTest
         bind(SecurityConfigurationSource.class).annotatedWith(Names.named("default")).toInstance(
             new PreconfiguredSecurityConfigurationSource(initialSecurityConfiguration()));
 
-        RealmConfiguration realmConfiguration = new TestRealmConfiguration();
-        realmConfiguration.setRealmNames(
-            new ArrayList<>(Arrays.asList("MockRealmA", "MockRealmB", "MockRealmC", AuthorizingRealmImpl.NAME)));
+        RealmConfiguration realmConfiguration = new RealmConfiguration();
+        realmConfiguration.setRealmNames(Arrays.asList("MockRealmA", "MockRealmB"));
         bind(RealmConfiguration.class).annotatedWith(Names.named("initial")).toInstance(realmConfiguration);
 
         bind(ApplicationDirectories.class).toInstance(mock(ApplicationDirectories.class));
         bind(NodeAccess.class).toInstance(mock(NodeAccess.class));
         bind(AnonymousManager.class).toInstance(mock(AnonymousManager.class));
-        bind(EventManager.class).toInstance(getEventManager());
+        bind(EventManager.class).toInstance(new SimpleEventManager());
 
         requestInjection(AbstractSecurityTest.this);
       }
     });
-  }
-
-  protected EventManager getEventManager() {
-    return new SimpleEventManager();
   }
 
   protected <T> T lookup(Class<T> role) {

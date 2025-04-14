@@ -13,10 +13,9 @@
 package org.sonatype.nexus.extender;
 
 import java.util.Map;
+
 import javax.servlet.ServletContext;
 
-import org.sonatype.nexus.blobstore.metrics.BlobStoreModule;
-import org.sonatype.nexus.common.app.ApplicationVersion;
 import org.sonatype.nexus.common.app.ManagedLifecycleManager;
 import org.sonatype.nexus.common.guice.TimeTypeConverter;
 import org.sonatype.nexus.common.stateguard.StateGuardModule;
@@ -54,9 +53,8 @@ public class NexusContextModule
 
   private final Map<?, ?> nexusProperties;
 
-  public NexusContextModule(final BundleContext bundleContext,
-                            final ServletContext servletContext,
-                            final Map<?, ?> nexusProperties)
+  public NexusContextModule(final BundleContext bundleContext, final ServletContext servletContext,
+      final Map<?, ?> nexusProperties)
   {
     this.bundleContext = checkNotNull(bundleContext);
     this.servletContext = checkNotNull(servletContext);
@@ -69,14 +67,14 @@ public class NexusContextModule
     // we will look these up later...
     requireBinding(GuiceFilter.class);
     requireBinding(BeanManager.class);
-    requireBinding(ApplicationVersion.class);
+
+    bind(ManagedLifecycleManager.class).to(NexusLifecycleManager.class);
 
     bind(ServletContext.class).toInstance(servletContext);
     bind(ParameterKeys.PROPERTIES).toInstance(nexusProperties);
 
     install(new StateGuardModule());
     install(new TransactionModule());
-    install(new BlobStoreModule());
     install(new TimeTypeConverter());
     install(new WebSecurityModule(servletContext));
 
@@ -84,7 +82,5 @@ public class NexusContextModule
     final MutableBeanLocator locator = new DefaultBeanLocator();
     locator.add(new ServiceBindings(bundleContext, ALLOW_SERVICES, IGNORE_SERVICES, Integer.MIN_VALUE));
     bind(MutableBeanLocator.class).toInstance(locator);
-
-    bind(ManagedLifecycleManager.class).toInstance(new NexusLifecycleManager(locator, bundleContext.getBundle(0)));
   }
 }

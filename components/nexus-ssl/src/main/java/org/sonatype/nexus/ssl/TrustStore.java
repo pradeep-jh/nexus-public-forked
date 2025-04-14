@@ -16,8 +16,9 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.util.Collection;
 
-import javax.net.ssl.KeyManager;
 import javax.net.ssl.SSLContext;
+
+import org.sonatype.nexus.ssl.KeystoreException;
 
 /**
  * Nexus SSL TrustStore.
@@ -26,8 +27,6 @@ import javax.net.ssl.SSLContext;
  */
 public interface TrustStore
 {
-  public static final String KEY_STORE_ERROR_MESSAGE = "An error occurred accessing the trust store.";
-
   /**
    * Imports a clients public key that will be allowed to connect.
    *
@@ -83,11 +82,4 @@ public interface TrustStore
    * @since 3.0
    */
   SSLContext getSSLContext();
-
-  /**
-   * Get the {@link KeyManager}'s
-   *
-   * @since 3.20
-   */
-  KeyManager[] getKeyManagers();
 }

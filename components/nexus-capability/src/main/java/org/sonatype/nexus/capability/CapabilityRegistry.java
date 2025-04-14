@@ -17,8 +17,6 @@ import java.util.Map;
 
 import javax.annotation.Nullable;
 
-import org.sonatype.nexus.crypto.secrets.Secret;
-
 import com.google.common.base.Predicate;
 
 /**
@@ -37,17 +35,6 @@ public interface CapabilityRegistry
    * @return reference to created capability (never null)
    */
   CapabilityReference add(CapabilityType type,
-                          boolean enabled,
-                          @Nullable String notes,
-                          @Nullable Map<String, String> properties);
-
-  /**
-   * Creates a new capability that isn't exposed for user creation, this is ONLY intended for internal use, for
-   * automatically creating non-exposed capabilities programmatically.
-   *
-   * NOT TO BE TRIGGERED BY USER ACTIONS!
-   */
-  CapabilityReference addNonExposed(CapabilityType type,
                           boolean enabled,
                           @Nullable String notes,
                           @Nullable Map<String, String> properties);
@@ -75,14 +62,6 @@ public interface CapabilityRegistry
    * @throws CapabilityNotFoundException If capability with specified id does not exist
    */
   CapabilityReference remove(CapabilityIdentity id);
-
-  /**
-   * Deletes a capability that isn't exposed for user creation, this is ONLY intended for internal use, for
-   * automatically deleting non-exposed capabilities programmatically.
-   *
-   * NOT TO BE TRIGGERED BY USER ACTIONS!
-   */
-  CapabilityReference removeNonExposed(CapabilityIdentity id);
 
   /**
    * Enables a capability.
@@ -130,15 +109,4 @@ public interface CapabilityRegistry
    */
   Collection<? extends CapabilityReference> getAll();
 
-  /**
-   * Update cached 'references' using extracted capabilities data from DB
-   */
-  void pullAndRefreshReferencesFromDB();
-
-  /**
-   * Re-encrypt secrets of a given capability.
-   * @param capabilityReference capability reference
-   * @param shouldMigrate predicate to determine if a secret should be re-encrypted
-   */
-  void migrateSecrets(CapabilityReference capabilityReference, Predicate<Secret> shouldMigrate);
 }

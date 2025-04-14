@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
 import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.quartz.internal.QuartzSchedulerSPI;
 import org.sonatype.nexus.scheduling.Task;
-import org.sonatype.nexus.scheduling.TaskState;
+import org.sonatype.nexus.scheduling.TaskInfo.RunState;
 import org.sonatype.nexus.scheduling.schedule.Schedule;
 
 import com.google.common.base.Throwables;
@@ -34,8 +34,6 @@ import org.quartz.JobKey;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
-import static org.sonatype.nexus.scheduling.TaskState.RUNNING_CANCELED;
-import static org.sonatype.nexus.scheduling.TaskState.RUNNING_STARTING;
 
 /**
  * Quartz {@link Task} {@link Future}.
@@ -69,7 +67,7 @@ public class QuartzTaskFuture
 
   private volatile Thread jobExecutingThread;
 
-  private volatile TaskState runState;
+  private volatile RunState runState;
 
   private Exception exception;
 
@@ -89,7 +87,7 @@ public class QuartzTaskFuture
     this.startedBy = checkNotNull(startedBy);
     this.triggerSource = triggerSource;
     this.countDownLatch = new CountDownLatch(1);
-    this.runState = RUNNING_STARTING;
+    this.runState = RunState.STARTING;
   }
 
   // TODO: Sort out public access for non-overrides, may be better off as package-private
@@ -113,12 +111,12 @@ public class QuartzTaskFuture
     return startedBy;
   }
 
-  public TaskState getRunState() {
+  public RunState getRunState() {
     return runState;
   }
 
-  public void setRunState(final TaskState runState) {
-    checkState(runState.isRunning() && this.runState.ordinal() <= runState.ordinal(),
+  public void setRunState(final RunState runState) {
+    checkState(this.runState.ordinal() <= runState.ordinal(),
         "Illegal run state transition: %s -> %s", this.runState, runState);
 
     log.debug("Task {} : {} runState transition {} -> {}", jobKey.getName(), taskLogName, this.runState, runState);
@@ -143,7 +141,7 @@ public class QuartzTaskFuture
       canceled = true;
     }
 
-    if (canceled || runState == RUNNING_STARTING) {
+    if (canceled || runState == RunState.STARTING) {
       // if canceled, or task not even started yet
       doCancel();
     }
@@ -152,7 +150,7 @@ public class QuartzTaskFuture
   }
 
   public void doCancel() {
-    setRunState(RUNNING_CANCELED);
+    setRunState(RunState.CANCELED);
     setResult(null, new CancellationException("Task canceled"));
     if (log.isDebugEnabled()) {
       log.info("Task canceled {} : {}", jobKey.getName(), taskLogName);
@@ -164,7 +162,7 @@ public class QuartzTaskFuture
 
   @Override
   public boolean isCancelled() {
-    return runState == RUNNING_CANCELED;
+    return runState == RunState.CANCELED;
   }
 
   @Override

@@ -16,19 +16,16 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Properties;
 
-import org.sonatype.nexus.blobstore.CloudBlobPropertiesSupport;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static java.lang.String.format;
-import static org.sonatype.nexus.blobstore.api.BlobAttributesConstants.HEADER_PREFIX;
-import static org.sonatype.nexus.blobstore.api.BlobStore.TEMPORARY_BLOB_HEADER;
 
 /**
  * Persistent properties file stored in AWS S3.
@@ -36,7 +33,7 @@ import static org.sonatype.nexus.blobstore.api.BlobStore.TEMPORARY_BLOB_HEADER;
  * @since 3.6.1
  */
 public class S3PropertiesFile
-    extends CloudBlobPropertiesSupport<ObjectMetadata>
+    extends Properties
 {
   private static final Logger log = LoggerFactory.getLogger(S3PropertiesFile.class);
 
@@ -62,32 +59,16 @@ public class S3PropertiesFile
     }
   }
 
-  @Override
-  public ObjectMetadata getMetadata() {
-    ObjectMetadata metadata = new ObjectMetadata();
-    maybePutTempBlobUserMetadata(metadata);
-    return metadata;
-  }
+  public void store() throws IOException {
+    log.debug("Storing: {}/{}", bucket, key);
 
-  @Override
-  public ByteArrayOutputStream getData() throws IOException {
     ByteArrayOutputStream bufferStream = new ByteArrayOutputStream();
     store(bufferStream, null);
-    return bufferStream;
-  }
+    byte[] buffer = bufferStream.toByteArray();
 
-  @Override
-  protected void write(final ByteArrayOutputStream data, final ObjectMetadata metadata) {
-    log.debug("Storing: {}/{}", bucket, key);
-    byte[] buffer = data.toByteArray();
+    ObjectMetadata metadata = new ObjectMetadata();
     metadata.setContentLength(buffer.length);
     s3.putObject(bucket, key, new ByteArrayInputStream(buffer), metadata);
-  }
-
-  private void maybePutTempBlobUserMetadata(final ObjectMetadata metadata) {
-    if (containsKey(HEADER_PREFIX + TEMPORARY_BLOB_HEADER)) {
-      metadata.addUserMetadata(TEMPORARY_BLOB_HEADER, "true");
-    }
   }
 
   public boolean exists() throws IOException {
@@ -99,7 +80,10 @@ public class S3PropertiesFile
   }
 
   public String toString() {
-    return format("s3://%s/%s %s", bucket, key, super.toString());
+    return getClass().getSimpleName() + "{" +
+        "bucket=" + bucket +
+        ", key=" + key +
+        '}';
   }
 
   @Override
@@ -107,10 +91,10 @@ public class S3PropertiesFile
     if (object instanceof S3PropertiesFile) {
       S3PropertiesFile other = (S3PropertiesFile) object;
       return
-          s3.equals(other.s3) &&
-              bucket.equals(other.bucket) &&
-              key.equals(other.key) &&
-              super.equals(object);
+        s3.equals(other.s3) &&
+        bucket.equals(other.bucket) &&
+        key.equals(other.key) &&
+        super.equals(object);
     }
     else {
       return false;
@@ -120,9 +104,9 @@ public class S3PropertiesFile
   @Override
   public int hashCode() {
     return
-        s3.hashCode() +
-            bucket.hashCode() +
-            key.hashCode() +
-            super.hashCode();
+      s3.hashCode() +
+      bucket.hashCode() +
+      key.hashCode() +
+      super.hashCode();
   }
 }

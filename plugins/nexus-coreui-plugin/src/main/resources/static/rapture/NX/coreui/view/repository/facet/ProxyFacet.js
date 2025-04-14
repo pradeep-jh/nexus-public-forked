@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -38,7 +34,6 @@ Ext.define('NX.coreui.view.repository.facet.ProxyFacet', {
    */
   initComponent: function() {
     var me = this;
-    const isReplicationEnabled = NX.State.isReplicationEnabled() || false;
 
     me.items = [
       {
@@ -56,7 +51,7 @@ Ext.define('NX.coreui.view.repository.facet.ProxyFacet', {
             helpText: NX.I18n.get('Repository_Facet_ProxyFacet_Remote_HelpText'),
             emptyText: NX.I18n.get('Repository_Facet_ProxyFacet_Remote_EmptyText'),
             allowBlank: false,
-            useTrustStore: function(field) {
+            useTrustStore: function (field) {
               if (Ext.String.startsWith(field.getValue(), 'https://')) {
                 return {
                   name: 'attributes.httpclient.connection.useTrustStore',
@@ -65,42 +60,6 @@ Ext.define('NX.coreui.view.repository.facet.ProxyFacet', {
               }
               return undefined;
             }
-          },
-          {
-            xtype: 'checkbox',
-            name: 'attributes.replication.preemptivePullEnabled',
-            hidden: !isReplicationEnabled,
-            fieldLabel: NX.I18n.get('Repository_Facet_ProxyFacet_PreemptivePull_FieldLabel'),
-            helpText: NX.I18n.get('Repository_Facet_ProxyFacet_PreemptivePull_HelpText'),
-            value: false,
-            listeners: {
-              change: function(checkbox) {
-                const checked = checkbox.checked;
-                const assetInput = checkbox.up('form').down('#replicationAssetRegex');
-
-                if (assetInput) {
-                  if (!checked) {
-                    //set the value  of the asset path to null since pull replication is disabled
-                    assetInput.setValue(null);
-                  }
-                  assetInput.setDisabled(!checked);
-                }
-              }
-            }
-          },
-          {
-            xtype: 'textfield',
-            itemId: 'replicationAssetRegex',
-            cls: 'nx-no-border',
-            name: 'attributes.replication.assetPathRegex',
-            hidden: !isReplicationEnabled,
-            fieldLabel: NX.I18n.get('Repository_Facet_ProxyFacet_AssetNameMatcher_FieldLabel'),
-            helpText: NX.I18n.get('Repository_Facet_ProxyFacet_AssetNameMatcher_HelpText'),
-            emptyText: NX.I18n.get('Repository_Facet_ProxyFacet_AssetNameMatcher_EmptyText'),
-            invalidText: NX.I18n.get('Repository_Facet_ProxyFacet_AssetNameMatcher_InvalidText'),
-            allowBlank: true,
-            regex: new RegExp('[^-\\s]'),
-            disabled: true
           },
           {
             xtype: 'checkbox',

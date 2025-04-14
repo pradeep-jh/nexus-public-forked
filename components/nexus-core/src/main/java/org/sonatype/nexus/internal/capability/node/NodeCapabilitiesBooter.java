@@ -37,6 +37,7 @@ public class NodeCapabilitiesBooter
         IdentityCapabilityDescriptor.TYPE,
         true, // enabled
         null, // no notes
-        Collections.<String, String>emptyMap());
+        Collections.<String, String>emptyMap()
+    );
   }
 }

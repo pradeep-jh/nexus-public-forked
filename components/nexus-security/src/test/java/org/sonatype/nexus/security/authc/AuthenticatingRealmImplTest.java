@@ -20,26 +20,20 @@ import org.sonatype.nexus.security.AbstractSecurityTest;
 import org.sonatype.nexus.security.config.CPrivilege;
 import org.sonatype.nexus.security.config.CRole;
 import org.sonatype.nexus.security.config.CUser;
-import org.sonatype.nexus.security.config.memory.MemoryCPrivilege;
-import org.sonatype.nexus.security.config.memory.MemoryCUser;
 import org.sonatype.nexus.security.internal.AuthenticatingRealmImpl;
 import org.sonatype.nexus.security.internal.SecurityConfigurationManagerImpl;
 
 import com.google.common.hash.Hashing;
+import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.authc.AuthenticationInfo;
-import org.apache.shiro.authc.CredentialsException;
-import org.apache.shiro.authc.DisabledAccountException;
-import org.apache.shiro.authc.IncorrectCredentialsException;
-import org.apache.shiro.authc.UnknownAccountException;
 import org.apache.shiro.authc.UsernamePasswordToken;
 import org.apache.shiro.authc.credential.PasswordService;
 import org.apache.shiro.realm.Realm;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.fail;
 
 public class AuthenticatingRealmImplTest
     extends AbstractSecurityTest
@@ -51,9 +45,6 @@ public class AuthenticatingRealmImplTest
   private PasswordService passwordService;
 
   private CUser testUser;
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
 
   @Override
   protected void setUp() throws Exception {
@@ -81,8 +72,12 @@ public class AuthenticatingRealmImplTest
     String clearPassword = "default-password";
     String username = "testCreateWithPassowrdEmailUserId";
 
-    CUser user = user("testCreateWithPassowrdEmail@somewhere", "testCreateWithPassowrdEmail",
-        "testCreateWithPassowrdEmail", CUser.STATUS_ACTIVE, username, null);
+    CUser user = new CUser();
+    user.setEmail("testCreateWithPassowrdEmail@somewhere");
+    user.setFirstName("testCreateWithPassowrdEmail");
+    user.setLastName("testCreateWithPassowrdEmail");
+    user.setStatus(CUser.STATUS_ACTIVE);
+    user.setId(username);
 
     Set<String> roles = new HashSet<String>();
     roles.add("role");
@@ -102,8 +97,14 @@ public class AuthenticatingRealmImplTest
 
     UsernamePasswordToken upToken = new UsernamePasswordToken("username", "badpassword");
 
-    thrown.expect(IncorrectCredentialsException.class);
-    realm.getAuthenticationInfo(upToken);
+    try {
+      realm.getAuthenticationInfo(upToken);
+
+      fail("Authentication should have failed");
+    }
+    catch (AuthenticationException e) {
+      // good
+    }
   }
 
   @Test
@@ -111,18 +112,14 @@ public class AuthenticatingRealmImplTest
     buildTestAuthenticationConfig(CUser.STATUS_DISABLED);
     UsernamePasswordToken upToken = new UsernamePasswordToken("username", "password");
 
-    thrown.expect(DisabledAccountException.class);
-    realm.getAuthenticationInfo(upToken);
-  }
+    try {
+      realm.getAuthenticationInfo(upToken);
 
-  @Test
-  public void testGetAuthenticationInfo_userStatusChangePassword() throws Exception {
-    buildTestAuthenticationConfig(CUser.STATUS_CHANGE_PASSWORD);
-
-    UsernamePasswordToken upToken = new UsernamePasswordToken("username", "password");
-    AuthenticationInfo ai = realm.getAuthenticationInfo(upToken);
-    String password = new String((char[]) ai.getCredentials());
-    assertThat(this.passwordService.passwordsMatch("password", password), is(true));
+      fail("Authentication should have failed");
+    }
+    catch (AuthenticationException e) {
+      // good
+    }
   }
 
   @Test
@@ -140,30 +137,12 @@ public class AuthenticatingRealmImplTest
     assertThat(passwordService.passwordsMatch(password, updatedUser.getPassword()), is(true));
   }
 
-  @Test
-  public void testNoneExistentUser() throws Exception {
-    buildTestAuthenticationConfig(CUser.STATUS_ACTIVE);
-    UsernamePasswordToken upToken = new UsernamePasswordToken("non-existent-user", "password");
-
-    thrown.expect(UnknownAccountException.class);
-    realm.getAuthenticationInfo(upToken);
-  }
-
-  @Test
-  public void testEmptyPassword() throws Exception {
-    buildTestAuthenticationConfig(CUser.STATUS_ACTIVE);
-    UsernamePasswordToken upToken = new UsernamePasswordToken("username", (String) null);
-
-    thrown.expect(CredentialsException.class);
-    realm.getAuthenticationInfo(upToken);
-  }
-
-  private void buildTestAuthenticationConfig(final String status) throws Exception {
+  private void buildTestAuthenticationConfig(String status) throws Exception {
     buildTestAuthenticationConfig(status, this.hashPassword("password"));
   }
 
-  private void buildTestAuthenticationConfig(final String status, final String hash) throws Exception {
-    CPrivilege priv = new MemoryCPrivilege();
+  private void buildTestAuthenticationConfig(String status, String hash) throws Exception {
+    CPrivilege priv = new CPrivilege();
     priv.setId("priv");
     priv.setName("name");
     priv.setDescription("desc");
@@ -173,7 +152,7 @@ public class AuthenticatingRealmImplTest
 
     configurationManager.createPrivilege(priv);
 
-    CRole role = configurationManager.newRole();
+    CRole role = new CRole();
     role.setName("name");
     role.setId("role");
     role.setDescription("desc");
@@ -181,7 +160,13 @@ public class AuthenticatingRealmImplTest
 
     configurationManager.createRole(role);
 
-    testUser = user("dummyemail@somewhere", "dummyFirstName", "dummyLastName", status, "username", hash);
+    testUser = new CUser();
+    testUser.setEmail("dummyemail@somewhere");
+    testUser.setFirstName("dummyFirstName");
+    testUser.setLastName("dummyLastName");
+    testUser.setStatus(status);
+    testUser.setId("username");
+    testUser.setPassword(hash);
 
     Set<String> roles = new HashSet<String>();
     roles.add("role");
@@ -189,34 +174,15 @@ public class AuthenticatingRealmImplTest
     configurationManager.createUser(testUser, roles);
   }
 
-  private String hashPassword(final String password) {
+  private String hashPassword(String password) {
     return passwordService.encryptPassword(password);
   }
 
-  @SuppressWarnings("deprecation")
-  private String legacyHashPassword(final String password) {
+  private String legacyHashPassword(String password) {
     return Hashing.sha1().hashString(password, StandardCharsets.UTF_8).toString();
   }
 
-  private void buildLegacyTestAuthenticationConfig(final String password) throws Exception {
+  private void buildLegacyTestAuthenticationConfig(String password) throws Exception {
     buildTestAuthenticationConfig(CUser.STATUS_ACTIVE, legacyHashPassword(password));
-  }
-
-  private static CUser user(
-      final String email,
-      final String firstName,
-      final String lastName,
-      final String status,
-      final String id,
-      final String passwordHash)
-  {
-    CUser testUser = new MemoryCUser();
-    testUser.setEmail(email);
-    testUser.setFirstName(firstName);
-    testUser.setLastName(lastName);
-    testUser.setStatus(status);
-    testUser.setId(id);
-    testUser.setPassword(passwordHash);
-    return testUser;
   }
 }

@@ -17,7 +17,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 import org.sonatype.nexus.repository.Format;
-import org.sonatype.nexus.repository.search.index.IndexSettingsContributorSupport;
+import org.sonatype.nexus.repository.search.IndexSettingsContributorSupport;
 
 /**
  * Contributor to ES index settings for Maven 2 repositories.

@@ -19,8 +19,6 @@ import org.junit.Test;
 import org.junit.contrib.java.lang.system.ExpectedSystemExit;
 import org.junit.contrib.java.lang.system.RestoreSystemProperties;
 import org.junit.contrib.java.lang.system.SystemErrRule;
-import org.mockito.MockedConstruction;
-import org.mockito.Mockito;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.core.StringContains.containsString;
@@ -42,13 +40,11 @@ public class NexusMainTest
   @Rule
   public final SystemErrRule systemErrRule = new SystemErrRule().enableLog();
 
-  @SuppressWarnings("java:S2699") // sonar wants assertions, but none seem worthwhile here
   @Test
   public void doNotExitWhenGreaterVersion() throws Exception {
     requireMinimumJavaVersion();
   }
 
-  @SuppressWarnings("java:S2699") // sonar wants assertions, but none seem worthwhile here
   @Test
   public void doNotExitWhenExactVersion() throws Exception {
     setVersion(NexusMain.MINIMUM_JAVA_VERSION.toString());
@@ -63,13 +59,11 @@ public class NexusMainTest
     requireMinimumJavaVersion();
   }
 
-  @SuppressWarnings("java:S2699") // sonar wants assertions, but none seem worthwhile here
   @Test
   public void doNotExitWhenWrongVersionButCheckDisabled() throws Exception {
     runDisabledVmCheckWithVersion(LOWER);
   }
 
-  @SuppressWarnings("java:S2699") // sonar wants assertions, but none seem worthwhile here
   @Test
   public void doNotExitWhenVmCheckDisabledAndInvalidVersion() throws Exception {
     runDisabledVmCheckWithVersion(INVALID);
@@ -91,27 +85,6 @@ public class NexusMainTest
   public void logInvalidVersionErrorWhenVmCheckDisabledAndInvalidVersion() throws Exception {
     runDisabledVmCheckWithVersion(INVALID);
     assertThat(systemErrRule.getLog(), containsString("invalid version \"X.X-internal\": non-numeric \"X\""));
-  }
-
-  @Test
-  public void logExpectedExitWithNoOverriddenExitCode() throws Exception {
-    try (MockedConstruction<NexusMain> ignored =
-        Mockito.mockConstruction(NexusMain.class)) {
-      exit.expectSystemExitWithStatus(0);
-      NexusMain.main(new String[0]);
-    }
-  }
-
-  @Test
-  public void logExpectedExitWithOverriddenExitCode() throws Exception {
-    try (MockedConstruction<NexusMain> ignored =
-        Mockito.mockConstruction(NexusMain.class)) {
-      System.setProperty("nexus.overrideExitCode", "-42");
-      exit.expectSystemExitWithStatus(-42);
-      NexusMain.main(new String[0]);
-      assertThat(systemErrRule.getLog(), containsString("Exited with code: -42"));
-      assertThat(systemErrRule.getLog(), containsString("Please check the previous log messages"));
-    }
   }
 
   private void runDisabledVmCheckWithVersion(final String version) {

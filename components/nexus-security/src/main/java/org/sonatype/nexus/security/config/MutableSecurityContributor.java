@@ -47,14 +47,10 @@ public class MutableSecurityContributor
   @Nullable
   private EventManager eventManager;
 
-  @Nullable
-  private SecurityConfigurationManager configurationManager;
-
   @Inject
-  protected void initialize(final EventManager eventManager, final SecurityConfigurationManager configurationManager) {
+  protected void initialize(final EventManager eventManager) {
     checkState(!initialized, "already initialized");
     this.eventManager = Preconditions.checkNotNull(eventManager);
-    this.configurationManager = Preconditions.checkNotNull(configurationManager);
     initial(model);
     initialized = true;
   }
@@ -85,7 +81,7 @@ public class MutableSecurityContributor
    */
   public interface Mutator
   {
-    void apply(SecurityConfiguration model, SecurityConfigurationManager configurationManager);
+    void apply(SecurityConfiguration model);
   }
 
   public void apply(final Mutator mutator) {
@@ -94,21 +90,12 @@ public class MutableSecurityContributor
 
     Lock lock = Locks.write(readWriteLock);
     try {
-      mutator.apply(model, configurationManager);
+      mutator.apply(model);
     }
     finally {
       lock.unlock();
     }
 
     eventManager.post(new SecurityContributionChangedEvent());
-  }
-
-  /**
-   * @since 3.16
-   */
-  protected void maybeAddPrivilege(final SecurityConfiguration model, final CPrivilege privilege) {
-    if (model.getPrivilege(privilege.getId()) == null) {
-      model.addPrivilege(privilege);
-    }
   }
 }

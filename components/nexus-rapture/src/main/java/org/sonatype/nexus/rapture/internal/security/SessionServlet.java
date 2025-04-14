@@ -13,8 +13,7 @@
 package org.sonatype.nexus.rapture.internal.security;
 
 import java.io.IOException;
-import java.util.Optional;
-import javax.inject.Inject;
+
 import javax.inject.Named;
 import javax.inject.Singleton;
 import javax.servlet.ServletException;
@@ -22,21 +21,13 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.sonatype.nexus.common.app.FeatureFlag;
-import org.sonatype.nexus.common.event.EventManager;
-import org.sonatype.nexus.security.authc.LoginEvent;
-import org.sonatype.nexus.security.authc.LogoutEvent;
-
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.subject.Subject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.net.HttpHeaders.X_FRAME_OPTIONS;
 import static javax.servlet.http.HttpServletResponse.SC_NO_CONTENT;
-import static org.sonatype.nexus.common.app.FeatureFlags.SESSION_ENABLED;
-import static org.sonatype.nexus.servlet.XFrameOptions.DENY;
 
 /**
  * Session servlet, to expose end-point for configuration of Shiro authentication filter to
@@ -48,18 +39,11 @@ import static org.sonatype.nexus.servlet.XFrameOptions.DENY;
  */
 @Named
 @Singleton
-@FeatureFlag(name = SESSION_ENABLED)
 public class SessionServlet
   extends HttpServlet
 {
   private static final Logger log = LoggerFactory.getLogger(SessionServlet.class);
 
-  private final EventManager eventManager;
-
-  @Inject
-  public SessionServlet(final EventManager eventManager) {
-    this.eventManager = eventManager;
-  }
   /**
    * Create session.
    */
@@ -69,17 +53,12 @@ public class SessionServlet
   {
     Subject subject = SecurityUtils.getSubject();
     log.info("Created session for user: {}", subject.getPrincipal());
-    Optional<String> realmName = subject.getPrincipals().getRealmNames().stream().findFirst();
-    realmName.ifPresent(realm -> eventManager.post(new LoginEvent(subject.getPrincipal().toString(), realm)));
 
     // sanity check
     checkState(subject.isAuthenticated());
     checkState(subject.getSession(false) != null);
 
     response.setStatus(SC_NO_CONTENT);
-
-    // Silence warnings about "clickjacking" (even though it doesn't actually apply to API calls)
-    response.setHeader(X_FRAME_OPTIONS, DENY);
   }
 
   /**
@@ -91,8 +70,6 @@ public class SessionServlet
   {
     Subject subject = SecurityUtils.getSubject();
     log.info("Deleting session for user: {}", subject.getPrincipal());
-    Optional<String> realmName = subject.getPrincipals().getRealmNames().stream().findFirst();
-    realmName.ifPresent(realm -> eventManager.post(new LogoutEvent(subject.getPrincipal().toString(), realm)));
     subject.logout();
 
     // sanity check
@@ -101,8 +78,5 @@ public class SessionServlet
     checkState(subject.getSession(false) == null);
 
     response.setStatus(SC_NO_CONTENT);
-
-    // Silence warnings about "clickjacking" (even though it doesn't actually apply to API calls)
-    response.setHeader(X_FRAME_OPTIONS, DENY);
   }
 }

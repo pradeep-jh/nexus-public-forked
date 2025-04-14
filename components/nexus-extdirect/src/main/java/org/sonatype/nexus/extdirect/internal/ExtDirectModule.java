@@ -12,18 +12,21 @@
  */
 package org.sonatype.nexus.extdirect.internal;
 
+import java.util.Map;
+
 import javax.inject.Named;
 
-import org.sonatype.nexus.common.app.FeatureFlag;
 import org.sonatype.nexus.security.FilterChainModule;
 import org.sonatype.nexus.security.SecurityFilter;
 import org.sonatype.nexus.security.anonymous.AnonymousFilter;
-import org.sonatype.nexus.security.authc.AntiCsrfFilter;
 import org.sonatype.nexus.security.authc.NexusAuthenticationFilter;
 
+import com.google.common.collect.Maps;
 import com.google.inject.AbstractModule;
-
-import static org.sonatype.nexus.common.app.FeatureFlags.SESSION_ENABLED;
+import com.google.inject.servlet.ServletModule;
+import com.softwarementors.extjs.djn.servlet.DirectJNgineServlet.GlobalParameters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Ext.Direct Guice module.
@@ -31,17 +34,29 @@ import static org.sonatype.nexus.common.app.FeatureFlags.SESSION_ENABLED;
  * @since 3.0
  */
 @Named
-@FeatureFlag(name = SESSION_ENABLED)
 public class ExtDirectModule
     extends AbstractModule
 {
-  protected static final String MOUNT_POINT = "/service/extdirect";
+  private static final Logger log = LoggerFactory.getLogger(ExtDirectModule.class);
+
+  private static final String MOUNT_POINT = "/service/extdirect";
 
   @Override
   protected void configure() {
-    install(new ExtDirectServletModule(MOUNT_POINT) {
+    install(new ServletModule()
+    {
       @Override
-      protected void bindSecurityFilter() {
+      protected void configureServlets() {
+        Map<String, String> config = Maps.newHashMap();
+        config.put(GlobalParameters.PROVIDERS_URL, MOUNT_POINT.substring(1));
+        config.put("minify", Boolean.FALSE.toString());
+        config.put(GlobalParameters.DEBUG, Boolean.toString(log.isDebugEnabled()));
+        config.put(GlobalParameters.JSON_REQUEST_PROCESSOR_THREAD_CLASS,
+            ExtDirectJsonRequestProcessorThread.class.getName());
+        config.put(GlobalParameters.GSON_BUILDER_CONFIGURATOR_CLASS,
+            ExtDirectGsonBuilderConfigurator.class.getName());
+
+        serve(MOUNT_POINT + "*").with(ExtDirectServlet.class, config);
         filter(MOUNT_POINT + "*").through(SecurityFilter.class);
       }
     });
@@ -50,10 +65,7 @@ public class ExtDirectModule
     {
       @Override
       protected void configure() {
-        addFilterChain(MOUNT_POINT + "/**",
-            NexusAuthenticationFilter.NAME,
-            AnonymousFilter.NAME,
-            AntiCsrfFilter.NAME);
+        addFilterChain(MOUNT_POINT + "/**", NexusAuthenticationFilter.NAME, AnonymousFilter.NAME);
       }
     });
   }

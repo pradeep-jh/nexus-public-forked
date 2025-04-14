@@ -20,7 +20,6 @@ import org.sonatype.goodies.common.ComponentSupport;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -34,7 +33,7 @@ public class TransitionsInterceptor
 {
   @Override
   public Object invoke(final MethodInvocation invocation) throws Throwable {
-    checkNotNull(invocation);
+    assert invocation != null;
 
     Object target = invocation.getThis();
     Method method = invocation.getMethod();
@@ -46,8 +45,7 @@ public class TransitionsInterceptor
 
     Transitions config = method.getAnnotation(Transitions.class);
     checkState(config != null);
-    Transition transition =
-        states.transition(config.to(), config.silent(), config.ignore(), config.requiresWriteLock());
+    Transition transition = states.transition(config.to(), config.silent(), config.ignore());
     if (config.from() != null && config.from().length != 0) {
       transition = transition.from(config.from());
     }

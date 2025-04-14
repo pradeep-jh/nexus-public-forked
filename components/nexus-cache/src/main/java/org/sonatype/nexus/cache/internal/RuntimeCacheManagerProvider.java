@@ -19,6 +19,7 @@ import javax.cache.CacheManager;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
+import javax.inject.Singleton;
 
 import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.common.node.NodeAccess;
@@ -36,7 +37,7 @@ import static com.google.common.base.Preconditions.checkState;
  * @since 3.0
  */
 @Named("default")
-// not a singleton because we want to provide a new manager when bouncing services
+@Singleton
 public class RuntimeCacheManagerProvider
     extends ComponentSupport
     implements Provider<CacheManager>
@@ -46,21 +47,15 @@ public class RuntimeCacheManagerProvider
   private final String name;
 
   @Inject
-  public RuntimeCacheManagerProvider(
-      final Map<String, Provider<CacheManager>> providers,
-      @Nullable @Named("${nexus.cache.provider}") final String customName,
-      @Named("${nexus.orient.enabled:-false}") final boolean orient,
-      final NodeAccess nodeAccess)
+  public RuntimeCacheManagerProvider(final Map<String, Provider<CacheManager>> providers,
+                                     @Nullable @Named("${nexus.cache.provider}") final String customName,
+                                     final NodeAccess nodeAccess)
   {
     this.providers = checkNotNull(providers);
-    this.name = customName != null ? customName : getCustomName(orient, nodeAccess);
+    this.name = customName != null ? customName : (nodeAccess.isClustered() ? "hazelcast" : "ehcache");
     checkArgument(!"default".equals(name));
     log.info("Cache-provider: {}", name);
     checkState(providers.containsKey(name), "Missing cache-provider: %s", name);
-  }
-
-  private String getCustomName(@Named("nexus.orient.enabled") final boolean orient, final NodeAccess nodeAccess) {
-    return orient && nodeAccess.isClustered() ? "hazelcast" : "ehcache";
   }
 
   @Override
@@ -68,7 +63,7 @@ public class RuntimeCacheManagerProvider
     Provider<CacheManager> provider = providers.get(name);
     checkState(provider != null, "Cache-provider vanished: %s", name);
     CacheManager manager = provider.get();
-    log.debug("Constructed cache-provider: {} -> {}", name, manager);
+    log.debug("Constructed cache-manager: {} -> {}", name, manager);
     return manager;
   }
 }

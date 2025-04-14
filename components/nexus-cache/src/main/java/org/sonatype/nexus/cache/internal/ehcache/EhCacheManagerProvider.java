@@ -16,24 +16,23 @@ import java.io.File;
 import java.net.URI;
 
 import javax.annotation.Nullable;
+import javax.annotation.PreDestroy;
 import javax.cache.CacheManager;
 import javax.cache.Caching;
 import javax.cache.spi.CachingProvider;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
+import javax.inject.Singleton;
 
-import org.sonatype.goodies.lifecycle.LifecycleSupport;
+import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.common.app.ApplicationDirectories;
-import org.sonatype.nexus.common.app.BindAsLifecycleSupport;
-import org.sonatype.nexus.common.app.ManagedLifecycle;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.ehcache.jsr107.EhcacheCachingProvider;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
-import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.STORAGE;
 
 /**
  * EhCache JCache {@link CacheManager} provider.
@@ -43,41 +42,40 @@ import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.STORAGE;
  * @since 3.0
  */
 @Named("ehcache")
-@ManagedLifecycle(phase = STORAGE)
-// not a singleton because we want to provide a new manager when bouncing services
+@Singleton
 public class EhCacheManagerProvider
-    extends LifecycleSupport
+    extends ComponentSupport
     implements Provider<CacheManager>
 {
   private static final String CONFIG_FILE = "ehcache.xml";
 
-  private final URI configUri;
-
-  // provide same manager instance until bounced
   private volatile CacheManager cacheManager;
 
   @Inject
   public EhCacheManagerProvider(final ApplicationDirectories directories) {
     checkNotNull(directories);
+
+    URI uri = null;
     File file = new File(directories.getConfigDirectory("fabric"), CONFIG_FILE);
     if (file.exists()) {
-      configUri = file.toURI();
+      uri = file.toURI();
     }
     else {
       log.warn("Missing configuration: {}", file.getAbsolutePath());
-      configUri = null;
     }
+    this.cacheManager = create(uri);
   }
 
   @VisibleForTesting
   public EhCacheManagerProvider(@Nullable final URI uri) {
-    this.configUri = uri;
+    this.cacheManager = create(uri);
   }
 
   private CacheManager create(@Nullable final URI config) {
     CachingProvider provider = Caching.getCachingProvider(
         EhcacheCachingProvider.class.getName(),
-        EhcacheCachingProvider.class.getClassLoader());
+        EhcacheCachingProvider.class.getClassLoader()
+    );
 
     log.info("Creating cache-manager with configuration: {}", config);
     CacheManager manager = provider.getCacheManager(config, getClass().getClassLoader());
@@ -86,31 +84,17 @@ public class EhCacheManagerProvider
   }
 
   @Override
-  public synchronized CacheManager get() {
-    checkState(!isStopped(), "Cache-manager destroyed");
-    if (cacheManager == null) {
-      this.cacheManager = create(configUri);
-    }
+  public CacheManager get() {
+    checkState(cacheManager != null, "Cache-manager destroyed");
     return cacheManager;
   }
 
-  @Override
-  protected void doStop() {
+  @PreDestroy
+  public void destroy() {
     if (cacheManager != null) {
       cacheManager.close();
       log.info("Cache-manager closed");
       cacheManager = null;
     }
-  }
-
-  /**
-   * Provider implementations are not automatically exposed under additional interfaces.
-   * This small module is a workaround to expose this provider as a (managed) lifecycle.
-   */
-  @Named
-  private static class BindAsLifecycle
-      extends BindAsLifecycleSupport<EhCacheManagerProvider>
-  {
-    // empty
   }
 }

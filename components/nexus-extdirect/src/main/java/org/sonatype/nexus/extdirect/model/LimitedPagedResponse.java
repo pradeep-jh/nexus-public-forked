@@ -26,17 +26,10 @@ public class LimitedPagedResponse<T>
 
   private boolean limited;
 
-  private boolean timedOut;
-
   public LimitedPagedResponse(long limit, long total, Collection<T> data) {
     super(Math.min(limit, total), data);
     this.unlimitedTotal = total;
     this.limited = total != getTotal();
-  }
-
-  public LimitedPagedResponse(long limit, long total, Collection<T> data, boolean timedOut) {
-    this(limit, total, data);
-    this.timedOut = timedOut;
   }
 
   public long getUnlimitedTotal() {
@@ -45,9 +38,5 @@ public class LimitedPagedResponse<T>
 
   public boolean isLimited() {
     return limited;
-  }
-
-  public boolean isTimedOut() {
-    return timedOut;
   }
 }

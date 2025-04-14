@@ -19,7 +19,6 @@ import org.sonatype.nexus.security.AbstractSecurityTest;
 import org.sonatype.nexus.security.config.CPrivilege;
 import org.sonatype.nexus.security.config.CRole;
 import org.sonatype.nexus.security.config.CUser;
-import org.sonatype.nexus.security.config.memory.MemoryCUser;
 import org.sonatype.nexus.security.internal.AuthorizingRealmImpl;
 import org.sonatype.nexus.security.internal.SecurityConfigurationManagerImpl;
 import org.sonatype.nexus.security.privilege.WildcardPrivilegeDescriptor;
@@ -84,7 +83,7 @@ public class AuthorizingRealmImplTest
     CPrivilege priv = WildcardPrivilegeDescriptor.privilege("app:config:read");
     configurationManager.createPrivilege(priv);
 
-    CRole role = configurationManager.newRole();
+    CRole role = new CRole();
     role.setId("role");
     role.setName("somerole");
     role.setDescription("somedescription");
@@ -92,7 +91,7 @@ public class AuthorizingRealmImplTest
 
     configurationManager.createRole(role);
 
-    CUser user = new MemoryCUser();
+    CUser user = new CUser();
     user.setEmail("dummyemail@foo");
     user.setFirstName("dummyFirstName");
     user.setLastName("dummyLastName");

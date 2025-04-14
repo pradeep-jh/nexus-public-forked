@@ -14,7 +14,6 @@ package org.sonatype.nexus.jmx.internal;
 
 import java.lang.annotation.Annotation;
 import java.util.Hashtable;
-import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -25,10 +24,12 @@ import javax.management.ObjectName;
 import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.jmx.MBean;
 import org.sonatype.nexus.jmx.ObjectNameEntry;
+import org.sonatype.nexus.jmx.SuppliedMBeanAttribute;
 import org.sonatype.nexus.jmx.reflect.ManagedObject;
 import org.sonatype.nexus.jmx.reflect.ReflectionMBeanBuilder;
 
 import com.google.common.base.Strings;
+import com.google.common.base.Supplier;
 import com.google.inject.Key;
 import org.eclipse.sisu.BeanEntry;
 import org.eclipse.sisu.EagerSingleton;
@@ -194,7 +195,7 @@ public class ManagedObjectRegistrar
     ReflectionMBeanBuilder builder = new ReflectionMBeanBuilder(type);
 
     // attach manged target
-    builder.target(new Supplier<Object>()
+    builder.target(new Supplier()
     {
       @Override
       public Object get() {
@@ -211,6 +212,33 @@ public class ManagedObjectRegistrar
 
     // discover managed members
     builder.discover();
+
+    // expose additional information we have about the bean
+    builder.attribute(new SuppliedMBeanAttribute.Builder()
+            .name("sisu.key")
+            .description("Sisu bean-key")
+            .value(entry.getKey().toString())
+            .build()
+    );
+    builder.attribute(new SuppliedMBeanAttribute.Builder()
+            .name("sisu.rank")
+            .description("Sisu bean-rank")
+            .value(entry.getRank())
+            .build()
+    );
+    builder.attribute(new SuppliedMBeanAttribute.Builder()
+            .name("sisu.source")
+            .description("Sisu bean-source")
+            .value(entry.getSource().toString())
+            .build()
+    );
+    builder.attribute(new SuppliedMBeanAttribute.Builder()
+            .name("sisu.description")
+            .description("Sisu bean-description")
+            .type(String.class)
+            .value(entry.getDescription())
+            .build()
+    );
 
     return builder.build();
   }

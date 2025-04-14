@@ -12,8 +12,6 @@
  */
 package org.sonatype.nexus.security.authz;
 
-import java.util.Set;
-
 import org.sonatype.nexus.security.privilege.NoSuchPrivilegeException;
 import org.sonatype.nexus.security.privilege.Privilege;
 import org.sonatype.nexus.security.role.NoSuchRoleException;
@@ -46,17 +44,7 @@ public abstract class AbstractReadOnlyAuthorizationManager
   }
 
   @Override
-  public Set<Role> searchRoles(final String query) {
-    return listRoles();
-  }
-
-  @Override
   public void deletePrivilege(final String privilegeId) throws NoSuchPrivilegeException {
-    throw unsupported();
-  }
-
-  @Override
-  public void deletePrivilegeByName(final String privilegeName) throws NoSuchPrivilegeException {
     throw unsupported();
   }
 
@@ -70,10 +58,6 @@ public abstract class AbstractReadOnlyAuthorizationManager
     throw unsupported();
   }
 
-  @Override
-  public Privilege updatePrivilegeByName(final Privilege privilege) throws NoSuchPrivilegeException {
-    return null;
-  }
   @Override
   public Role updateRole(final Role role) throws NoSuchRoleException {
     throw unsupported();

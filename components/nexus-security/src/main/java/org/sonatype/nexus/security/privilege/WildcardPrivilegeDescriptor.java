@@ -24,13 +24,9 @@ import org.sonatype.nexus.formfields.StringTextFormField;
 import org.sonatype.nexus.security.authz.WildcardPermission2;
 import org.sonatype.nexus.security.config.CPrivilege;
 import org.sonatype.nexus.security.config.CPrivilegeBuilder;
-import org.sonatype.nexus.security.privilege.rest.ApiPrivilegeWildcard;
-import org.sonatype.nexus.security.privilege.rest.ApiPrivilegeWildcardRequest;
 
 import com.google.common.collect.ImmutableList;
 import org.apache.shiro.authz.Permission;
-
-import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
  * Wildcard {@link PrivilegeDescriptor}.
@@ -41,7 +37,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 @Named(WildcardPrivilegeDescriptor.TYPE)
 @Singleton
 public class WildcardPrivilegeDescriptor
-    extends PrivilegeDescriptorSupport<ApiPrivilegeWildcard, ApiPrivilegeWildcardRequest>
+    extends PrivilegeDescriptorSupport
 {
   public static final String TYPE = "wildcard";
 
@@ -53,10 +49,10 @@ public class WildcardPrivilegeDescriptor
     @DefaultMessage("Wildcard")
     String name();
 
-    @DefaultMessage("Privilege String")
+    @DefaultMessage("Pattern")
     String pattern();
 
-    @DefaultMessage("The internal segment matching algorithm uses Apache Shiro wildcard permissions")
+    @DefaultMessage("The regex pattern")
     String patternHelp();
   }
 
@@ -78,7 +74,7 @@ public class WildcardPrivilegeDescriptor
 
   @Override
   public Permission createPermission(final CPrivilege privilege) {
-    checkNotNull(privilege);
+    assert privilege != null;
     String pattern = readProperty(privilege, P_PATTERN);
     return new WildcardPermission2(pattern);
   }
@@ -107,15 +103,5 @@ public class WildcardPrivilegeDescriptor
         .id(id(pattern))
         .property(P_PATTERN, pattern)
         .create();
-  }
-
-  @Override
-  public ApiPrivilegeWildcard createApiPrivilegeImpl(final Privilege privilege) {
-    return new ApiPrivilegeWildcard(privilege);
-  }
-
-  @Override
-  public void validate(final ApiPrivilegeWildcardRequest apiPrivilege) {
-    //not validating anything in particular here
   }
 }

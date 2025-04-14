@@ -12,13 +12,17 @@
  */
 package org.sonatype.nexus.bootstrap.osgi;
 
+import java.io.File;
 import java.util.EnumSet;
-import java.util.LinkedHashSet;
-import java.util.Properties;
-import java.util.Set;
+import java.util.Map;
+
+import javax.annotation.Nullable;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
+
+import org.sonatype.nexus.bootstrap.ConfigurationHolder;
+import org.sonatype.nexus.bootstrap.internal.DirectoryHelper;
 
 import org.apache.karaf.features.Feature;
 import org.apache.karaf.features.FeaturesService;
@@ -30,18 +34,20 @@ import org.osgi.util.tracker.ServiceTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.prefs.Preferences.userRoot;
 import static org.apache.karaf.features.FeaturesService.Option.NoAutoRefreshBundles;
 import static org.apache.karaf.features.FeaturesService.Option.NoAutoRefreshManagedBundles;
 
 /**
  * {@link ServletContextListener} that bootstraps an OSGi-based application.
- *
+ * 
  * @since 3.0
  */
 public class BootstrapListener
     implements ServletContextListener
 {
+
+  private static final String NEXUS_LOAD_AS_OSS_PROP_NAME = "nexus.loadAsOSS";
 
   private static final Logger log = LoggerFactory.getLogger(BootstrapListener.class);
 
@@ -49,16 +55,32 @@ public class BootstrapListener
 
   private FilterTracker filterTracker;
 
-  private final NexusEditionPropertiesConfigurer propertiesConfigurer = new NexusEditionPropertiesConfigurer();
-
   @Override
   public void contextInitialized(final ServletContextEvent event) {
     log.info("Initializing");
+
     ServletContext servletContext = event.getServletContext();
+    
     try {
-      Properties properties = propertiesConfigurer.getPropertiesFromConfiguration();
+      Map<String, String> properties = ConfigurationHolder.get();
+      if (properties == null) {
+        throw new IllegalStateException("Missing bootstrap configuration properties");
+      }
+
+      // Ensure required properties exist
+      requireProperty(properties, "karaf.base");
+      requireProperty(properties, "karaf.data");
+
+      if (shouldSwitchToOss()) {
+        adjustEditionProperties(properties);  
+      }
+
       // pass bootstrap properties to embedded servlet listener
       servletContext.setAttribute("nexus.properties", properties);
+
+      File workDir = new File(properties.get("karaf.data")).getCanonicalFile();
+      DirectoryHelper.mkdir(workDir.toPath());
+
       // are we already running in OSGi or should we embed OSGi?
       Bundle containingBundle = FrameworkUtil.getBundle(getClass());
       BundleContext bundleContext;
@@ -69,8 +91,10 @@ public class BootstrapListener
         // when we support running in embedded mode this is where it'll go
         throw new UnsupportedOperationException("Missing OSGi container");
       }
+
       // bootstrap our chosen Nexus edition
-      installNexusEdition(bundleContext, properties);
+      requireProperty(properties, "nexus-edition");
+      installNexusEdition(bundleContext, properties.get("nexus-edition"));
 
       // watch out for the real Nexus listener
       listenerTracker = new ListenerTracker(bundleContext, "nexus", servletContext);
@@ -91,43 +115,63 @@ public class BootstrapListener
     log.info("Initialized");
   }
 
-  private static void installNexusEdition(final BundleContext ctx, final Properties properties) throws Exception {
-    String editionName = properties.getProperty(NexusEditionPropertiesConfigurer.NEXUS_EDITION);
-    if (editionName != null && !editionName.isEmpty()) {
+  /**
+   * Ensure that the oss edition is loaded, regardless of what the configuration specifies.
+   * @param properties
+   */
+  private void adjustEditionProperties(final Map<String, String> properties) {
+    log.info("Loading OSS Edition");
+    //override to load nexus-oss-edition
+    properties.put("nexus-edition", "nexus-oss-edition");
+    properties
+        .put("nexus-features", properties.get("nexus-features").replace("nexus-pro-feature", "nexus-oss-feature"));
+  }
+
+  /**
+   * Determine whether or not we should be booting the OSS edition or not, based on the presence of a license or
+   * a System property that can be used to override the behaviour.
+   */
+  private static boolean shouldSwitchToOss() {
+    if (null != System.getProperty(NEXUS_LOAD_AS_OSS_PROP_NAME)) {
+      return Boolean.valueOf(System.getProperty(NEXUS_LOAD_AS_OSS_PROP_NAME));
+    }
+    if (Boolean.getBoolean("nexus.clustered")) {
+      return false; // avoid switching the edition when clustered
+    }
+    return System.getProperty("nexus.licenseFile") == null
+        && userRoot().node("/com/sonatype/nexus/professional").get("license", null) == null;
+  }
+
+  private static void installNexusEdition(final BundleContext ctx, @Nullable final String editionName)
+      throws Exception
+  {
+    if (editionName != null && editionName.length() > 0) {
       final ServiceTracker<?, FeaturesService> tracker = new ServiceTracker<>(ctx, FeaturesService.class, null);
       tracker.open();
       try {
         FeaturesService featuresService = tracker.waitForService(1000);
         Feature editionFeature = featuresService.getFeature(editionName);
-        checkNotNull(editionFeature, "Unable to find feature " + editionName);
-        properties.put(NexusEditionPropertiesConfigurer.NEXUS_FULL_EDITION, editionFeature.toString());
 
-        String dbFeatureName = properties.getProperty(NexusEditionPropertiesConfigurer.NEXUS_DB_FEATURE);
-        Feature dbFeature = featuresService.getFeature(dbFeatureName);
-        checkNotNull(editionFeature, "Unable to find feature " + dbFeatureName);
-
-        log.info("Installing: {} ({})", editionFeature, dbFeature);
-
-        Set<String> featureIds = new LinkedHashSet<>();
-        if (!featuresService.isInstalled(editionFeature)) {
-          featureIds.add(editionFeature.getId());
-        }
-        if (!featuresService.isInstalled(dbFeature)) {
-          featureIds.add(dbFeature.getId());
-        }
+        log.info("Installing: {}", editionFeature);
 
         // edition might already be installed in the cache; if so then skip installation
-        if (!featureIds.isEmpty()) {
+        if (!featuresService.isInstalled(editionFeature)) {
           // avoid auto-refreshing bundles as that could trigger unwanted restart/lifecycle events
           EnumSet<Option> options = EnumSet.of(NoAutoRefreshBundles, NoAutoRefreshManagedBundles);
-          featuresService.installFeatures(featureIds, options);
+          featuresService.installFeature(editionFeature.getId(), options);
         }
 
-        log.info("Installed: {} ({})", editionFeature, dbFeature);
+        log.info("Installed: {}", editionFeature);
       }
       finally {
         tracker.close();
       }
+    }
+  }
+
+  private static void requireProperty(final Map<String, String> properties, final String name) {
+    if (!properties.containsKey(name)) {
+      throw new IllegalStateException("Missing required property: " + name);
     }
   }
 

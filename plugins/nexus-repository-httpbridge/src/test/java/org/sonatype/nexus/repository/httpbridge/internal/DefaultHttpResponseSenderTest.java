@@ -40,6 +40,8 @@ import org.mockito.Spy;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.fail;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -120,6 +122,7 @@ public class DefaultHttpResponseSenderTest
     order.verify(payload).getContentType();
     order.verify(payload, atLeastOnce()).getSize();
     order.verify(payload).openInputStream();
+    order.verify(input, atLeastOnce()).read(any(byte[].class));
     order.verify(input).close();
     order.verify(payload).close();
 
@@ -130,7 +133,7 @@ public class DefaultHttpResponseSenderTest
   public void payloadClosedAfterError() throws Exception {
     when(request.getAction()).thenReturn(HttpMethods.GET);
 
-    doThrow(new IOException("Dropped")).when(payload).copy(input, output);
+    doThrow(new IOException("Dropped")).when(output).write(any(byte[].class), anyInt(), anyInt());
 
     try {
       underTest.send(request, HttpResponses.ok(payload), httpServletResponse);
@@ -145,6 +148,7 @@ public class DefaultHttpResponseSenderTest
     order.verify(payload).getContentType();
     order.verify(payload, atLeastOnce()).getSize();
     order.verify(payload).openInputStream();
+    order.verify(input, atLeastOnce()).read(any(byte[].class));
     order.verify(input).close();
     order.verify(payload).close();
 

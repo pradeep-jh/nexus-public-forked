@@ -12,21 +12,25 @@
  */
 package org.sonatype.nexus.selector;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import org.apache.commons.jexl3.JexlContext;
+import org.sonatype.nexus.common.text.Strings2;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static java.lang.Boolean.TRUE;
+import org.apache.commons.jexl3.JexlBuilder;
+import org.apache.commons.jexl3.JexlContext;
+import org.apache.commons.jexl3.JexlEngine;
+import org.apache.commons.jexl3.JexlException;
+import org.apache.commons.jexl3.JexlExpression;
+import org.apache.commons.jexl3.JexlInfo;
+import org.apache.commons.jexl3.MapContext;
+
+import static com.google.common.base.Strings.isNullOrEmpty;
 
 /**
  * {@link Selector} implementation that uses JEXL to evaluate expressions describing the selection criteria.
  *
  * @see <a href="http://commons.apache.org/proper/commons-jexl/">Commons Jexl</a>
- *
  * @since 3.0
  */
 public class JexlSelector
@@ -34,56 +38,66 @@ public class JexlSelector
 {
   public static final String TYPE = "jexl";
 
-  protected final JexlExpression expression;
+  // this stops JEXL from using expensive new Throwable().getStackTrace() to find caller info
+  private static final JexlInfo CALLER_INFO = new JexlInfo(JexlSelector.class.getName(), 0, 0);
 
-  public JexlSelector(final JexlExpression expression) {
-    this.expression = checkNotNull(expression);
+  private static final JexlBuilder jexlBuilder = new JexlBuilder();
+
+  // provide a JEXL engine per-thread to avoid contention on the parsing lock
+  private static final ThreadLocal<JexlEngine> threadLocalJexl = new ThreadLocal<JexlEngine>()
+  {
+    @Override
+    protected JexlEngine initialValue() {
+      return jexlBuilder.create();
+    }
+  };
+
+  private final Optional<JexlExpression> expression;
+
+  public JexlSelector(final String expression) {
+    this.expression = isNullOrEmpty(expression) ? Optional.<JexlExpression>empty()
+        : Optional.of(threadLocalJexl.get().createExpression(CALLER_INFO, expression));
   }
 
   @Override
-  public boolean evaluate(final VariableSource source) {
-    return TRUE.equals(expression.evaluate(asJexlContext(source)));
+  public boolean evaluate(final VariableSource variableSource) {
+    if (expression.isPresent()) {
+      Set<String> vars = variableSource.getVariableSet();
+      JexlContext jc = new MapContext();
+
+      // load the values, if present, into the context
+      vars.forEach(variable -> variableSource.get(variable).ifPresent(value -> jc.set(variable, value)));
+
+      Object o = expression.get().evaluate(jc);
+
+      return (o instanceof Boolean) ? (Boolean) o : false;
+    }
+    else {
+      return true;
+    }
   }
 
-  @Override
-  public void toSql(final SelectorSqlBuilder sqlBuilder) {
-    throw new UnsupportedOperationException();
+  public String getSourceText() {
+    return expression.map(JexlExpression::getSourceText).orElse("");
   }
 
-  @Override
-  public <T> void toSql(final T sqlBuilder, final CselToSql<T> cselToSql) {
-    throw new UnsupportedOperationException();
+  public static String prettyExceptionMsg(JexlException e) {
+    JexlInfo info = e.getInfo();
+    if (info != null) {
+      String detail = e.getMessage();
+      if (!Strings2.isBlank(detail) && detail.indexOf('\'') > -1) {
+        detail = e.getMessage().substring(detail.indexOf('\'') + 1, detail.lastIndexOf('\''));
+      }
+      String parseMsg = detail.isEmpty() ? detail : String.format(" Error parsing string: '%s'.", detail);
+      return String.format("Invalid JEXL at line '%s' column '%s'.%s", info.getLine(), info.getColumn(), parseMsg);
+    }
+    else {
+      return e.getMessage();
+    }
   }
 
   @Override
   public String toString() {
-    return expression.getParsedText();
-  }
-
-  /**
-   * Wraps the given {@link VariableSource} so it can be used as a lazy {@link JexlContext}.
-   */
-  private static JexlContext asJexlContext(final VariableSource source) {
-    return new JexlContext()
-    {
-      private final Set<String> names = source.getVariableSet();
-
-      private final Map<String, Optional<?>> values = new HashMap<>(names.size());
-
-      @Override
-      public boolean has(final String name) {
-        return names.contains(name);
-      }
-
-      @Override
-      public Object get(final String name) {
-        return values.computeIfAbsent(name, source::get).orElse(null);
-      }
-
-      @Override
-      public void set(final String name, final Object value) {
-        throw new UnsupportedOperationException();
-      }
-    };
+    return expression.isPresent() ? expression.get().getParsedText() : "";
   }
 }

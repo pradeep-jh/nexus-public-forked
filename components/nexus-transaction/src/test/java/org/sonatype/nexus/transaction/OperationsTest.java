@@ -22,16 +22,15 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.InOrder;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
-import static org.sonatype.nexus.transaction.Transactional.DEFAULT_REASON;
 
 /**
  * Test operations behaviour.
@@ -40,18 +39,14 @@ import static org.sonatype.nexus.transaction.Transactional.DEFAULT_REASON;
 public class OperationsTest
     extends TestSupport
 {
-  ExampleMethods methods = new ExampleMethods(new ExampleMethods.ExampleNestedStore());
-
-  @Mock
-  TransactionalSession<Transaction> session;
+  ExampleMethods methods = new ExampleMethods();
 
   @Mock
   Transaction tx;
 
   @Before
   public void setUp() {
-    when(session.getTransaction()).thenReturn(tx);
-    UnitOfWork.begin(Suppliers.ofInstance(session));
+    UnitOfWork.begin(Suppliers.ofInstance(tx));
   }
 
   @After
@@ -64,14 +59,11 @@ public class OperationsTest
 
     Transactional.operation.call(() -> methods.nonTransactional());
 
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    InOrder order = inOrder(tx);
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
+    order.verify(tx).close();
+    verifyNoMoreInteractions(tx);
   }
 
   @Test
@@ -84,9 +76,7 @@ public class OperationsTest
         .throwing(IOException.class)
         .call(() -> methods.retryOnCheckedException());
 
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    InOrder order = inOrder(tx);
     order.verify(tx).begin();
     order.verify(tx).rollback();
     order.verify(tx).allowRetry(any(IOException.class));
@@ -98,9 +88,8 @@ public class OperationsTest
     order.verify(tx).allowRetry(any(IOException.class));
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
+    order.verify(tx).close();
+    verifyNoMoreInteractions(tx);
   }
 
   @Test(expected = IOException.class)
@@ -115,18 +104,15 @@ public class OperationsTest
           .call(() -> methods.retryOnCheckedException());
     }
     finally {
-      InOrder order = inOrder(session, tx);
-      order.verify(session).getTransaction();
-      order.verify(tx).reason(DEFAULT_REASON);
+      InOrder order = inOrder(tx);
       order.verify(tx).begin();
       order.verify(tx).rollback();
       order.verify(tx).allowRetry(any(IOException.class));
       order.verify(tx).begin();
       order.verify(tx).rollback();
       order.verify(tx).allowRetry(any(IOException.class));
-      order.verify(tx).end();
-      order.verify(session).close();
-      verifyNoMoreInteractions(session, tx);
+      order.verify(tx).close();
+      verifyNoMoreInteractions(tx);
     }
   }
 
@@ -140,9 +126,7 @@ public class OperationsTest
         .throwing(IOException.class)
         .call(() -> methods.retryOnCheckedException());
 
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    InOrder order = inOrder(tx);
     order.verify(tx).begin();
     order.verify(tx).rollback();
     order.verify(tx).allowRetry(any(IOException.class));
@@ -154,18 +138,17 @@ public class OperationsTest
     order.verify(tx).allowRetry(any(IOException.class));
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
+    order.verify(tx).close();
+    verifyNoMoreInteractions(tx);
   }
 
   @Test
   public void testBatchModeDoesntLeakOutsideScope() {
     final Transaction[] txHolder = new Transaction[2];
 
-    UnitOfWork.begin(() -> newMockSession());
+    UnitOfWork.begin(() -> Mockito.mock(Transaction.class));
     try {
-      UnitOfWork.beginBatch(() -> newMockSession());
+      UnitOfWork.beginBatch(() -> Mockito.mock(Transaction.class));
       try {
         Transactional.operation.run(() -> txHolder[0] = UnitOfWork.currentTx());
         Transactional.operation.run(() -> txHolder[1] = UnitOfWork.currentTx());
@@ -186,11 +169,5 @@ public class OperationsTest
     finally {
       UnitOfWork.end(); // ends outer-non-batch-work
     }
-  }
-
-  private TransactionalSession<Transaction> newMockSession() {
-    TransactionalSession<Transaction> session = mock(TransactionalSession.class);
-    when(session.getTransaction()).thenReturn(mock(Transaction.class));
-    return session;
   }
 }

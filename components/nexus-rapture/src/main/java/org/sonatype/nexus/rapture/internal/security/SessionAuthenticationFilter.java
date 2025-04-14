@@ -19,7 +19,6 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.sonatype.nexus.common.app.FeatureFlag;
 import org.sonatype.nexus.common.text.Strings2;
 
 import org.apache.shiro.authc.AuthenticationException;
@@ -30,8 +29,6 @@ import org.apache.shiro.web.util.WebUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.sonatype.nexus.common.app.FeatureFlags.SESSION_ENABLED;
-
 /**
  * Session authentication filter for {@link SessionServlet}.
  *
@@ -41,7 +38,6 @@ import static org.sonatype.nexus.common.app.FeatureFlags.SESSION_ENABLED;
  */
 @Named
 @Singleton
-@FeatureFlag(name = SESSION_ENABLED)
 public class SessionAuthenticationFilter
     extends AuthenticatingFilter
 {

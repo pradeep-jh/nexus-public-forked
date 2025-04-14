@@ -21,15 +21,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
+import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 
-import org.sonatype.goodies.lifecycle.LifecycleSupport;
+import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.common.app.ApplicationDirectories;
-import org.sonatype.nexus.common.app.BindAsLifecycleSupport;
-import org.sonatype.nexus.common.app.ManagedLifecycle;
 import org.sonatype.nexus.common.node.NodeAccess;
 import org.sonatype.nexus.common.thread.TcclBlock;
 import org.sonatype.nexus.elasticsearch.PluginLocator;
@@ -49,8 +48,6 @@ import org.elasticsearch.plugins.PluginManager.OutputMode;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static org.elasticsearch.node.NodeBuilder.nodeBuilder;
-import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.STORAGE;
-import static org.sonatype.nexus.common.app.ManagedLifecycleManager.isShuttingDown;
 
 /**
  * ElasticSearch {@link Node} provider.
@@ -58,16 +55,15 @@ import static org.sonatype.nexus.common.app.ManagedLifecycleManager.isShuttingDo
  * @since 3.0
  */
 @Named
-@ManagedLifecycle(phase = STORAGE)
 @Singleton
 public class NodeProvider
-    extends LifecycleSupport
+    extends ComponentSupport
     implements Provider<Node>
 {
   private final ApplicationDirectories directories;
 
   private final NodeAccess nodeAccess;
-
+  
   private final List<String> plugins;
 
   private final List<PluginLocator> pluginLocators;
@@ -75,11 +71,10 @@ public class NodeProvider
   private Node node;
 
   @Inject
-  public NodeProvider(
-      final ApplicationDirectories directories,
-      final NodeAccess nodeAccess,
-      @Nullable @Named("${nexus.elasticsearch.plugins}") final String plugins,
-      @Nullable final List<PluginLocator> pluginLocators)
+  public NodeProvider(final ApplicationDirectories directories,
+                      final NodeAccess nodeAccess,
+                      @Nullable @Named("${nexus.elasticsearch.plugins}") final String plugins,
+                      @Nullable final List<PluginLocator> pluginLocators)
   {
     this.directories = checkNotNull(directories);
     this.nodeAccess = checkNotNull(nodeAccess);
@@ -143,10 +138,9 @@ public class NodeProvider
     return pluginLocators.stream().map(PluginLocator::pluginClass).collect(Collectors.toList());
   }
 
-  @Override
-  protected void doStop() {
-    // elasticsearch cannot be restarted, so avoid shutting it down when bouncing the service
-    if (node != null && isShuttingDown()) {
+  @PreDestroy
+  public synchronized void shutdown() {
+    if (node != null) {
       log.debug("Shutting down");
       try {
         node.close();
@@ -155,16 +149,5 @@ public class NodeProvider
         node = null;
       }
     }
-  }
-
-  /**
-   * Provider implementations are not automatically exposed under additional interfaces.
-   * This small module is a workaround to expose this provider as a (managed) lifecycle.
-   */
-  @Named
-  private static class BindAsLifecycle
-      extends BindAsLifecycleSupport<NodeProvider>
-  {
-    // empty
   }
 }

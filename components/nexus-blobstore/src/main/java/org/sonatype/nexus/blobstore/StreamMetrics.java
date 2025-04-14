@@ -12,8 +12,7 @@
  */
 package org.sonatype.nexus.blobstore;
 
-public class StreamMetrics
-{
+public class StreamMetrics {
   private final long size;
 
   private final String sha1;

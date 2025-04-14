@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -65,9 +61,7 @@ Ext.define('NX.coreui.controller.Capabilities', {
     { ref: 'statusPanel', selector: 'nx-coreui-capability-status' },
     { ref: 'aboutPanel', selector: 'nx-coreui-capability-about' },
     { ref: 'notesPanel', selector: '#nx-coreui-capability-notes-subsection' },
-    { ref: 'settingsPanel', selector: 'nx-coreui-capability-settings-form' },
-    { ref: 'enableButton', selector: 'nx-coreui-capability-feature button[action=enable]'},
-    { ref: 'disableButton', selector: 'nx-coreui-capability-feature button[action=disable]'}
+    { ref: 'settingsPanel', selector: 'nx-coreui-capability-settings-form' }
   ],
   icons: {
     'capability-default': {
@@ -136,10 +130,12 @@ Ext.define('NX.coreui.controller.Capabilities', {
           click: me.showSelectTypePanel
         },
         'nx-coreui-capability-feature button[action=enable]': {
-          runaction: me.enableCapability
+          runaction: me.enableCapability,
+          afterrender: me.bindEnableButton
         },
         'nx-coreui-capability-feature button[action=disable]': {
-          runaction: me.disableCapability
+          runaction: me.disableCapability,
+          afterrender: me.bindDisableButton
         },
         'nx-coreui-capability-settings button[action=save]': {
           click: me.updateCapability
@@ -178,66 +174,17 @@ Ext.define('NX.coreui.controller.Capabilities', {
    */
   onSelection: function(list, model) {
     var me = this,
-        capabilityTypeStore = me.getStore('CapabilityType'),
-        listener,
         capabilityTypeModel;
 
     if (Ext.isDefined(model)) {
-      if (capabilityTypeStore.isLoaded()) {
-        capabilityTypeModel = capabilityTypeStore.getById(model.get('typeId'));
+      capabilityTypeModel = me.getStore('CapabilityType').getById(model.get('typeId'));
 
-        me.eventuallyShowWarning(model);
-        me.showSummary(model);
-        me.showSettings(model);
-        me.showStatus(model);
-        me.showAbout(capabilityTypeModel);
-      }
-      else {
-        capabilityTypeStore.on('load', function() {
-          me.onSelection(list, model);
-        }, this, {single: true});
-      }
+      me.eventuallyShowWarning(model);
+      me.showSummary(model);
+      me.showSettings(model);
+      me.showStatus(model);
+      me.showAbout(capabilityTypeModel);
     }
-  },
-
-  /**
-   * @override
-   */
-  onDelete: function () {
-    var me = this,
-        bookmark = NX.Bookmarks.getBookmark(),
-        selection = me.getSelection(),
-        description, model, modelId, deleteWarningMessage;
-
-    if (Ext.isDefined(selection) && selection.length > 0) {
-      modelId = decodeURIComponent(bookmark.getSegment(1));
-      model = me.getList().getStore().getById(modelId);
-      deleteWarningMessage = model.get('deleteWarningMessage');
-
-      if (deleteWarningMessage) {
-        NX.Dialogs.askConfirmation('Confirm deletion?', deleteWarningMessage, function() {
-          me.doDelete(selection);
-        });
-      } else {
-        // standard confirmation
-        description = me.getDescription(selection[0]);
-        NX.Dialogs.askConfirmation('Confirm deletion?', Ext.htmlEncode(description), function () {
-          me.doDelete(selection);
-        });
-      }
-    }
-  },
-
-  /**
-   * @private
-   */
-  doDelete: function(selection) {
-    var me = this;
-
-    me.deleteModel(selection[0]);
-
-    // Reset the bookmark
-    NX.Bookmarks.bookmark(NX.Bookmarks.fromToken(NX.Bookmarks.getBookmark().getSegment(0)));
   },
 
   /**
@@ -265,9 +212,9 @@ Ext.define('NX.coreui.controller.Capabilities', {
     var summary = this.getSummaryTab(),
         info = {};
 
-    info[NX.I18n.get('Capabilities_TypeName_Text')] = Ext.htmlEncode(model.get('typeName'));
-    info[NX.I18n.get('Capabilities_Description_Text')] = Ext.htmlEncode(model.get('description'));
-    info[NX.I18n.get('Capabilities_State_Text')] = Ext.htmlEncode(Ext.String.capitalize(model.get('state')));
+    info[NX.I18n.get('Capabilities_TypeName_Text')] = model.get('typeName');
+    info[NX.I18n.get('Capabilities_Description_Text')] = model.get('description');
+    info[NX.I18n.get('Capabilities_State_Text')] = Ext.String.capitalize(model.get('state'));
 
     if (Ext.isDefined(model.get('tags'))) {
       Ext.apply(info, model.get('tags'));
@@ -284,10 +231,6 @@ Ext.define('NX.coreui.controller.Capabilities', {
    */
   showSettings: function(model) {
     this.getSettingsTab().loadRecord(model);
-    if (NX.Permissions.check('nexus:capabilities:update')) {
-      this.getEnableButton().setDisabled(model.get('enabled'));
-      this.getDisableButton().setDisabled(!model.get('enabled'));
-    }
   },
 
   /**
@@ -316,7 +259,7 @@ Ext.define('NX.coreui.controller.Capabilities', {
 
     // Show the first panel in the create wizard, and set the breadcrumb
     me.setItemName(1, NX.I18n.get('Capabilities_Select_Title'));
-    me.loadCreateWizard(1, Ext.widget({
+    me.loadCreateWizard(1, true, Ext.widget({
       xtype: 'panel',
       layout: {
         type: 'vbox',
@@ -341,7 +284,7 @@ Ext.define('NX.coreui.controller.Capabilities', {
 
     // Show the first panel in the create wizard, and set the breadcrumb
     me.setItemName(2, NX.I18n.format('Capabilities_Create_Title', model.get('name')));
-    me.loadCreateWizard(2, panel = Ext.create('widget.nx-coreui-capability-add'));
+    me.loadCreateWizard(2, true, panel = Ext.create('widget.nx-coreui-capability-add'));
     var m = me.getCapabilityModel().create({ typeId: model.getId(), enabled: true });
     panel.down('nx-settingsform').loadRecord(m);
   },
@@ -358,12 +301,49 @@ Ext.define('NX.coreui.controller.Capabilities', {
             NX.Conditions.storeHasRecords('CapabilityType')
         ),
         {
-          satisfied: function() {
-            button.enable();
-          },
-          unsatisfied: function() {
-            button.disable();
-          }
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
+        }
+    );
+  },
+
+  /**
+   * @private
+   * Enable 'Enable' button when user has 'update' permission and capability is not enabled.
+   */
+  bindEnableButton: function(button) {
+    button.mon(
+        NX.Conditions.and(
+            NX.Conditions.isPermitted('nexus:capabilities:update'),
+            NX.Conditions.gridHasSelection('nx-coreui-capability-list', function(model) {
+              return !model.get('enabled');
+            })
+        ),
+        {
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
+        }
+    );
+  },
+
+  /**
+   * @private
+   * Enable 'Disable' button when user has 'update' permission and capability is enabled.
+   */
+  bindDisableButton: function(button) {
+    button.mon(
+        NX.Conditions.and(
+            NX.Conditions.isPermitted('nexus:capabilities:update'),
+            NX.Conditions.gridHasSelection('nx-coreui-capability-list', function(model) {
+              return model.get('enabled');
+            })
+        ),
+        {
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
         }
     );
   },
@@ -380,8 +360,11 @@ Ext.define('NX.coreui.controller.Capabilities', {
     NX.direct.capability_Capability.create(values, function(response) {
       if (Ext.isObject(response)) {
         if (response.success) {
-          NX.Messages.success(NX.I18n.format('Capabilities_Create_Success',
-              me.getDescription(me.getCapabilityModel().create(response.data))));
+          NX.Messages.add({
+            text: NX.I18n.format('Capabilities_Create_Success',
+                me.getDescription(me.getCapabilityModel().create(response.data))),
+            type: 'success'
+          });
           me.getStore('Capability').load();
         }
         else if (Ext.isDefined(response.errors)) {
@@ -405,8 +388,11 @@ Ext.define('NX.coreui.controller.Capabilities', {
       me.getContent().getEl().unmask();
       if (Ext.isObject(response)) {
         if (response.success) {
-          NX.Messages.success(NX.I18n.format('Capabilities_Update_Success',
-              me.getDescription(me.getCapabilityModel().create(response.data))));
+          NX.Messages.add({
+            text: NX.I18n.format('Capabilities_Update_Success',
+                me.getDescription(me.getCapabilityModel().create(response.data))),
+            type: 'success'
+          });
           form.fireEvent('submitted', form);
           me.getStore('Capability').load();
         }
@@ -429,7 +415,10 @@ Ext.define('NX.coreui.controller.Capabilities', {
     NX.direct.capability_Capability.remove(model.getId(), function(response) {
       me.getStore('Capability').load();
       if (Ext.isObject(response) && response.success) {
-        NX.Messages.success(NX.I18n.format('Capabilities_Delete_Success', description));
+        NX.Messages.add({
+          text: NX.I18n.format('Capabilities_Delete_Success', description),
+          type: 'success'
+        });
       }
     });
   },
@@ -459,7 +448,10 @@ Ext.define('NX.coreui.controller.Capabilities', {
       me.getContent().getEl().unmask();
       if (Ext.isObject(response) && response.success) {
         me.getStore('Capability').load();
-        NX.Messages.success(NX.I18n.format('Capabilities_Enable_Text', description));
+        NX.Messages.add({
+          text: NX.I18n.format('Capabilities_Enable_Text', description),
+          type: 'success'
+        });
       }
     });
   },
@@ -471,33 +463,21 @@ Ext.define('NX.coreui.controller.Capabilities', {
   disableCapability: function() {
     var me = this,
         bookmark = NX.Bookmarks.getBookmark(),
-        model, modelId, disableWarningMessage;
+        model, modelId, description;
 
     modelId = decodeURIComponent(bookmark.getSegment(1));
     model = me.getList().getStore().getById(modelId);
-    disableWarningMessage = model.get('disableWarningMessage');
-
-    if (disableWarningMessage) {
-      NX.Dialogs.askConfirmation('Confirm disable?', disableWarningMessage, function() {
-        me.doDisable(model);
-      });
-    } else {
-      me.doDisable(model);
-    }
-  },
-
-  /**
-   * @private
-   */
-  doDisable: function(model) {
-    var me = this, description;
     description = me.getDescription(model);
+
     me.getContent().getEl().mask(NX.I18n.get('Capabilities_Disable_Mask'));
-    NX.direct.capability_Capability.disable(model.getId(), function (response) {
+    NX.direct.capability_Capability.disable(model.getId(), function(response) {
       me.getContent().getEl().unmask();
       if (Ext.isObject(response) && response.success) {
         me.getStore('Capability').load();
-        NX.Messages.success(NX.I18n.format('Capabilities_Disable_Text', description));
+        NX.Messages.add({
+          text: NX.I18n.format('Capabilities_Disable_Text', description),
+          type: 'success'
+        });
       }
     });
   },
@@ -587,7 +567,7 @@ Ext.define('NX.coreui.controller.Capabilities', {
   addDynamicTagFieldsToModel: function(tags) {
     var me = this,
         model = me.getCapabilityModel(),
-        fields = [];
+        fields = model.prototype.fields.getRange();
 
     Ext.Array.each(tags, function(entry) {
       fields.push({
@@ -595,7 +575,7 @@ Ext.define('NX.coreui.controller.Capabilities', {
         type: 'string'
       });
     });
-    model.replaceFields(fields, false);
+    model.setFields(fields);
 
     //<if debug>
     me.logDebug('Dynamic tag fields added to Capability model');

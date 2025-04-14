@@ -45,11 +45,10 @@ public class StateGuard
 
   private String current;
 
-  StateGuard(
-      final Logger log,
-      final ReadWriteLock readWriteLock,
-      final String initial,
-      @Nullable final String failure)
+  StateGuard(final Logger log,
+             final ReadWriteLock readWriteLock,
+             final String initial,
+             @Nullable final String failure)
   {
     this.log = checkNotNull(log);
     this.readWriteLock = checkNotNull(readWriteLock);
@@ -68,13 +67,6 @@ public class StateGuard
     finally {
       lock.unlock();
     }
-  }
-
-  /**
-   * Get write lock from State Guard.
-   */
-  public Lock getWriteLock() {
-    return readWriteLock.writeLock();
   }
 
   /**
@@ -126,21 +118,15 @@ public class StateGuard
   /**
    * Create a transition to given state.
    */
-  @SuppressWarnings("unchecked")
   public Transition transition(final String to) {
-    return transition(to, false, new Class[0], true);
+    return new TransitionImpl(to, false, new Class[0]);
   }
 
   /**
    * Create a transition to given state with custom exception-handling behaviour.
    */
-  public Transition transition(
-      final String to,
-      final boolean silent,
-      final Class<? extends Exception>[] ignore,
-      boolean requiresWriteLock)
-  {
-    return new TransitionImpl(to, silent, ignore, requiresWriteLock);
+  public Transition transition(final String to, final boolean silent, final Class<? extends Exception>[] ignore) {
+    return new TransitionImpl(to, silent, ignore);
   }
 
   /**
@@ -158,7 +144,7 @@ public class StateGuard
    * Transition from current state to target state and execute an action.
    */
   private class TransitionImpl
-      implements Transition
+    implements Transition
   {
     private final String to;
 
@@ -166,21 +152,13 @@ public class StateGuard
 
     private final Class<? extends Exception>[] ignore;
 
-    private final boolean requiresWriteLock;
-
     @Nullable
     private String[] allowed;
 
-    private TransitionImpl(
-        final String to,
-        final boolean silent,
-        final Class<? extends Exception>[] ignore,
-        final boolean requiresWriteLock)
-    {
+    private TransitionImpl(final String to, final boolean silent, final Class<? extends Exception>[] ignore)    {
       this.to = checkNotNull(to);
       this.silent = silent;
       this.ignore = checkNotNull(ignore);
-      this.requiresWriteLock = requiresWriteLock;
     }
 
     @Override
@@ -191,7 +169,6 @@ public class StateGuard
           '}';
     }
 
-    @Override
     public TransitionImpl from(final String... allowed) {
       checkNotNull(allowed);
       checkArgument(allowed.length != 0);
@@ -202,10 +179,7 @@ public class StateGuard
     @Override
     @Nullable
     public <V> V run(final Action<V> action) throws Exception {
-      Lock lock = null;
-      if (requiresWriteLock) {
-        lock = Locks.write(readWriteLock);
-      }
+      Lock lock = Locks.write(readWriteLock);
       try {
         if (allowed != null) {
           _ensure(allowed);
@@ -234,7 +208,7 @@ public class StateGuard
             else {
               log.error("Failed transition: {} -> {}", current, to, t);
             }
-
+  
             // maybe set failure state
             if (failure != null) {
               current = failure;
@@ -246,9 +220,7 @@ public class StateGuard
         }
       }
       finally {
-        if (lock != null) {
-          lock.unlock();
-        }
+        lock.unlock();
       }
     }
 
@@ -270,7 +242,7 @@ public class StateGuard
    * Execute an action or callable if current state is allowed.
    */
   private class GuardImpl
-      implements Guard
+    implements Guard
   {
     private final String[] allowed;
 
@@ -349,7 +321,8 @@ public class StateGuard
           logger != null ? logger : defaultLogger,
           lock != null ? lock : new ReentrantReadWriteLock(),
           initial,
-          failure);
+          failure
+      );
     }
   }
 }

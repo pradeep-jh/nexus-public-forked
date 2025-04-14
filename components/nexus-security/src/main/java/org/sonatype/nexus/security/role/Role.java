@@ -35,19 +35,18 @@ public class Role
 
   private Set<String> privileges = new HashSet<String>();
 
-  private int version;
+  private String version;
 
   public Role() {
   }
 
-  public Role(
-      final String roleId,
-      final String name,
-      final String description,
-      final String source,
-      final boolean readOnly,
-      final Set<String> roles,
-      final Set<String> privileges)
+  public Role(final String roleId,
+              final String name,
+              final String description,
+              final String source,
+              final boolean readOnly,
+              final Set<String> roles,
+              final Set<String> privileges)
   {
     this.roleId = roleId;
     this.name = name;
@@ -62,7 +61,7 @@ public class Role
     return roleId;
   }
 
-  public void setRoleId(final String roleId) {
+  public void setRoleId(String roleId) {
     this.roleId = roleId;
   }
 
@@ -70,7 +69,7 @@ public class Role
     return name;
   }
 
-  public void setName(final String name) {
+  public void setName(String name) {
     this.name = name;
   }
 
@@ -78,7 +77,7 @@ public class Role
     return source;
   }
 
-  public void setSource(final String source) {
+  public void setSource(String source) {
     this.source = source;
   }
 
@@ -86,11 +85,11 @@ public class Role
     return roles;
   }
 
-  public void addRole(final String role) {
+  public void addRole(String role) {
     this.roles.add(role);
   }
 
-  public void setRoles(final Set<String> roles) {
+  public void setRoles(Set<String> roles) {
     this.roles = roles;
   }
 
@@ -98,16 +97,15 @@ public class Role
     return privileges;
   }
 
-  public void addPrivilege(final String privilege) {
+  public void addPrivilege(String privilege) {
     this.privileges.add(privilege);
   }
 
-  public void setPrivileges(final Set<String> privilege) {
+  public void setPrivileges(Set<String> privilege) {
     this.privileges = privilege;
   }
 
-  @Override
-  public int compareTo(final Role o) {
+  public int compareTo(Role o) {
     final int before = -1;
     final int equal = 0;
     final int after = 1;
@@ -146,7 +144,7 @@ public class Role
     return description;
   }
 
-  public void setDescription(final String description) {
+  public void setDescription(String description) {
     this.description = description;
   }
 
@@ -154,15 +152,15 @@ public class Role
     return readOnly;
   }
 
-  public void setReadOnly(final boolean readOnly) {
+  public void setReadOnly(boolean readOnly) {
     this.readOnly = readOnly;
   }
 
-  public int getVersion() {
+  public String getVersion() {
     return version;
   }
 
-  public void setVersion(final int version) {
+  public void setVersion(final String version) {
     this.version = version;
   }
 
@@ -198,7 +196,7 @@ public class Role
     if (source != null ? !source.equals(role.source) : role.source != null) {
       return false;
     }
-    if (version != role.version) {
+    if (version != null ? !version.equals(role.version) : role.version != null) {
       return false;
     }
 
@@ -214,7 +212,7 @@ public class Role
     result = 31 * result + (readOnly ? 1 : 0);
     result = 31 * result + (roles != null ? roles.hashCode() : 0);
     result = 31 * result + (privileges != null ? privileges.hashCode() : 0);
-    result = 31 * result + version;
+    result = 31 * result + (version != null ? version.hashCode() : 0);
     return result;
   }
 

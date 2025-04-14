@@ -18,19 +18,13 @@ package org.sonatype.nexus.transaction;
  * @since 3.0
  */
 public interface Transaction
+    extends AutoCloseable
 {
-  void begin();
+  void begin() throws Exception;
 
-  void commit();
+  void commit() throws Exception;
 
-  void rollback();
-
-  /**
-   * Invoked at the end of the transaction
-   */
-  default void end() {
-
-  };
+  void rollback() throws Exception;
 
   boolean isActive();
 
@@ -43,25 +37,4 @@ public interface Transaction
    * @throws RuntimeException may be thrown to implicitly deny the retry
    */
   boolean allowRetry(Exception cause);
-
-  /**
-   * Notifies this transaction if it captures another {@link TransactionalStore} during a nested transaction.
-   *
-   * @since 3.20
-   */
-  default void capture(TransactionalStore<?> store) {
-    // do nothing by default
-  }
-
-  /**
-   * @see Transactional#reason()
-   * @since 3.20
-   */
-  void reason(String reason);
-
-  /**
-   * @see Transactional#reason()
-   * @since 3.20
-   */
-  String reason();
 }

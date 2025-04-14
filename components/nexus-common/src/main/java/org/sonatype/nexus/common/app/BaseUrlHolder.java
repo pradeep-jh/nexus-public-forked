@@ -12,9 +12,6 @@
  */
 package org.sonatype.nexus.common.app;
 
-import java.util.concurrent.Callable;
-import java.util.function.Supplier;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,39 +27,27 @@ public final class BaseUrlHolder
 {
   private static final Logger log = LoggerFactory.getLogger(BaseUrlHolder.class);
 
-  private static final InheritableThreadLocal<String> baseUrl = new InheritableThreadLocal<>();
-
-  private static final InheritableThreadLocal<String> relativePath = new InheritableThreadLocal<>();
+  private static final InheritableThreadLocal<String> value = new InheritableThreadLocal<>();
 
   private BaseUrlHolder() {
     // empty
   }
 
   /**
-   * Set the current base URL, and the relative path.
+   * Set the current base URL.
    *
    * The value will be normalized to never end with "/".
    */
-  public static void set(final String url, final String newRelativePath) {
+  public static void set(String url) {
     checkNotNull(url);
-    checkNotNull(newRelativePath);
 
-    String strippedUrl = stripSlash(url);
-    String strippedRelativePath = stripSlash(newRelativePath);
-
-    log.trace("Set: {}", strippedUrl);
-    baseUrl.set(strippedUrl);
-
-    log.trace("Set relativePath: {}", strippedRelativePath);
-    relativePath.set(strippedRelativePath);
-  }
-
-  private static String stripSlash(final String url) {
     // strip off trailing "/", note this is done so that script/template can easily $baseUrl/foo
     if (url.endsWith("/")) {
-      return url.substring(0, url.length() - 1);
+      url = url.substring(0, url.length() - 1);
     }
-    return url;
+
+    log.trace("Set: {}", url);
+    value.set(url);
   }
 
   /**
@@ -71,44 +56,17 @@ public final class BaseUrlHolder
    * @throws IllegalStateException
    */
   public static String get() {
-    String url = baseUrl.get();
+    String url = value.get();
     checkState(url != null, "Base URL not set");
-    return url;
-  }
-
-  public static String getRelativePath() {
-    String url = relativePath.get();
-    checkState(url != null, "Relative path not set");
     return url;
   }
 
   public static void unset() {
     log.trace("Unset");
-    baseUrl.remove();
-    relativePath.remove();
+    value.remove();
   }
 
   public static boolean isSet() {
-    return baseUrl.get() != null;
-  }
-
-  public static <R> R with(final String url, final String relative, final Supplier<R> operation) {
-    set(url, relative);
-    try {
-      return operation.get();
-    }
-    finally {
-      unset();
-    }
-  }
-
-  public static <R> R call(final String url, final String relative, final Callable<R> operation) throws Exception {
-    set(url, relative);
-    try {
-      return operation.call();
-    }
-    finally {
-      unset();
-    }
+    return value.get() != null;
   }
 }

@@ -27,7 +27,7 @@ import org.osgi.framework.Version;
 public class NexusMain
     extends org.apache.karaf.main.Main
 {
-  // Visible for testing
+  //Visibile for testing
   static final Version MINIMUM_JAVA_VERSION = new Version(1, 8, 0);
 
   Logger log = Logger.getLogger(this.getClass().getName());
@@ -43,9 +43,6 @@ public class NexusMain
     System.setProperty("java.util.logging.manager", "org.sonatype.nexus.karaf.NonResettableLogManager");
     while (true) {
       boolean restart = false;
-      boolean restartJvm = false;
-      // karaf.restart.jvm take priority over karaf.restart
-      System.setProperty("karaf.restart.jvm", "false");
       System.setProperty("karaf.restart", "false");
       final NexusMain main = new NexusMain(args);
       try {
@@ -63,7 +60,6 @@ public class NexusMain
         main.awaitShutdown();
         boolean stopped = main.destroy();
         restart = Boolean.getBoolean("karaf.restart");
-        restartJvm = Boolean.getBoolean("karaf.restart.jvm");
         main.updateInstancePidAfterShutdown();
         if (!stopped) {
           if (restart) {
@@ -81,17 +77,7 @@ public class NexusMain
         ex.printStackTrace();
       }
       finally {
-        if (restartJvm && restart) {
-          System.exit(10);
-        }
-        else if (!restart) {
-
-          int overriddenExitCode = Integer.getInteger("nexus.overrideExitCode", 0);
-          if (overriddenExitCode != 0) {
-            System.err.println("Exited with code: " + overriddenExitCode);
-            System.err.println("Please check the previous log messages to identify why shutdown was initiated.");
-            System.exit(overriddenExitCode);
-          }
+        if (!restart) {
           System.exit(main.getExitCode());
         }
         else {
@@ -153,7 +139,7 @@ public class NexusMain
     System.setProperty(propertyName, new File(parent, child).getAbsolutePath());
   }
 
-  // Visible for testing
+  //Visible for testing
   static void requireMinimumJavaVersion() {
     if (isNotSupportedVersion(System.getProperty("java.version"))) {
       // logging is not configured yet, so use console

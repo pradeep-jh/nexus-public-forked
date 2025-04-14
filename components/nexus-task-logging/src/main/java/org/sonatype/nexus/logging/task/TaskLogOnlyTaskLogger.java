@@ -27,11 +27,4 @@ public class TaskLogOnlyTaskLogger
     super(log, taskLogInfo);
     MDC.put(TASK_LOG_ONLY_MDC, "true");
   }
-
-  @Override
-  protected void writeLogFileNameToNexusLog() {
-    MDC.remove(TASK_LOG_ONLY_MDC);
-    super.writeLogFileNameToNexusLog();
-    MDC.put(TASK_LOG_ONLY_MDC, "true");
-  }
 }

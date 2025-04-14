@@ -17,7 +17,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.sonatype.goodies.common.Time;
 import org.sonatype.goodies.testsupport.TestSupport;
 import org.sonatype.nexus.common.event.EventAware.Asynchronous;
 import org.sonatype.nexus.common.event.EventHelper;
@@ -29,7 +28,7 @@ import com.google.common.eventbus.Subscribe;
 import org.eclipse.sisu.inject.DefaultBeanLocator;
 import org.junit.Test;
 
-import static org.awaitility.Awaitility.await;
+import static com.jayway.awaitility.Awaitility.await;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -43,7 +42,7 @@ public class EventManagerImplTest
 {
   @Test
   public void dispatchOrder() {
-    EventManager underTest = new EventManagerImpl(new DefaultBeanLocator(), newEventExecutor());
+    EventManager underTest = new EventManagerImpl(new DefaultBeanLocator(), new EventExecutor());
     ReentrantHandler handler = new ReentrantHandler(underTest);
 
     underTest.register(handler);
@@ -80,7 +79,7 @@ public class EventManagerImplTest
 
   @Test
   public void asyncInheritsIsReplicating() throws Exception {
-    EventExecutor executor = newEventExecutor();
+    EventExecutor executor = new EventExecutor();
     EventManager underTest = new EventManagerImpl(new DefaultBeanLocator(), executor);
     AsyncReentrantHandler handler = new AsyncReentrantHandler(underTest);
     underTest.register(handler);
@@ -88,9 +87,8 @@ public class EventManagerImplTest
     executor.start(); // enable multi-threaded mode
 
     // non-replicating case
-    FakeAlmightySubject.forUserId("testUser")
-        .execute(
-            () -> underTest.post("a string"));
+    FakeAlmightySubject.forUserId("testUser").execute(
+        () -> underTest.post("a string"));
 
     await().atMost(5, TimeUnit.SECONDS).until(underTest::isCalmPeriod);
 
@@ -99,10 +97,9 @@ public class EventManagerImplTest
     assertThat(handler.replicatingCount.get(), is(0));
 
     // replicating case
-    FakeAlmightySubject.forUserId("testUser")
-        .execute(
-            () -> EventHelper.asReplicating(
-                () -> underTest.post("a string")));
+    FakeAlmightySubject.forUserId("testUser").execute(
+        () -> EventHelper.asReplicating(
+            () -> underTest.post("a string")));
 
     await().atMost(5, TimeUnit.SECONDS).until(underTest::isCalmPeriod);
 
@@ -147,7 +144,7 @@ public class EventManagerImplTest
 
   @Test
   public void singleThreadedOnShutdown() throws Exception {
-    EventExecutor executor = newEventExecutor();
+    EventExecutor executor = new EventExecutor();
     EventManager underTest = new EventManagerImpl(new DefaultBeanLocator(), executor);
     AsyncHandler handler = new AsyncHandler();
     underTest.register(handler);
@@ -190,10 +187,6 @@ public class EventManagerImplTest
         throw new RuntimeException(e);
       }
     });
-  }
-
-  private static EventExecutor newEventExecutor() {
-    return new EventExecutor(false, 0, Time.seconds(0), false, false);
   }
 
   private class AsyncHandler

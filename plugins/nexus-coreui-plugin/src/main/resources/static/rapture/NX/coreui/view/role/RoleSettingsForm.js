@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -27,8 +23,7 @@ Ext.define('NX.coreui.view.role.RoleSettingsForm', {
   requires: [
     'NX.Conditions',
     'NX.coreui.store.Role',
-    'NX.I18n',
-    'NX.util.Validator'
+    'NX.I18n'
   ],
 
   api: {
@@ -40,10 +35,8 @@ Ext.define('NX.coreui.view.role.RoleSettingsForm', {
         idField,
         roleStore = Ext.create('NX.coreui.store.Role');
 
-    roleStore.load();
-
     me.settingsFormSuccessMessage = me.settingsFormSuccessMessage || function(data) {
-      return NX.I18n.get('Role_RoleSettingsForm_Update_Success') + Ext.String.htmlEncode(data['name']);
+      return NX.I18n.get('Role_RoleSettingsForm_Update_Success') + data['name'];
     };
 
     me.editableMarker = NX.I18n.get('Role_RoleSettingsForm_Update_Error');
@@ -54,6 +47,8 @@ Ext.define('NX.coreui.view.role.RoleSettingsForm', {
           return !model.get('readOnly');
         })
     );
+
+    roleStore.load();
 
     if (me.source) {
       idField = {
@@ -93,14 +88,12 @@ Ext.define('NX.coreui.view.role.RoleSettingsForm', {
       idField,
       {
         name: 'name',
-        fieldLabel: NX.I18n.get('Role_RoleSettingsForm_Name_FieldLabel'),
-        transformRawValue: Ext.htmlDecode
+        fieldLabel: NX.I18n.get('Role_RoleSettingsForm_Name_FieldLabel')
       },
       {
         name: 'description',
         allowBlank: true,
-        fieldLabel: NX.I18n.get('Role_RoleSettingsForm_Description_FieldLabel'),
-        transformRawValue: Ext.htmlDecode
+        fieldLabel: NX.I18n.get('Role_RoleSettingsForm_Description_FieldLabel')
       },
       {
         xtype: 'nx-itemselector',
@@ -128,26 +121,31 @@ Ext.define('NX.coreui.view.role.RoleSettingsForm', {
         store: roleStore,
         valueField: 'id',
         displayField: 'name',
-        delimiter: null
+        delimiter: null,
+        listeners: {
+          /**
+           * Ensure that the reference to the Role we're updating is not displayed.
+           */
+          change: function(roles) {
+            var form = roles.up('form'),
+                record = form.getRecord(),
+                store = roles.getStore();
+            if (record) {
+              store.clearFilter(true);
+              store.filter([
+                {
+                  filterFn: function(item) {
+                    return item.get('id') !== record.get('id');
+                  }
+                }
+              ]);
+            }
+          }
+        }
       }
     ];
 
     me.callParent();
-
-    NX.Conditions.formIs(me, function(form) {
-      return !form.isDisabled();
-    }).on({
-      satisfied: function() {
-        Ext.each(me.query('nx-itemselector'), function(it) {
-          it.show();
-        });
-      },
-      unsatisfied: function() {
-        Ext.each(me.query('nx-itemselector'), function(it) {
-          it.hide();
-        });
-      },
-      scope: me
-    });
   }
+
 });

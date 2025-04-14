@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -34,20 +30,27 @@ Ext.define('NX.controller.Help', {
     'AboutWindow'
   ],
 
-  statics: {
-    /**
-     * The base-url for help links.
-     *
-     * @private
-     * @property {String}
-     * @readonly
-     */
-    baseUrl: 'https://links.sonatype.com/products/nexus',
-
-    getDocsUrl: function() {
-      return NX.controller.Help.baseUrl + '/docs/' + NX.State.getVersionMajorMinor();
+  refs: [
+    {
+      ref: 'featureHelp',
+      selector: 'nx-header-help menuitem[action=feature]'
     }
-  },
+  ],
+
+  /**
+   * The base-url for help links.
+   *
+   * @private
+   * @property {String}
+   * @readonly
+   */
+  baseUrl: 'http://links.sonatype.com/products/nexus',
+
+  /**
+   * @private
+   * @property {NX.model.Feature}
+   */
+  selectedFeature: undefined,
 
   /**
    * @override
@@ -75,15 +78,19 @@ Ext.define('NX.controller.Help', {
       'help-kb': {
         file: 'brain_trainer.png',
         variants: ['x16', 'x32']
-      },
-      'help-guides': {
-        file: 'sonatype.png',
-        variants: ['x16', 'x32']
       }
     });
 
     me.listen({
+      controller: {
+        '#Menu': {
+          featureselected: me.onFeatureSelected
+        }
+      },
       component: {
+        'nx-header-help menuitem[action=feature]': {
+          click: me.onFeatureHelp
+        },
         'nx-header-help menuitem[action=about]': {
           click: me.onAbout
         },
@@ -101,12 +108,27 @@ Ext.define('NX.controller.Help', {
         },
         'nx-header-help menuitem[action=kb]': {
           click: me.onKnowledgeBase
-        },
-        'nx-header-help menuitem[action=guides]': {
-          click: me.onGuides
         }
       }
     });
+  },
+
+  /**
+   * Update help menu content.
+   *
+   * @private
+   * @param {NX.model.Feature} feature selected feature
+   */
+  onFeatureSelected: function (feature) {
+    var me = this,
+        text = feature.get('text'),
+        iconName = feature.get('iconName'),
+        featureHelp = me.getFeatureHelp();
+
+    me.selectedFeature = feature;
+
+    featureHelp.setText(NX.I18n.get('Help_Feature_Text') + text);
+    featureHelp.setIconCls(NX.Icons.cls(iconName, 'x16'));
   },
 
   /**
@@ -114,7 +136,27 @@ Ext.define('NX.controller.Help', {
    * @param {String} section
    */
   openUrl: function(section) {
-    NX.Windows.open(NX.controller.Help.baseUrl + '/' + section);
+    NX.Windows.open(this.baseUrl + '/' + section);
+  },
+
+  /**
+   * Create a help url for the given keyword.
+   * @param keyword
+   * @returns {string}
+   */
+  createUrl: function(keyword) {
+    return this.baseUrl + '/docs-search/' + NX.State.getVersionMajorMinor() + '/' + keyword;
+  },
+
+  /**
+   * @private
+   */
+  onFeatureHelp: function() {
+    var me = this,
+        keyword = me.selectedFeature.get('helpKeyword'),
+        url = me.createUrl(keyword);
+
+    NX.Windows.open(url);
   },
 
   /**
@@ -128,7 +170,7 @@ Ext.define('NX.controller.Help', {
    * @private
    */
   onDocs: function() {
-    NX.Windows.open(NX.controller.Help.getDocsUrl());
+    NX.Windows.open(this.baseUrl + '/docs/' + NX.State.getVersionMajorMinor());
   },
 
   /**
@@ -157,12 +199,5 @@ Ext.define('NX.controller.Help', {
    */
   onKnowledgeBase: function() {
     this.openUrl('kb');
-  },
-
-  /**
-   * @private
-   */
-  onGuides: function() {
-    NX.Windows.open("https://links.sonatype.com/products/nxrm3/guides")
   }
 });

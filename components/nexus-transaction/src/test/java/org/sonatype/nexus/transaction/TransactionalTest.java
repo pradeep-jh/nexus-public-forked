@@ -27,13 +27,13 @@ import org.mockito.Mock;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
-import static org.sonatype.nexus.transaction.Transactional.DEFAULT_REASON;
 
 /**
  * Test transactional behaviour.
@@ -45,9 +45,6 @@ public class TransactionalTest
   ExampleMethods methods = Guice.createInjector(new TransactionModule()).getInstance(ExampleMethods.class);
 
   @Mock
-  TransactionalSession<Transaction> session;
-
-  @Mock
   Transaction tx;
 
   boolean isActive;
@@ -56,21 +53,18 @@ public class TransactionalTest
 
   @Before
   public void setUp() throws Exception {
-    when(session.getTransaction()).thenReturn(tx);
-    UnitOfWork.begin(Suppliers.ofInstance(session));
+    UnitOfWork.begin(Suppliers.ofInstance(tx));
 
     when(tx.isActive()).thenAnswer(new Answer<Boolean>()
     {
-      @Override
-      public Boolean answer(final InvocationOnMock invocation) throws Throwable {
+      public Boolean answer(InvocationOnMock invocation) throws Throwable {
         return isActive;
       }
     });
 
     doAnswer(new Answer<Void>()
     {
-      @Override
-      public Void answer(final InvocationOnMock invocation) throws Throwable {
+      public Void answer(InvocationOnMock invocation) throws Throwable {
         isActive = true;
         return null;
       }
@@ -78,8 +72,7 @@ public class TransactionalTest
 
     doAnswer(new Answer<Void>()
     {
-      @Override
-      public Void answer(final InvocationOnMock invocation) throws Throwable {
+      public Void answer(InvocationOnMock invocation) throws Throwable {
         isActive = false;
         if (throwExceptionOnCommit) {
           throw new ConcurrentModificationException();
@@ -90,8 +83,7 @@ public class TransactionalTest
 
     doAnswer(new Answer<Void>()
     {
-      @Override
-      public Void answer(final InvocationOnMock invocation) throws Throwable {
+      public Void answer(InvocationOnMock invocation) throws Throwable {
         isActive = false;
         return null;
       }
@@ -120,54 +112,28 @@ public class TransactionalTest
     methods.transactional();
     methods.transactional();
 
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    InOrder order = inOrder(tx);
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    order.verify(tx).close();
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    order.verify(tx).close();
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
-  }
-
-  @Test
-  public void testCustomReason() throws Exception {
-
-    methods.customReason();
-
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason("Testing!");
-    order.verify(tx).begin();
-    order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
+    order.verify(tx).close();
+    verifyNoMoreInteractions(tx);
   }
 
   @Test
   public void testPauseResume() throws Exception {
-    final TransactionalSession<Transaction> session2 = mock(TransactionalSession.class);
     final Transaction tx2 = mock(Transaction.class);
-    when(session2.getTransaction()).thenReturn(tx2);
 
     methods.transactional();
 
     final UnitOfWork work = UnitOfWork.pause();
     try {
-      UnitOfWork.begin(Suppliers.ofInstance(session2));
+      UnitOfWork.begin(Suppliers.ofInstance(tx2));
       try {
         methods.transactional();
       }
@@ -180,31 +146,22 @@ public class TransactionalTest
     }
     methods.transactional();
 
-    InOrder order = inOrder(session, tx, session2, tx2);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    InOrder order = inOrder(tx, tx2);
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    order.verify(session2).getTransaction();
-    order.verify(tx2).reason(DEFAULT_REASON);
+    order.verify(tx).close();
     order.verify(tx2).begin();
     order.verify(tx2).commit();
-    order.verify(tx2).end();
-    order.verify(session2).close();
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    order.verify(tx2).close();
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx, session2, tx2);
+    order.verify(tx).close();
+    verifyNoMoreInteractions(tx);
   }
 
   @Test
   public void testBatchTransactional() throws Exception {
-    UnitOfWork.beginBatch(Suppliers.ofInstance(session));
+    UnitOfWork.beginBatch(Suppliers.ofInstance(tx));
     try {
       methods.transactional();
       methods.transactional();
@@ -214,26 +171,18 @@ public class TransactionalTest
       UnitOfWork.end();
     }
 
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    InOrder order = inOrder(tx);
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).getTransaction();
     order.verify(tx).isActive();
-    order.verify(tx).reason(DEFAULT_REASON);
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).getTransaction();
     order.verify(tx).isActive();
-    order.verify(tx).reason(DEFAULT_REASON);
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
+    order.verify(tx).isActive();
+    order.verify(tx).close();
+    verifyNoMoreInteractions(tx);
   }
 
   @Test
@@ -243,44 +192,26 @@ public class TransactionalTest
     methods.outer();
     methods.outer();
 
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    InOrder order = inOrder(tx);
     order.verify(tx).begin();
-    order.verify(session).getTransaction();
-    order.verify(tx).isActive();
-    order.verify(session).getTransaction();
-    order.verify(tx).isActive();
+    order.verify(tx, times(2)).isActive();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    order.verify(tx).close();
     order.verify(tx).begin();
-    order.verify(session).getTransaction();
-    order.verify(tx).isActive();
-    order.verify(session).getTransaction();
-    order.verify(tx).isActive();
+    order.verify(tx, times(2)).isActive();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    order.verify(tx).close();
     order.verify(tx).begin();
-    order.verify(session).getTransaction();
-    order.verify(tx).isActive();
-    order.verify(session).getTransaction();
-    order.verify(tx).isActive();
+    order.verify(tx, times(2)).isActive();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
+    order.verify(tx).close();
+    verifyNoMoreInteractions(tx);
   }
 
   @Test
   public void testBatchNested() throws Exception {
 
-    UnitOfWork.beginBatch(Suppliers.ofInstance(session));
+    UnitOfWork.beginBatch(Suppliers.ofInstance(tx));
     try {
       methods.outer();
       methods.outer();
@@ -290,59 +221,23 @@ public class TransactionalTest
       UnitOfWork.end();
     }
 
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    InOrder order = inOrder(tx);
     order.verify(tx).begin();
-    order.verify(session).getTransaction();
-    order.verify(tx).isActive();
-    order.verify(session).getTransaction();
-    order.verify(tx).isActive();
+    order.verify(tx, times(2)).isActive();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).getTransaction();
     order.verify(tx).isActive();
-    order.verify(tx).reason(DEFAULT_REASON);
     order.verify(tx).begin();
-    order.verify(session).getTransaction();
-    order.verify(tx).isActive();
-    order.verify(session).getTransaction();
-    order.verify(tx).isActive();
+    order.verify(tx, times(2)).isActive();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).getTransaction();
     order.verify(tx).isActive();
-    order.verify(tx).reason(DEFAULT_REASON);
     order.verify(tx).begin();
-    order.verify(session).getTransaction();
-    order.verify(tx).isActive();
-    order.verify(session).getTransaction();
-    order.verify(tx).isActive();
+    order.verify(tx, times(2)).isActive();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
+    order.verify(tx).isActive();
+    order.verify(tx).close();
+    verifyNoMoreInteractions(tx);
   }
 
-  @Test
-  public void testNestedTransactionalStoreIsCaptured() throws Exception {
-
-    methods.captureNestedStore();
-
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
-    order.verify(tx).begin();
-    order.verify(session).getTransaction();
-    order.verify(tx).capture(methods.nestedStore);
-    order.verify(tx).isActive();
-    order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
-  }
-
-  @SuppressWarnings("java:S2699") // sonar expects assertions, but best to let this exception bubble up
   @Test
   public void testCanSeeTransactionInsideTransactional() {
     methods.canSeeTransactionInsideTransactional();
@@ -359,14 +254,11 @@ public class TransactionalTest
       methods.rollbackOnCheckedException();
     }
     finally {
-      InOrder order = inOrder(session, tx);
-      order.verify(session).getTransaction();
-      order.verify(tx).reason(DEFAULT_REASON);
+      InOrder order = inOrder(tx);
       order.verify(tx).begin();
       order.verify(tx).rollback();
-      order.verify(tx).end();
-      order.verify(session).close();
-      verifyNoMoreInteractions(session, tx);
+      order.verify(tx).close();
+      verifyNoMoreInteractions(tx);
     }
   }
 
@@ -376,14 +268,11 @@ public class TransactionalTest
       methods.rollbackOnUncheckedException();
     }
     finally {
-      InOrder order = inOrder(session, tx);
-      order.verify(session).getTransaction();
-      order.verify(tx).reason(DEFAULT_REASON);
+      InOrder order = inOrder(tx);
       order.verify(tx).begin();
       order.verify(tx).rollback();
-      order.verify(tx).end();
-      order.verify(session).close();
-      verifyNoMoreInteractions(session, tx);
+      order.verify(tx).close();
+      verifyNoMoreInteractions(tx);
     }
   }
 
@@ -393,14 +282,11 @@ public class TransactionalTest
       methods.commitOnCheckedException();
     }
     finally {
-      InOrder order = inOrder(session, tx);
-      order.verify(session).getTransaction();
-      order.verify(tx).reason(DEFAULT_REASON);
+      InOrder order = inOrder(tx);
       order.verify(tx).begin();
       order.verify(tx).commit();
-      order.verify(tx).end();
-      order.verify(session).close();
-      verifyNoMoreInteractions(session, tx);
+      order.verify(tx).close();
+      verifyNoMoreInteractions(tx);
     }
   }
 
@@ -410,14 +296,11 @@ public class TransactionalTest
       methods.commitOnUncheckedException();
     }
     finally {
-      InOrder order = inOrder(session, tx);
-      order.verify(session).getTransaction();
-      order.verify(tx).reason(DEFAULT_REASON);
+      InOrder order = inOrder(tx);
       order.verify(tx).begin();
       order.verify(tx).commit();
-      order.verify(tx).end();
-      order.verify(session).close();
-      verifyNoMoreInteractions(session, tx);
+      order.verify(tx).close();
+      verifyNoMoreInteractions(tx);
     }
   }
 
@@ -428,9 +311,7 @@ public class TransactionalTest
     methods.setCountdownToSuccess(3);
     methods.retryOnCheckedException();
 
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    InOrder order = inOrder(tx);
     order.verify(tx).begin();
     order.verify(tx).rollback();
     order.verify(tx).allowRetry(any(IOException.class));
@@ -442,9 +323,8 @@ public class TransactionalTest
     order.verify(tx).allowRetry(any(IOException.class));
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
+    order.verify(tx).close();
+    verifyNoMoreInteractions(tx);
   }
 
   @Test(expected = IOException.class)
@@ -456,18 +336,15 @@ public class TransactionalTest
       methods.retryOnCheckedException();
     }
     finally {
-      InOrder order = inOrder(session, tx);
-      order.verify(session).getTransaction();
-      order.verify(tx).reason(DEFAULT_REASON);
+      InOrder order = inOrder(tx);
       order.verify(tx).begin();
       order.verify(tx).rollback();
       order.verify(tx).allowRetry(any(IOException.class));
       order.verify(tx).begin();
       order.verify(tx).rollback();
       order.verify(tx).allowRetry(any(IOException.class));
-      order.verify(tx).end();
-      order.verify(session).close();
-      verifyNoMoreInteractions(session, tx);
+      order.verify(tx).close();
+      verifyNoMoreInteractions(tx);
     }
   }
 
@@ -478,9 +355,7 @@ public class TransactionalTest
     methods.setCountdownToSuccess(3);
     methods.retryOnUncheckedException();
 
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    InOrder order = inOrder(tx);
     order.verify(tx).begin();
     order.verify(tx).rollback();
     order.verify(tx).allowRetry(any(IllegalStateException.class));
@@ -492,9 +367,8 @@ public class TransactionalTest
     order.verify(tx).allowRetry(any(IllegalStateException.class));
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
+    order.verify(tx).close();
+    verifyNoMoreInteractions(tx);
   }
 
   @Test(expected = IllegalStateException.class)
@@ -506,18 +380,15 @@ public class TransactionalTest
       methods.retryOnUncheckedException();
     }
     finally {
-      InOrder order = inOrder(session, tx);
-      order.verify(session).getTransaction();
-      order.verify(tx).reason(DEFAULT_REASON);
+      InOrder order = inOrder(tx);
       order.verify(tx).begin();
       order.verify(tx).rollback();
       order.verify(tx).allowRetry(any(IllegalStateException.class));
       order.verify(tx).begin();
       order.verify(tx).rollback();
       order.verify(tx).allowRetry(any(IllegalStateException.class));
-      order.verify(tx).end();
-      order.verify(session).close();
-      verifyNoMoreInteractions(session, tx);
+      order.verify(tx).close();
+      verifyNoMoreInteractions(tx);
     }
   }
 
@@ -528,9 +399,7 @@ public class TransactionalTest
     methods.setCountdownToSuccess(3);
     methods.retryOnExceptionCause();
 
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    InOrder order = inOrder(tx);
     order.verify(tx).begin();
     order.verify(tx).rollback();
     order.verify(tx).allowRetry(any(IllegalStateException.class));
@@ -542,9 +411,8 @@ public class TransactionalTest
     order.verify(tx).allowRetry(any(IllegalStateException.class));
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
+    order.verify(tx).close();
+    verifyNoMoreInteractions(tx);
   }
 
   @Test(expected = IllegalStateException.class)
@@ -556,18 +424,15 @@ public class TransactionalTest
       methods.retryOnExceptionCause();
     }
     finally {
-      InOrder order = inOrder(session, tx);
-      order.verify(session).getTransaction();
-      order.verify(tx).reason(DEFAULT_REASON);
+      InOrder order = inOrder(tx);
       order.verify(tx).begin();
       order.verify(tx).rollback();
       order.verify(tx).allowRetry(any(IllegalStateException.class));
       order.verify(tx).begin();
       order.verify(tx).rollback();
       order.verify(tx).allowRetry(any(IllegalStateException.class));
-      order.verify(tx).end();
-      order.verify(session).close();
-      verifyNoMoreInteractions(session, tx);
+      order.verify(tx).close();
+      verifyNoMoreInteractions(tx);
     }
   }
 
@@ -591,9 +456,7 @@ public class TransactionalTest
     }
     finally {
       throwExceptionOnCommit = false;
-      InOrder order = inOrder(session, tx);
-      order.verify(session).getTransaction();
-      order.verify(tx).reason(DEFAULT_REASON);
+      InOrder order = inOrder(tx);
       order.verify(tx).begin();
       order.verify(tx).commit();
       order.verify(tx).rollback();
@@ -602,9 +465,8 @@ public class TransactionalTest
       order.verify(tx).commit();
       order.verify(tx).rollback();
       order.verify(tx).allowRetry(any(ConcurrentModificationException.class));
-      order.verify(tx).end();
-      order.verify(session).close();
-      verifyNoMoreInteractions(session, tx);
+      order.verify(tx).close();
+      verifyNoMoreInteractions(tx);
     }
   }
 
@@ -618,15 +480,12 @@ public class TransactionalTest
     }
     finally {
       throwExceptionOnCommit = false;
-      InOrder order = inOrder(session, tx);
-      order.verify(session).getTransaction();
-      order.verify(tx).reason(DEFAULT_REASON);
+      InOrder order = inOrder(tx);
       order.verify(tx).begin();
       order.verify(tx).commit();
       order.verify(tx).rollback();
-      order.verify(tx).end();
-      order.verify(session).close();
-      verifyNoMoreInteractions(session, tx);
+      order.verify(tx).close();
+      verifyNoMoreInteractions(tx);
     }
   }
 
@@ -640,15 +499,12 @@ public class TransactionalTest
     }
     finally {
       throwExceptionOnCommit = false;
-      InOrder order = inOrder(session, tx);
-      order.verify(session).getTransaction();
-      order.verify(tx).reason(DEFAULT_REASON);
+      InOrder order = inOrder(tx);
       order.verify(tx).begin();
       order.verify(tx).commit();
       order.verify(tx).rollback();
-      order.verify(tx).end();
-      order.verify(session).close();
-      verifyNoMoreInteractions(session, tx);
+      order.verify(tx).close();
+      verifyNoMoreInteractions(tx);
     }
   }
 
@@ -659,9 +515,7 @@ public class TransactionalTest
     methods.setCountdownToSuccess(3);
     methods.canUseStereotypeAnnotation();
 
-    InOrder order = inOrder(session, tx);
-    order.verify(session).getTransaction();
-    order.verify(tx).reason(DEFAULT_REASON);
+    InOrder order = inOrder(tx);
     order.verify(tx).begin();
     order.verify(tx).rollback();
     order.verify(tx).allowRetry(any(IOException.class));
@@ -673,8 +527,7 @@ public class TransactionalTest
     order.verify(tx).allowRetry(any(IOException.class));
     order.verify(tx).begin();
     order.verify(tx).commit();
-    order.verify(tx).end();
-    order.verify(session).close();
-    verifyNoMoreInteractions(session, tx);
+    order.verify(tx).close();
+    verifyNoMoreInteractions(tx);
   }
 }

@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -66,8 +62,7 @@ Ext.define('NX.coreui.controller.Nodes', {
       variants: ['x16', 'x32']
     },
     visible: function () {
-      return NX.Permissions.check('nexus:nodes:read') &&
-        !NX.State.getValue('nexus.datastore.clustered.enabled');
+      return NX.Permissions.check('nexus:nodes:read');
     }
   },
 
@@ -116,57 +111,57 @@ Ext.define('NX.coreui.controller.Nodes', {
     return model.get('friendlyName') || model.get('nodeIdentity');
   },
 
-  nxFrozen: false,
+  dbFrozen: false,
 
   load: function() {
     var me = this;
-    me.updateFreezeStatus(NX.State.getValue('frozen'));
+    me.updateFreezeStatus(NX.State.getValue('db', {})['dbFrozen']);
   },
 
   updateFreezeStatus: function(status) {
     var me = this;
-    me.nxFrozen = status;
+    me.dbFrozen = status;
 
     me.getToggleFreezeButton().setText(
-        me.nxFrozen ? NX.I18n.get('Nodes_Disable_read_only_mode') : NX.I18n.get('Nodes_Enable_read_only_mode'));
+        me.dbFrozen ? NX.I18n.get('Nodes_Disable_read_only_mode') : NX.I18n.get('Nodes_Enable_read_only_mode'));
 
-    if (NX.State.getValue('frozen') !== me.nxFrozen) {
-      NX.State.setValue('frozen', me.nxFrozen);
+    if (NX.State.getValue('db', {})['dbFrozen'] !== me.dbFrozen) {
+      NX.State.setValue('db', { dbFrozen: me.dbFrozen });
     }
   },
 
   toggleFreeze: function() {
     var me = this, dialogTitle, dialogDescription, yesButtonText;
 
-    var frozenManually = NX.State.getValue('frozenManually');
+    var systemInitiated = NX.State.getValue('db', {})['system'];
 
-    if (!frozenManually && me.nxFrozen) {
+    if (systemInitiated && me.dbFrozen) {
       dialogTitle = NX.I18n.get('Nodes_force_release_dialog');
       dialogDescription = NX.I18n.get('Nodes_force_release_warning')
           + ' ' + NX.I18n.get('Nodes_force_release_confirmation');
       yesButtonText = NX.I18n.get('Nodes_force_release');
     } else {
-      dialogTitle = me.nxFrozen ? NX.I18n.get('Nodes_Disable_read_only_mode_dialog') :
+      dialogTitle = me.dbFrozen ? NX.I18n.get('Nodes_Disable_read_only_mode_dialog') :
           NX.I18n.get('Nodes_Enable_read_only_mode_dialog');
-      dialogDescription = me.nxFrozen ? NX.I18n.get('Nodes_disable_read_only_mode_dialog_description') :
+      dialogDescription = me.dbFrozen ? NX.I18n.get('Nodes_disable_read_only_mode_dialog_description') :
           NX.I18n.get('Nodes_enable_read_only_mode_dialog_description');
-      yesButtonText = me.nxFrozen ? NX.I18n.get('Nodes_Disable_read_only_mode') :
+      yesButtonText = me.dbFrozen ? NX.I18n.get('Nodes_Disable_read_only_mode') :
           NX.I18n.get('Nodes_Enable_read_only_mode');
     }
 
     NX.Dialogs.askConfirmation(dialogTitle, dialogDescription, function() {
-      var settings = {frozen: !me.nxFrozen};
+      var settings = {frozen: !me.dbFrozen};
 
       me.getContent().getEl().mask(NX.I18n.get('Nodes_Toggling_read_only_mode'));
-      if (!frozenManually && me.nxFrozen) {
-        NX.direct.coreui_Freeze.forceRelease(function(response) {
+      if (systemInitiated && me.dbFrozen) {
+        NX.direct.coreui_DatabaseFreeze.forceRelease(function(response) {
           me.getContent().getEl().unmask();
           if (Ext.isObject(response) && response.success) {
             me.updateFreezeStatus(response.data.frozen);
           }
         });
       } else {
-        NX.direct.coreui_Freeze.update(settings, function(response) {
+        NX.direct.coreui_DatabaseFreeze.update(settings, function(response) {
           me.getContent().getEl().unmask();
           if (Ext.isObject(response) && response.success) {
             me.updateFreezeStatus(response.data.frozen);

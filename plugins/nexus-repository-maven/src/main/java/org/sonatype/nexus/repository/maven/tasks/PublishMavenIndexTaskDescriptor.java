@@ -15,7 +15,6 @@ package org.sonatype.nexus.repository.maven.tasks;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
-import org.sonatype.nexus.common.upgrade.AvailabilityVersion;
 import org.sonatype.nexus.formfields.RepositoryCombobox;
 import org.sonatype.nexus.repository.maven.internal.Maven2Format;
 import org.sonatype.nexus.scheduling.TaskDescriptorSupport;
@@ -25,7 +24,6 @@ import org.sonatype.nexus.scheduling.TaskDescriptorSupport;
  *
  * @since 3.0
  */
-@AvailabilityVersion(from = "1.0")
 @Named
 @Singleton
 public class PublishMavenIndexTaskDescriptor
@@ -38,13 +36,13 @@ public class PublishMavenIndexTaskDescriptor
   public PublishMavenIndexTaskDescriptor() {
     super(TYPE_ID,
         PublishMavenIndexTask.class,
-        "Maven - Publish Maven Indexer files",
+        "Publish Maven indexes",
         VISIBLE,
         EXPOSED,
         new RepositoryCombobox(
             REPOSITORY_NAME_FIELD_ID,
             "Repository",
-            "Select the Maven repository to publish indexer files for",
+            "Select the Maven repository to publish indexes for",
             true
         ).includingAnyOfFormats(Maven2Format.NAME).includeAnEntryForAllRepositories()
     );

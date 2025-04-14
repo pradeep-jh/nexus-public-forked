@@ -12,6 +12,7 @@
  */
 package org.sonatype.nexus.security;
 
+import java.util.Iterator;
 import java.util.List;
 
 import javax.inject.Inject;
@@ -65,14 +66,14 @@ public class UserPrincipalsHelper
         throw new UserNotFoundException(userId, e.getMessage(), e);
       }
       catch (final UserNotFoundTransientException e) {
-        log.debug("Ignoring transient user error", e);
+        log.debug("Ignoring transient user error: {}", e);
         return UserStatus.disabled;
       }
       catch (final UserNotFoundException e) {
         throw e; // pass back original cause unchanged
       }
       catch (final RuntimeException e) {
-        log.debug("Ignoring transient user error", e);
+        log.debug("Ignoring transient user error: {}", e);
         return UserStatus.disabled;
       }
     }
@@ -86,21 +87,18 @@ public class UserPrincipalsHelper
    * @return UserManager component
    */
   public UserManager findUserManager(final PrincipalCollection principals) throws NoSuchUserManagerException {
-    if (principals == null) {
-      throw new NoSuchUserManagerException("Missing principals");
-    }
-    boolean isPrimary = true;
-    for (final String realmName : principals.getRealmNames()) {
-      // include secondary realms in the search as long as they have the same userId as the primary
-      if (isPrimary || principals.fromRealm(realmName).contains(principals.getPrimaryPrincipal())) {
+    String primaryRealmName = null;
+    if (principals != null) {
+      final Iterator<String> itr = principals.getRealmNames().iterator();
+      if (itr.hasNext()) {
+        primaryRealmName = itr.next();
         for (final UserManager userManager : userManagers) {
-          if (realmName.equals(userManager.getAuthenticationRealmName())) {
+          if (primaryRealmName.equals(userManager.getAuthenticationRealmName())) {
             return userManager;
           }
         }
-        isPrimary = false;
       }
     }
-    throw new NoSuchUserManagerException("User-manager not found for realm(s)", principals.getRealmNames().toString());
+    throw new NoSuchUserManagerException(primaryRealmName);
   }
 }

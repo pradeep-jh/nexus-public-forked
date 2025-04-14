@@ -59,11 +59,6 @@ public abstract class MockUserManagerSupport
     return null;
   }
 
-  @Override
-  public User getUser(final String userId, final Set<String> roleIds) throws UserNotFoundException {
-    return getUser(userId);
-  }
-
   public Set<String> listUserIds() {
     Set<String> userIds = new HashSet<String>();
 
@@ -88,10 +83,5 @@ public abstract class MockUserManagerSupport
 
   public void changePassword(String userId, String newPassword) throws UserNotFoundException {
     // empty
-  }
-
-  @Override
-  public boolean isConfigured() {
-    throw new UnsupportedOperationException("Not supported yet.");
   }
 }

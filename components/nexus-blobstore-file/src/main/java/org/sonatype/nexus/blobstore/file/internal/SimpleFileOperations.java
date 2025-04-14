@@ -17,8 +17,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryNotEmptyException;
-import java.nio.file.FileSystemException;
 import java.nio.file.Files;
+import java.nio.file.FileSystemException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
@@ -113,27 +113,6 @@ public class SimpleFileOperations
   }
 
   @Override
-  public void overwrite(final Path source, final Path target) throws IOException {
-    checkNotNull(source);
-    checkNotNull(target);
-    DirectoryHelper.mkdir(target.getParent());
-    Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
-  }
-
-  @Override
-  public void overwriteAtomic(final Path source, final Path target) throws IOException {
-    checkNotNull(source);
-    checkNotNull(target);
-    DirectoryHelper.mkdir(target.getParent());
-    try {
-      Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-    }
-    catch (UnsupportedOperationException e) { // NOSONAR
-      throw new AtomicMoveNotSupportedException(source.toString(), target.toString(), e.getMessage());
-    }
-  }
-
-  @Override
   public void copyIfLocked(final Path source, final Path target, final Mover mover) throws IOException {
     checkNotNull(source);
     checkNotNull(target);
@@ -141,7 +120,7 @@ public class SimpleFileOperations
       mover.accept(source, target);
     }
     catch (AtomicMoveNotSupportedException atomicMoveNotSupported) {
-      throw atomicMoveNotSupported;
+        throw atomicMoveNotSupported;
     }
     catch (FileSystemException e) { // NOSONAR
       // Windows can throw a FileSystemException on move or moveAtomic
@@ -161,7 +140,7 @@ public class SimpleFileOperations
   @Override
   public StreamMetrics computeMetrics(final Path file) throws IOException {
     try (InputStream is = Files.newInputStream(file);
-        MetricsInputStream mis = new MetricsInputStream(is)) {
+         MetricsInputStream mis = new MetricsInputStream(is)) {
       ByteStreams.copy(mis, ByteStreams.nullOutputStream());
       return mis.getMetrics();
     }
@@ -171,16 +150,6 @@ public class SimpleFileOperations
   public boolean exists(final Path path) {
     checkNotNull(path);
     return Files.exists(path);
-  }
-
-  public boolean isBlobZeroLength(final Path path) {
-    checkNotNull(path);
-    try {
-      return Files.exists(path) && Files.size(path) == 0L;
-    }
-    catch (IOException e) {
-      return false;
-    }
   }
 
   @Override
@@ -203,17 +172,6 @@ public class SimpleFileOperations
     return deleted;
   }
 
-  @Override
-  public boolean deleteQuietly(final Path path) {
-    try {
-      return delete(path);
-    }
-    catch (Exception e) {
-      log.warn("Unable to delete path {}", path, e);
-      return false;
-    }
-  }
-
   /**
    * Removes the directory and all of its contents.
    */
@@ -227,17 +185,13 @@ public class SimpleFileOperations
    * Removes the directory if and only if the directory is empty.
    */
   @Override
-  public boolean deleteEmptyDirectory(final Path directory) {
+  public boolean deleteEmptyDirectory(final Path directory) throws IOException {
     try {
       Files.deleteIfExists(directory);
       return true;
     }
     catch (DirectoryNotEmptyException e) {
       log.debug("Cannot remove non-empty directory {}", directory, e);
-      return false;
-    }
-    catch (IOException e) {
-      log.debug("Unable to remove directory {}", directory, e);
       return false;
     }
   }

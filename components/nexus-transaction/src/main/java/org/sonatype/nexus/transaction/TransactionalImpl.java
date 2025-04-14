@@ -20,43 +20,26 @@ import java.util.Arrays;
  *
  * @since 3.2
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
+@SuppressWarnings({ "rawtypes", "unchecked" })
 final class TransactionalImpl
     implements Transactional
 {
-  private final String reason;
-
   private final Class[] commitOn;
 
   private final Class[] retryOn;
 
   private final Class[] swallow;
 
-  private final TransactionIsolation isolation;
-
   @SuppressWarnings("pmd:ArrayIsStoredDirectly") // we assume these are safe to store
-  TransactionalImpl(
-      final String reason,
-      final Class[] commitOn,
-      final Class[] retryOn,
-      final Class[] swallow,
-      final TransactionIsolation isolation)
-  {
-    this.reason = reason;
+  TransactionalImpl(final Class[] commitOn, final Class[] retryOn, final Class[] swallow) {
     this.commitOn = commitOn;
     this.retryOn = retryOn;
     this.swallow = swallow;
-    this.isolation = isolation;
   }
 
   @Override
   public Class<? extends Annotation> annotationType() {
     return Transactional.class;
-  }
-
-  @Override
-  public String reason() {
-    return reason;
   }
 
   @Override
@@ -75,17 +58,10 @@ final class TransactionalImpl
   }
 
   @Override
-  public TransactionIsolation isolation() {
-    return isolation;
-  }
-
-  @Override
   public int hashCode() {
-    return (127 * "reason".hashCode() ^ reason.hashCode())
-        + (127 * "commitOn".hashCode() ^ Arrays.hashCode(commitOn))
+    return (127 * "commitOn".hashCode() ^ Arrays.hashCode(commitOn))
         + (127 * "retryOn".hashCode() ^ Arrays.hashCode(retryOn))
-        + (127 * "swallow".hashCode() ^ Arrays.hashCode(swallow))
-        + (127 * "isolation".hashCode() ^ isolation.hashCode());
+        + (127 * "swallow".hashCode() ^ Arrays.hashCode(swallow));
   }
 
   @Override
@@ -99,22 +75,17 @@ final class TransactionalImpl
     }
 
     final Transactional spec = (Transactional) o;
-    return reason.equals(spec.reason())
-        && Arrays.equals(commitOn, spec.commitOn())
+    return Arrays.equals(commitOn, spec.commitOn())
         && Arrays.equals(retryOn, spec.retryOn())
-        && Arrays.equals(swallow, spec.swallow())
-        && isolation == spec.isolation();
-
+        && Arrays.equals(swallow, spec.swallow());
   }
 
   @Override
   public String toString() {
-    return String.format("@%s(reason=%s, commitOn=%s, retryOn=%s, swallow=%s, isolation=%s)",
+    return String.format("@%s(commitOn=%s, retryOn=%s, swallow=%s)",
         annotationType().getName(),
-        reason,
         Arrays.toString(commitOn),
         Arrays.toString(retryOn),
-        Arrays.toString(swallow),
-        isolation);
+        Arrays.toString(swallow));
   }
 }

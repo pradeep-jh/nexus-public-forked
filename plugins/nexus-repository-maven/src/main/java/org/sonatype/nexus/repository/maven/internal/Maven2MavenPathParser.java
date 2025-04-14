@@ -19,7 +19,6 @@ import javax.annotation.Nullable;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
-import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.repository.maven.MavenPath;
 import org.sonatype.nexus.repository.maven.MavenPath.Coordinates;
 import org.sonatype.nexus.repository.maven.MavenPath.HashType;
@@ -36,17 +35,8 @@ import static com.google.common.base.Preconditions.checkNotNull;
 @Singleton
 @Named(Maven2Format.NAME)
 public class Maven2MavenPathParser
-    extends ComponentSupport
     implements MavenPathParser
 {
-  private static final String TAR_EXT_PREFIX = ".tar";
-
-  private static final String CPIO_EXT_PREFIX = ".cpio";
-
-  // The extension supported for Coca-Cola
-  // https://issues.sonatype.org/browse/NEXUS-24098
-  private static final String NK_OS_EXT = ".nk.os";
-
   @Nonnull
   @Override
   public MavenPath parsePath(final String path) {
@@ -68,12 +58,6 @@ public class Maven2MavenPathParser
   @Override
   public boolean isRepositoryMetadata(final MavenPath path) {
     return path.main().getFileName().equals(Constants.METADATA_FILENAME);
-  }
-
-  @Override
-  public boolean isRepositoryIndex(final MavenPath path) {
-    return path.getPath().equals(Constants.INDEX_MAIN_CHUNK_FILE_PATH) ||
-        path.getPath().equals(Constants.INDEX_PROPERTY_FILE_PATH);
   }
 
   /**
@@ -131,46 +115,27 @@ public class Maven2MavenPathParser
       String version = baseVersion;
       Long timestamp = null;
       Integer buildNumber = null;
-      String tail = null;
+      String tail;
       if (snapshot) {
-        int vSnapshotStart =
-            artifactId.length() + 1 + baseVersion.length() - Constants.SNAPSHOT_VERSION_SUFFIX.length();
-        version = str.substring(vSnapshotStart, vSnapshotStart + Constants.SNAPSHOT_VERSION_SUFFIX.length());
-
+        int vSnapshotStart = artifactId.length() + baseVersion.length() - 10 + 3;
+        version = str.substring(vSnapshotStart, vSnapshotStart + 8);
         if (Constants.SNAPSHOT_VERSION_SUFFIX.equals(version)) {
-          int vTimestampStart = vSnapshotStart + version.length() + 1;
-
-          //this would be expected in most cases
           version = baseVersion; // reset it
-          tail = str.substring(artifactId.length() + baseVersion.length() + 1);
-
-          //check if we have something hokey like SNAPSHOT-20180101.121212
-          if (str.length() > vTimestampStart + Constants.DOTTED_TIMESTAMP_VERSION_FORMAT.length()) {
-            try { //NOSONAR not extracting to method as many variables external to the method need to be updated
-              Constants.METADATA_DOTTED_TIMESTAMP.parseDateTime(
-                  str.substring(vTimestampStart, vTimestampStart + Constants.DOTTED_TIMESTAMP_VERSION_FORMAT.length()))
-                  .getMillis();
-              version = str.substring(vTimestampStart, vTimestampStart + Constants.SNAPSHOT_VERSION_SUFFIX.length());
-              vSnapshotStart = vTimestampStart;
-              tail = null;
-            }
-            catch (IllegalArgumentException e) { //NOSONAR
-              //usually expected
-            }
-          }
+          int nTailPos = artifactId.length() + baseVersion.length() + 1;
+          tail = str.substring(nTailPos);
         }
-
-        if (tail == null) {
+        else {
           final StringBuilder snapshotTimestampedVersion = new StringBuilder(version);
-          snapshotTimestampedVersion.append(str.substring(vSnapshotStart + version.length(),
-              vSnapshotStart + version.length() + Constants.SNAPSHOT_VERSION_SUFFIX.length() - 1));
+          snapshotTimestampedVersion.append(
+              str.substring(vSnapshotStart + version.length(), vSnapshotStart + version.length() + 7)
+          );
 
           try {
             timestamp = Constants.METADATA_DOTTED_TIMESTAMP.parseDateTime(
                 snapshotTimestampedVersion.toString()).getMillis();
           }
           catch (IllegalArgumentException e) {
-            log.trace("metadata dotted timestamp failed parsing to millis {}", snapshotTimestampedVersion.toString());
+            // skip it
           }
 
           // add the dash between timestamp and buildNo
@@ -183,15 +148,18 @@ public class Maven2MavenPathParser
             bnr.append(str.charAt(buildNumberPos));
             buildNumberPos++;
           }
+          if (bnr.length() == 0) {
+            return null;
+          }
           try {
             buildNumber = Integer.parseInt(bnr.toString());
           }
           catch (NumberFormatException e) {
-            log.trace("build number failed parsing {}", bnr);
+            // skip it
           }
-          tail = str.substring(vSnapshotStart + snapshotTimestampedVersion.length());
-          version = baseVersion.substring(0, baseVersion.length() - Constants.SNAPSHOT_VERSION_SUFFIX.length())
-              + snapshotTimestampedVersion;
+          int n = baseVersion.length() > 8 ? baseVersion.length() - 8 : 0;
+          tail = str.substring(artifactId.length() + n + snapshotTimestampedVersion.length() + 1);
+          version = baseVersion.substring(0, baseVersion.length() - 8) + snapshotTimestampedVersion;
         }
       }
       else {
@@ -212,10 +180,13 @@ public class Maven2MavenPathParser
         tail = str.substring(nTailPos);
       }
 
-      int nExtPos = getExceptionPos(tail);
+      int nExtPos = tail.lastIndexOf('.');
       if (nExtPos == -1) {
         // NX-563: not allowing extensionless paths to be interpreted as artifact
         return null;
+      }
+      if (tail.endsWith(".tar.gz")) {
+        nExtPos = nExtPos - 4;
       }
 
       final String ext = tail.substring(nExtPos + 1);
@@ -237,26 +208,5 @@ public class Maven2MavenPathParser
     catch (StringIndexOutOfBoundsException e) {
       return null;
     }
-  }
-
-  private int getExceptionPos(final String tail) {
-    int nExtPos = tail.lastIndexOf('.');
-    if (nExtPos == -1) {
-      return -1;
-    }
-
-    String tailWithoutExt = tail.substring(0, nExtPos);
-
-    if (tailWithoutExt.endsWith(TAR_EXT_PREFIX)) {
-      nExtPos -= TAR_EXT_PREFIX.length();
-    }
-    else if (tailWithoutExt.endsWith(CPIO_EXT_PREFIX)) {
-      nExtPos -= CPIO_EXT_PREFIX.length();
-    }
-    else if (tail.endsWith(NK_OS_EXT)){
-      nExtPos = tail.length() - NK_OS_EXT.length();
-    }
-
-    return nExtPos;
   }
 }

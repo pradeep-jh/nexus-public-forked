@@ -13,7 +13,6 @@
 package org.sonatype.nexus.scheduling.spi;
 
 import java.util.List;
-import java.util.Map;
 
 import javax.annotation.Nullable;
 
@@ -68,13 +67,6 @@ public interface SchedulerSPI
   List<TaskInfo> listsTasks();
 
   /**
-   * Returns description of triggers that were recovered after an error caused them to be lost
-   *
-   * @since 3.17
-   */
-  List<String> getMissingTriggerDescriptions();
-
-  /**
    * Schedule a task with the given scheduler.
    *
    * If a task already exists with the same task identifier, the task will be updated.
@@ -94,69 +86,4 @@ public interface SchedulerSPI
    * @since 3.7
    */
   int getExecutedTaskCount();
-
-  /**
-   * Attempts to cancel execution of the task ({@code id}).  This attempt will
-   * fail if the task has already completed, has already been cancelled,
-   *  or could not be cancelled for some other reason.
-   *
-   * @return {@code false} if the task could not be cancelled,
-   * typically because it has already completed normally;
-   * {@code true} otherwise
-   *
-   * @since 3.19
-   */
-  boolean cancel(String id, boolean mayInterruptIfRunning);
-
-  /**
-   * Returns the {@link TaskInfo} of the first task with type ID matching {@code typeId}, otherwise {@code null}.
-   */
-  @Nullable
-  TaskInfo getTaskByTypeId(String typeId);
-
-  /**
-   * Returns the {@link TaskInfo} of the first task with type ID matching {@code typeId}
-   * and {@link TaskConfiguration} matching {@code config}, otherwise {@code null}.
-   * <p/>
-   * All entries in {@code config} must match entries in the task's {@link TaskConfiguration} to be
-   * considered a match. Any entries of {@code config} with either a null key or null value will be ignored.
-   */
-  @Nullable
-  TaskInfo getTaskByTypeId(String typeId, Map<String, String> config);
-
-  /**
-   * Find the first task with type ID matching {@code typeId}.
-   * <p/>
-   * If found, submit the task for execution if it is not already running.
-   *
-   * @param typeId task type ID
-   * @return {@code true} if a task is found, {@code false} otherwise
-   */
-  boolean findAndSubmit(String typeId);
-
-  /**
-   * Find the first task with type ID matching {@code typeId} and {@link TaskConfiguration} matching {@code config}.
-   * <p/>
-   * All entries in {@code config} must match entries in the task's {@link TaskConfiguration} to be
-   * considered a match. Any entries of {@code config} with either a null key or null value will be ignored.
-   * <p/>
-   * If found, don't submit the task for execution just confirm the waiting/running state with a boolean value
-   *
-   * @param typeId task type ID
-   * @return {@code true} if a task is found waiting or already running, {@code false} otherwise
-   */
-  boolean findWaitingTask(String typeId, Map<String, String> config);
-
-  /**
-   * Find the first task with type ID matching {@code typeId} and {@link TaskConfiguration} matching {@code config}.
-   * <p/>
-   * All entries in {@code config} must match entries in the task's {@link TaskConfiguration} to be
-   * considered a match. Any entries of {@code config} with either a null key or null value will be ignored.
-   * <p/>
-   * If found, submit the task for execution if it is not already running.
-   *
-   * @param typeId task type ID
-   * @return {@code true} if a task is found, {@code false} otherwise
-   */
-  boolean findAndSubmit(String typeId, Map<String, String> config);
 }

@@ -30,7 +30,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 /**
  * @since 3.6
  */
-@SuppressWarnings("rawtypes")
 @Named
 @Singleton
 public class CacheHelper
@@ -38,30 +37,17 @@ public class CacheHelper
 {
   private final Provider<CacheManager> cacheManagerProvider;
 
-  private final Provider<CacheBuilder> cacheBuilderProvider;
-
   @Inject
-  public CacheHelper(
-      final Provider<CacheManager> cacheManagerProvider,
-      final Provider<CacheBuilder> cacheBuilderProvider)
-  {
+  public CacheHelper(final Provider<CacheManager> cacheManagerProvider) {
     this.cacheManagerProvider = checkNotNull(cacheManagerProvider);
-    this.cacheBuilderProvider = checkNotNull(cacheBuilderProvider);
   }
 
   private CacheManager manager() {
     return cacheManagerProvider.get();
   }
 
-  @SuppressWarnings("unchecked")
-  public <K, V> CacheBuilder<K, V> builder() {
-    return cacheBuilderProvider.get();
-  }
-
-  public synchronized <K, V> Cache<K, V> maybeCreateCache(
-      final String name,
-      final MutableConfiguration<K, V> mutableConfiguration)
-  {
+  public synchronized <K, V> Cache<K, V> maybeCreateCache(final String name,
+                                                          final MutableConfiguration<K, V> mutableConfiguration) {
     checkNotNull(name);
     checkNotNull(mutableConfiguration);
 
@@ -79,34 +65,16 @@ public class CacheHelper
     return cache;
   }
 
-  public synchronized <K, V> Cache<K, V> getOrCreate(final CacheBuilder<K, V> builder) {
-    checkNotNull(builder);
-
-    Cache<K, V> cache = manager().getCache(builder.getName(), builder.getKeyType(), builder.getValueType());
-
-    if (cache == null) {
-      cache = builder.build(manager());
-      log.debug("Created cache: {}", cache);
-    }
-    else {
-      log.debug("Re-using existing cache: {}", cache);
-    }
-
-    return cache;
-  }
-
-  public synchronized <K, V> Cache<K, V> maybeCreateCache(
-      final String name,
-      final Factory<? extends ExpiryPolicy> expiryPolicyFactory)
+  public synchronized <K, V> Cache<K, V> maybeCreateCache(final String name,
+                                                          final Factory<? extends ExpiryPolicy> expiryPolicyFactory)
   {
     return maybeCreateCache(name, null, null, expiryPolicyFactory);
   }
 
-  public synchronized <K, V> Cache<K, V> maybeCreateCache(
-      final String name,
-      @Nullable final Class<K> keyType,
-      @Nullable final Class<V> valueType,
-      final Factory<? extends ExpiryPolicy> expiryPolicyFactory)
+  public synchronized <K, V> Cache<K, V> maybeCreateCache(final String name,
+                                                          @Nullable final Class<K> keyType,
+                                                          @Nullable final Class<V> valueType,
+                                                          final Factory<? extends ExpiryPolicy> expiryPolicyFactory)
   {
     return maybeCreateCache(name, createCacheConfig(keyType, valueType, expiryPolicyFactory));
   }

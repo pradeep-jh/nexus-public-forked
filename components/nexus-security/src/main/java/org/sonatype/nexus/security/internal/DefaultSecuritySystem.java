@@ -18,9 +18,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 import javax.crypto.Cipher;
@@ -32,20 +30,15 @@ import org.sonatype.nexus.common.app.ManagedLifecycle;
 import org.sonatype.nexus.common.event.EventManager;
 import org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport;
 import org.sonatype.nexus.common.text.Strings2;
-import org.sonatype.nexus.security.SecurityHelper;
 import org.sonatype.nexus.security.SecuritySystem;
-import org.sonatype.nexus.security.UserIdHelper;
 import org.sonatype.nexus.security.UserPrincipalsExpired;
 import org.sonatype.nexus.security.anonymous.AnonymousConfiguration;
-import org.sonatype.nexus.security.anonymous.AnonymousHelper;
 import org.sonatype.nexus.security.anonymous.AnonymousManager;
-import org.sonatype.nexus.security.authc.UserPasswordChanged;
 import org.sonatype.nexus.security.authz.AuthorizationConfigurationChanged;
 import org.sonatype.nexus.security.authz.AuthorizationManager;
 import org.sonatype.nexus.security.authz.NoSuchAuthorizationManagerException;
 import org.sonatype.nexus.security.privilege.Privilege;
 import org.sonatype.nexus.security.realm.RealmManager;
-import org.sonatype.nexus.security.realm.SecurityRealm;
 import org.sonatype.nexus.security.role.Role;
 import org.sonatype.nexus.security.role.RoleIdentifier;
 import org.sonatype.nexus.security.user.InvalidCredentialsException;
@@ -55,11 +48,11 @@ import org.sonatype.nexus.security.user.User;
 import org.sonatype.nexus.security.user.UserManager;
 import org.sonatype.nexus.security.user.UserNotFoundException;
 import org.sonatype.nexus.security.user.UserSearchCriteria;
+import org.sonatype.nexus.security.user.UserStatus;
 
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.authc.UsernamePasswordToken;
-import org.apache.shiro.authz.AuthorizationException;
 import org.apache.shiro.mgt.RealmSecurityManager;
 import org.apache.shiro.realm.Realm;
 import org.apache.shiro.subject.PrincipalCollection;
@@ -67,7 +60,6 @@ import org.apache.shiro.subject.Subject;
 import org.apache.shiro.util.LifecycleUtils;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static java.lang.String.format;
 import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.SECURITY;
 
 /**
@@ -81,8 +73,6 @@ public class DefaultSecuritySystem
     implements SecuritySystem
 {
   private static final String ALL_ROLES_KEY = "all";
-  public static final String NEXUS_AUTHORIZING_REALM = "NexusAuthorizingRealm";
-  public static final String NEXUS_AUTHENTICATING_REALM = "NexusAuthenticatingRealm";
 
   private final EventManager eventManager;
 
@@ -96,16 +86,13 @@ public class DefaultSecuritySystem
 
   private final Map<String, UserManager> userManagers;
 
-  private final SecurityHelper securityHelper;
-
   @Inject
   public DefaultSecuritySystem(final EventManager eventManager,
                                final RealmSecurityManager realmSecurityManager,
                                final RealmManager realmManager,
                                final AnonymousManager anonymousManager,
                                final Map<String, AuthorizationManager> authorizationManagers,
-                               final Map<String, UserManager> userManagers,
-                               final SecurityHelper securityHelper)
+                               final Map<String, UserManager> userManagers)
   {
     this.eventManager = checkNotNull(eventManager);
     this.realmSecurityManager = checkNotNull(realmSecurityManager);
@@ -113,7 +100,6 @@ public class DefaultSecuritySystem
     this.anonymousManager = checkNotNull(anonymousManager);
     this.authorizationManagers = checkNotNull(authorizationManagers);
     this.userManagers = checkNotNull(userManagers);
-    this.securityHelper = checkNotNull(securityHelper);
   }
 
   // TODO: Sort out better lifecycle management for dependent components
@@ -181,12 +167,6 @@ public class DefaultSecuritySystem
   }
 
   @Override
-  public Set<Role> searchRoles(String sourceId, String query) throws NoSuchAuthorizationManagerException {
-    AuthorizationManager authzManager = getAuthorizationManager(sourceId);
-    return authzManager.searchRoles(query);
-  }
-
-  @Override
   public Set<Privilege> listPrivileges() {
     Set<Privilege> result = new HashSet<>();
     for (AuthorizationManager authzManager : authorizationManagers.values()) {
@@ -250,7 +230,7 @@ public class DefaultSecuritySystem
 
     final User oldUser = userManager.getUser(user.getUserId());
     userManager.updateUser(user);
-    if (oldUser.getStatus().isActive() && user.getStatus() != oldUser.getStatus()) {
+    if (oldUser.getStatus() == UserStatus.active && user.getStatus() != oldUser.getStatus()) {
       // clear the realm authc caches as user got disabled
       eventManager.post(new UserPrincipalsExpired(user.getUserId(), user.getSource()));
     }
@@ -347,10 +327,10 @@ public class DefaultSecuritySystem
     eventManager.post(new AuthorizationConfigurationChanged());
   }
 
-  private User findUser(String userId, UserManager userManager, Set<String> roleIds) throws UserNotFoundException {
+  private User findUser(String userId, UserManager userManager) throws UserNotFoundException {
     log.trace("Finding user: {} in user-manager: {}", userId, userManager);
 
-    User user = userManager.getUser(userId, roleIds);
+    User user = userManager.getUser(userId);
     if (user == null) {
       throw new UserNotFoundException(userId);
     }
@@ -370,16 +350,6 @@ public class DefaultSecuritySystem
       return null;
     }
 
-    String userId = subject.getPrincipal().toString();
-    Optional<String> realm = subject.getPrincipals().getRealmNames().stream().findFirst();
-    try {
-      if (realm.isPresent()) {
-        return findUser(userId, getUserManagerByRealm(realm.get()), null);
-      }
-    }
-    catch (NoSuchUserManagerException e) {
-      log.trace("User: '{}' of source: '{}' could not be found.", userId, realm.get());
-    }
     return getUser(subject.getPrincipal().toString());
   }
 
@@ -389,7 +359,7 @@ public class DefaultSecuritySystem
 
     for (UserManager userManager : orderUserManagers()) {
       try {
-        return findUser(userId, userManager, null);
+        return findUser(userId, userManager);
       }
       catch (UserNotFoundException e) {
         log.trace("User: '{}' was not found in: '{}'", userId, userManager, e);
@@ -402,15 +372,10 @@ public class DefaultSecuritySystem
 
   @Override
   public User getUser(String userId, String source) throws UserNotFoundException, NoSuchUserManagerException {
-    return getUser(userId, source, null);
-  }
-
-  @Override
-  public User getUser(String userId, String source, Set<String> roleIds) throws UserNotFoundException, NoSuchUserManagerException {
     log.trace("Finding user: {} in source: {}", userId, source);
 
     UserManager userManager = getUserManager(source);
-    return findUser(userId, userManager, roleIds);
+    return findUser(userId, userManager);
   }
 
   @Override
@@ -556,14 +521,6 @@ public class DefaultSecuritySystem
 
   @Override
   public void changePassword(String userId, String newPassword) throws UserNotFoundException {
-    changePassword(userId, newPassword, true);
-  }
-
-  @Override
-  public void changePassword(String userId, String newPassword, boolean clearCache) throws UserNotFoundException {
-    // NEXUS-23237 check required permissions first
-    requirePermissionToChangeUserPassword(userId);
-
     User user = getUser(userId);
 
     try {
@@ -576,29 +533,12 @@ public class DefaultSecuritySystem
           userId, user.getSource());
     }
 
-    // Post event containing the userId for which the password has been changed
-    eventManager.post(new UserPasswordChanged(userId, clearCache));
-  }
-
-  public void requirePermissionToChangeUserPassword(final String userId) {
-    if (!isPermittedToChangeUserPassword(userId)) {
-      throw new AuthorizationException(
-          format("%s is not permitted to change the password for %s", UserIdHelper.get(), userId));
-    }
-  }
-
-  public boolean isPermittedToChangeUserPassword(final String userId) {
-    return UserIdHelper.get().equals(userId) || securityHelper.isAllPermitted();
+    // flush authc
+    eventManager.post(new UserPrincipalsExpired(userId, user.getSource()));
   }
 
   private Collection<UserManager> getUserManagers() {
     return userManagers.values();
-  }
-
-  private UserManager getUserManagerByRealm(final String realmName) throws NoSuchUserManagerException {
-    return userManagers.values().stream()
-        .filter(userManager -> realmName.equalsIgnoreCase(userManager.getAuthenticationRealmName())).findFirst()
-        .orElseThrow(() -> new NoSuchUserManagerException(realmName));
   }
 
   @Override
@@ -607,26 +547,5 @@ public class DefaultSecuritySystem
       throw new NoSuchUserManagerException(source);
     }
     return userManagers.get(source);
-  }
-
-
-  @Override
-  public List<String> listSources() {
-    return authorizationManagers.keySet().stream().sorted().collect(Collectors.toList());
-  }
-
-  @Override
-  public boolean isValidRealm(final String realm) {
-    return !realm.isEmpty() &&
-        getAllRealmIds().stream().anyMatch(singleRealm -> singleRealm.equals(realm));
-  }
-
-  private List<String> getAllRealmIds() {
-    List<String> authenticationRealms = AnonymousHelper.getAuthenticationRealms(new ArrayList<>(userManagers.values()));
-    return realmManager.getAvailableRealms(true).stream()
-        .map(SecurityRealm::getId)
-        .filter(authenticationRealms::contains)
-        .map(id -> id.equals(NEXUS_AUTHORIZING_REALM) ? NEXUS_AUTHENTICATING_REALM : id)
-        .collect(Collectors.toList());
   }
 }

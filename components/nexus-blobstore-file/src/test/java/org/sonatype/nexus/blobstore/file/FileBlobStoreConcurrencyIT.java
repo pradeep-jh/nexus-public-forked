@@ -26,24 +26,21 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 
 import org.sonatype.goodies.testsupport.TestSupport;
 import org.sonatype.goodies.testsupport.concurrent.ConcurrentRunner;
-import org.sonatype.nexus.blobstore.BlobStoreReconciliationLogger;
-import org.sonatype.nexus.blobstore.DefaultBlobIdLocationResolver;
 import org.sonatype.nexus.blobstore.MetricsInputStream;
-import org.sonatype.nexus.blobstore.MockBlobStoreConfiguration;
+import org.sonatype.nexus.blobstore.TemporaryLocationStrategy;
+import org.sonatype.nexus.blobstore.VolumeChapterLocationStrategy;
 import org.sonatype.nexus.blobstore.api.Blob;
 import org.sonatype.nexus.blobstore.api.BlobId;
 import org.sonatype.nexus.blobstore.api.BlobMetrics;
 import org.sonatype.nexus.blobstore.api.BlobStoreConfiguration;
 import org.sonatype.nexus.blobstore.api.BlobStoreException;
-import org.sonatype.nexus.blobstore.file.internal.FileOperations;
+import org.sonatype.nexus.blobstore.file.internal.BlobStoreMetricsStore;
+import org.sonatype.nexus.blobstore.file.internal.BlobStoreMetricsStoreImpl;
 import org.sonatype.nexus.blobstore.file.internal.SimpleFileOperations;
-import org.sonatype.nexus.blobstore.file.internal.datastore.metrics.DatastoreFileBlobStoreMetricsService;
-import org.sonatype.nexus.blobstore.quota.BlobStoreQuotaService;
-import org.sonatype.nexus.blobstore.quota.BlobStoreQuotaUsageChecker;
+import org.sonatype.nexus.blobstore.internal.PeriodicJobServiceImpl;
 import org.sonatype.nexus.common.app.ApplicationDirectories;
 import org.sonatype.nexus.common.log.DryRunPrefix;
 import org.sonatype.nexus.common.node.NodeAccess;
-import org.sonatype.nexus.scheduling.internal.PeriodicJobServiceImpl;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.ImmutableMap;
@@ -55,11 +52,8 @@ import org.mockito.Mock;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.io.ByteStreams.nullOutputStream;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.sonatype.nexus.blobstore.api.BlobStore.BLOB_NAME_HEADER;
 import static org.sonatype.nexus.blobstore.api.BlobStore.CREATED_BY_HEADER;
@@ -72,36 +66,20 @@ public class FileBlobStoreConcurrencyIT
 {
   public static final ImmutableMap<String, String> TEST_HEADERS = ImmutableMap.of(
       CREATED_BY_HEADER, "test",
-      BLOB_NAME_HEADER, "test/randomData.bin");
+      BLOB_NAME_HEADER, "test/randomData.bin"
+  );
 
   public static final int BLOB_MAX_SIZE_BYTES = 5_000_000;
 
-  private static final int QUOTA_CHECK_INTERVAL = 1;
-
   private FileBlobStore underTest;
 
-  @Mock
-  private DatastoreFileBlobStoreMetricsService metricsStore;
-
-  private BlobStoreQuotaUsageChecker blobStoreQuotaUsageChecker;
-
-  @Mock
-  private FileBlobDeletionIndex fileBlobDeletionIndex;
+  private BlobStoreMetricsStore metricsStore;
 
   @Mock
   NodeAccess nodeAccess;
 
   @Mock
   DryRunPrefix dryRunPrefix;
-
-  @Mock
-  BlobStoreQuotaService quotaService;
-
-  @Mock
-  FileOperations fileOperations;
-
-  @Mock
-  private BlobStoreReconciliationLogger reconciliationLogger;
 
   @Before
   public void setUp() throws Exception {
@@ -114,15 +92,18 @@ public class FileBlobStoreConcurrencyIT
     ApplicationDirectories applicationDirectories = mock(ApplicationDirectories.class);
     when(applicationDirectories.getWorkDirectory(anyString())).thenReturn(root.toFile());
 
-    final BlobStoreConfiguration config = new MockBlobStoreConfiguration();
+    final BlobStoreConfiguration config = new BlobStoreConfiguration();
     config.attributes(FileBlobStore.CONFIG_KEY).set(FileBlobStore.PATH_KEY, root.toString());
 
-    blobStoreQuotaUsageChecker = spy(
-        new BlobStoreQuotaUsageChecker(new PeriodicJobServiceImpl(), QUOTA_CHECK_INTERVAL, quotaService));
+    metricsStore = new BlobStoreMetricsStoreImpl(new PeriodicJobServiceImpl(), nodeAccess);
 
-    this.underTest = new FileBlobStore(content, new DefaultBlobIdLocationResolver(true), new SimpleFileOperations(),
-        metricsStore, config, applicationDirectories, nodeAccess, dryRunPrefix, reconciliationLogger, 0L,
-        blobStoreQuotaUsageChecker, fileBlobDeletionIndex);
+    this.underTest = new FileBlobStore(content,
+        new VolumeChapterLocationStrategy(),
+        new TemporaryLocationStrategy(),
+        new SimpleFileOperations(),
+        metricsStore,
+        config,
+        applicationDirectories, nodeAccess, dryRunPrefix);
     underTest.start();
   }
 
@@ -161,46 +142,47 @@ public class FileBlobStoreConcurrencyIT
     });
 
     runner.addTask(numberOfReaders, () -> {
-      final BlobId blobId = blobIdsInTheStore.peek();
+          final BlobId blobId = blobIdsInTheStore.peek();
 
-      log("Attempting to read " + blobId);
+          log("Attempting to read " + blobId);
 
-      if (blobId == null) {
-        return;
-      }
+          if (blobId == null) {
+            return;
+          }
 
-      final Blob blob = underTest.get(blobId);
-      if (blob == null) {
-        log("Attempted to obtain blob, but it was deleted:" + blobId);
-        return;
-      }
+          final Blob blob = underTest.get(blobId);
+          if (blob == null) {
+            log("Attempted to obtain blob, but it was deleted:" + blobId);
+            return;
+          }
 
-      try (InputStream inputStream = blob.getInputStream()) {
-        readContentAndValidateMetrics(blobId, inputStream, blob.getMetrics());
-      }
-      catch (BlobStoreException e) {
-        checkState(deletedIds.contains(e.getBlobId()));
-        // This is normal operation if another thread deletes your blob after you obtain a Blob reference
-        log("Concurrent deletion suspected while calling blob.getInputStream().", e);
-      }
-    });
+          try (InputStream inputStream = blob.getInputStream()) {
+            readContentAndValidateMetrics(blobId, inputStream, blob.getMetrics());
+          }
+          catch (BlobStoreException e) {
+            checkState(deletedIds.contains(e.getBlobId()));
+            // This is normal operation if another thread deletes your blob after you obtain a Blob reference
+            log("Concurrent deletion suspected while calling blob.getInputStream().", e);
+          }
+        }
+    );
 
     runner.addTask(numberOfDeleters, () -> {
-      final BlobId blobId = blobIdsInTheStore.poll();
-      if (blobId == null) {
-        log("deleter: null blob id");
-        return;
-      }
-      log("Deleting {}", blobId);
+          final BlobId blobId = blobIdsInTheStore.poll();
+          if (blobId == null) {
+            log("deleter: null blob id");
+            return;
+          }
+          log("Deleting {}", blobId);
 
-      // There's a race condition here, we need to note that we're attempting to delete this before the deletion
-      // goes through, otherwise we may fail the check, above.
-      deletedIds.add(blobId);
-      underTest.delete(blobId, "Testing concurrency");
-    });
+          // There's a race condition here, we need to note that we're attempting to delete this before the deletion
+          // goes through, otherwise we may fail the check, above.
+          deletedIds.add(blobId);
+          underTest.delete(blobId, "Testing concurrency");
+        }
+    );
 
-    // Shufflers pull blob IDs off the front of the queue and stick them on the back, to make the blobID queue a bit
-    // less orderly
+    // Shufflers pull blob IDs off the front of the queue and stick them on the back, to make the blobID queue a bit less orderly
     runner.addTask(numberOfShufflers, () -> {
       final BlobId blobId = blobIdsInTheStore.poll();
       if (blobId != null) {
@@ -208,12 +190,10 @@ public class FileBlobStoreConcurrencyIT
       }
     });
 
+
     runner.addTask(numberOfCompactors, () -> underTest.compact(null));
 
     runner.go();
-
-    verify(metricsStore).init(underTest);
-    verify(quotaService, atLeastOnce()).checkQuota(underTest);
   }
 
   /**
@@ -221,10 +201,10 @@ public class FileBlobStoreConcurrencyIT
    *
    * @throws RuntimeException if there is any deviation
    */
-  private void readContentAndValidateMetrics(
-      final BlobId blobId,
-      final InputStream inputStream,
-      final BlobMetrics metadataMetrics) throws NoSuchAlgorithmException, IOException
+  private void readContentAndValidateMetrics(final BlobId blobId,
+                                             final InputStream inputStream,
+                                             final BlobMetrics metadataMetrics)
+      throws NoSuchAlgorithmException, IOException
   {
     final MetricsInputStream measured = new MetricsInputStream(inputStream);
     ByteStreams.copy(measured, nullOutputStream());
@@ -233,16 +213,14 @@ public class FileBlobStoreConcurrencyIT
     checkEqual("SHA1 hash", metadataMetrics.getSha1Hash(), measured.getMessageDigest(), blobId);
   }
 
-  private void checkEqual(
-      final String propertyName,
-      final Object expected,
-      final Object measured,
-      final BlobId blobId)
+  private void checkEqual(final String propertyName, final Object expected, final Object measured,
+                          final BlobId blobId)
   {
     if (!Objects.equal(measured, expected)) {
       throw new RuntimeException(
           "Blob " + blobId + "'s measured " + propertyName + " differed from its metadata. Expected " + expected +
-              " but was " + measured + ".");
+              " but was " + measured + "."
+      );
     }
   }
 }

@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -27,7 +23,6 @@ Ext.define('NX.coreui.controller.Repositories', {
     'NX.Dialogs',
     'NX.Messages',
     'NX.Permissions',
-    'NX.State',
     'NX.I18n'
   ],
 
@@ -38,11 +33,10 @@ Ext.define('NX.coreui.controller.Repositories', {
     'Repository'
   ],
   stores: [
-    'BlobstoreNames',
+    'Blobstore',
     'Repository',
     'RepositoryRecipe',
-    'RepositoryReference',
-    'CleanupPolicy'
+    'RepositoryReference'
   ],
   views: [
     'repository.RepositoryAdd',
@@ -51,77 +45,38 @@ Ext.define('NX.coreui.controller.Repositories', {
     'repository.RepositorySelectRecipe',
     'repository.RepositorySettings',
     'repository.RepositorySettingsForm',
-    'repository.recipe.AptHosted',
-    'repository.recipe.AptProxy',
-    'repository.recipe.CargoGroup',
-    'repository.recipe.CargoHosted',
-    'repository.recipe.CargoProxy',
-    'repository.recipe.ComposerProxy',
-    'repository.recipe.CocoapodsProxy',
-    'repository.recipe.ConanGroup',
-    'repository.recipe.ConanHosted',
-    'repository.recipe.ConanProxy',
-    'repository.recipe.CondaProxy',
+    'repository.recipe.BowerGroup',
+    'repository.recipe.BowerHosted',
+    'repository.recipe.BowerProxy',
+    'repository.recipe.Maven2Hosted',
+    'repository.recipe.Maven2Proxy',
+    'repository.recipe.Maven2Group',
+    'repository.recipe.NpmHosted',
+    'repository.recipe.NpmProxy',
+    'repository.recipe.NpmGroup',
+    'repository.recipe.NugetHosted',
+    'repository.recipe.NugetProxy',
+    'repository.recipe.NugetGroup',
+    'repository.recipe.RubygemsHosted',
+    'repository.recipe.RubygemsProxy',
+    'repository.recipe.RawHosted',
+    'repository.recipe.RawProxy',
+    'repository.recipe.RawGroup',
     'repository.recipe.DockerHosted',
     'repository.recipe.DockerGroup',
     'repository.recipe.DockerProxy',
-    'repository.recipe.GitLfsHosted',
-    'repository.recipe.GolangGroup',
-    'repository.recipe.GolangHosted',
-    'repository.recipe.HelmHosted',
-    'repository.recipe.HelmProxy',
-    'repository.recipe.HuggingFaceProxy',
-    'repository.recipe.Maven2Group',
-    'repository.recipe.Maven2Hosted',
-    'repository.recipe.Maven2Proxy',
-    'repository.recipe.NpmGroup',
-    'repository.recipe.NpmHosted',
-    'repository.recipe.NpmProxy',
-    'repository.recipe.NugetGroup',
-    'repository.recipe.NugetHosted',
-    'repository.recipe.NugetProxy',
-    'repository.recipe.P2Proxy',
-    'repository.recipe.PyPiGroup',
     'repository.recipe.PyPiHosted',
     'repository.recipe.PyPiProxy',
-    'repository.recipe.RGroup',
-    'repository.recipe.RHosted',
-    'repository.recipe.RProxy',
-    'repository.recipe.RawGroup',
-    'repository.recipe.RawHosted',
-    'repository.recipe.RawProxy',
-    'repository.recipe.RubygemsGroup',
-    'repository.recipe.RubygemsHosted',
-    'repository.recipe.RubygemsProxy',
-    'repository.recipe.YumGroup',
-    'repository.recipe.YumHosted',
-    'repository.recipe.YumProxy'
+    'repository.recipe.PyPiGroup',
+    'repository.recipe.YumProxy',
+    'repository.recipe.GitLfsHosted'
   ],
   refs: [
     {ref: 'feature', selector: 'nx-coreui-repository-feature'},
     {ref: 'content', selector: 'nx-feature-content'},
     {ref: 'list', selector: 'nx-coreui-repository-list'},
     {ref: 'settings', selector: 'nx-coreui-repository-feature nx-coreui-repository-settings'},
-    {
-      ref: 'proxyFacetContentMaxAge',
-      selector: 'nx-coreui-repository-add numberfield[name=attributes.proxy.contentMaxAge]'
-    },
-    {
-      ref: 'removeQuarantinedVersions',
-      selector: 'nx-coreui-repository-npm-proxy-facet checkbox[name=attributes.npm.removeQuarantinedVersions]'
-    },
-    {
-      ref: 'npmProxyFirewallWarning',
-      selector: 'nx-coreui-repository-npm-proxy-facet panel[name=npmProxyFirewallWarning]'
-    },
-    {
-      ref: 'removePypiQuarantinedVersions',
-      selector: 'nx-coreui-repository-pypi-proxy-facet checkbox[name=attributes.pypi.removeQuarantinedVersions]'
-    },
-    {
-      ref: 'pypiProxyFirewallWarning',
-      selector: 'nx-coreui-repository-pypi-proxy-facet panel[name=pypiProxyFirewallWarning]'
-    }
+    {ref: 'proxyFacetContentMaxAge', selector: 'nx-coreui-repository-add numberfield[name=attributes.proxy.contentMaxAge]'}
   ],
   icons: {
     'repository-hosted': {
@@ -141,7 +96,7 @@ Ext.define('NX.coreui.controller.Repositories', {
   /**
    * @override
    */
-  init: function() {
+  init: function () {
     var me = this;
 
     me.features = {
@@ -156,10 +111,8 @@ Ext.define('NX.coreui.controller.Repositories', {
       },
       visible: function() {
         // Show feature if the current user is permitted any repository-admin permissions
-        return NX.Permissions.checkExistsWithPrefix('nexus:repository-admin') &&
-            !NX.State.getValue('nexus.react.repositories', false);
-      },
-      weight: 10
+        return NX.Permissions.checkExistsWithPrefix('nexus:repository-admin');
+      }
     };
 
     me.callParent();
@@ -201,124 +154,54 @@ Ext.define('NX.coreui.controller.Repositories', {
         'nx-coreui-repository-selectrecipe': {
           cellclick: me.showAddRepositoryPanel
         },
-        'nx-coreui-repository-feature #remoteUrl': {
-          change: me.disablePreEmptiveAuthCheckboxIfNotHttps
-        },
-        'nx-coreui-repository-feature checkbox[name=authEnabled]': {
-          change: me.disablePreEmptiveAuthCheckboxIfNotHttps
-        },
-        'nx-coreui-repository-feature #attributes_httpclient_authentication_preemptive': {
-          /* Enabled/disabled state has to be re-evaluated any time the checkbox is enabled, because the parent
-          OptionalFieldSet enables all child elements each time it is expanded */
-          enable: me.disablePreEmptiveAuthCheckboxIfNotHttps
-        },
-        'nx-coreui-repository-feature combo[name=attributes.maven.versionPolicy]': {
+        'nx-coreui-repository-feature combo[name=attributes.maven.versionPolicy]' : {
           change: me.handleMaven2VersionPolicyChange
-        },
-        'nx-coreui-repository-nugetproxy-facet radiogroup[name=nugetVersion]': {
-          change: me.onNugetProxyVersionChange
-        },
+        }
       }
     });
-  },
-
-  disablePreEmptiveAuthCheckboxIfNotHttps: function(el) {
-    var form = el.up('form'),
-        remoteUrl = form.down('#remoteUrl').getValue(),
-        authenticationCheckbox = form.down('checkbox[name=authEnabled]'),
-        preemptiveCheckbox = form.down('checkbox#attributes_httpclient_authentication_preemptive');
-
-    if (preemptiveCheckbox && preemptiveCheckbox.isVisible()
-        && authenticationCheckbox && authenticationCheckbox.getValue()) {
-      preemptiveCheckbox.setDisabled(!remoteUrl.startsWith('https://'));
-    }
   },
 
   /**
    * @override
    */
-  getDescription: function(model) {
+  getDescription: function (model) {
     return model.get('name');
   },
 
   /**
    * @override
    */
-  onSelection: function(list, model) {
+  onSelection: function (list, model) {
     var me = this,
         settingsPanel = me.getSettings(),
         formCls = Ext.ClassManager.getByAlias('widget.nx-coreui-repository-' + model.get('recipe'));
 
+    Ext.suspendLayouts();
+
     if (!formCls) {
       me.logWarn('Could not find settings form for: ' + model.getId());
     }
-    else if (Ext.isDefined(model)) {
-      // load the record after we have all stores available
-      me.loadCleanupPolicies(model.get('format'), function() {
-        Ext.suspendLayouts();
+    else {
+      if (Ext.isDefined(model)) {
         // Load the form
         settingsPanel.removeAllSettingsForms();
         settingsPanel.addSettingsForm({xtype: formCls.xtype, recipe: model});
         settingsPanel.loadRecord(model);
 
         // Set immutable fields to readonly
-        Ext.Array.each(settingsPanel.query('field[readOnlyOnUpdate=true]'), function(field) {
+        Ext.Array.each(settingsPanel.query('field[readOnlyOnUpdate=true]'), function (field) {
           field.setReadOnly(true);
           field.addCls('nx-combo-disabled');
         });
-
-        // Hide unsupported replication fields
-        me.hideUnsupportedReplicationFields(settingsPanel, model.get('format'));
-
-        me.checkFirewallCapabilitiesStatus(model.get('name'), function(isNpmProxyFacetEnabled) {
-          var removeQuarantinedVersions = me.getRemoveQuarantinedVersions();
-          if (removeQuarantinedVersions) {
-            removeQuarantinedVersions.setDisabled(!isNpmProxyFacetEnabled);
-          }
-          var npmProxyFirewallWarning = me.getNpmProxyFirewallWarning();
-          if (npmProxyFirewallWarning && isNpmProxyFacetEnabled) {
-            npmProxyFirewallWarning.setTitle(NX.I18n.format('Repository_Facet_Npm_RemoveQuarantined_Warning'))
-          }
-        });
-
-        me.checkFirewallCapabilitiesStatusForPypi(model.get('name'), function(isPypiProxyFacetEnabled) {
-          var removePypiQuarantinedVersions = me.getRemovePypiQuarantinedVersions();
-          if (removePypiQuarantinedVersions) {
-            removePypiQuarantinedVersions.setDisabled(!isPypiProxyFacetEnabled);
-          }
-          var pypiProxyFirewallWarning = me.getPypiProxyFirewallWarning();
-          if (pypiProxyFirewallWarning && isPypiProxyFacetEnabled) {
-            pypiProxyFirewallWarning.setTitle(NX.I18n.format('Repository_Facet_Pypi_RemoveQuarantined_Warning'))
-          }
-        });
-
-        Ext.resumeLayouts();
-      });
-    }
-  },
-
-  /**
-   * @private
-   */
-  hideUnsupportedReplicationFields: function(settingsPanel, format) {
-    var supportedFormats = NX.State.getValue('replicationSupportedFormats');
-
-    if (supportedFormats instanceof Array) {
-      if (!supportedFormats.includes(format)) {
-        Ext.Array.each(settingsPanel.query('field[name="attributes.replication.preemptivePullEnabled"]'), function(field) {
-          field.setHidden(true);
-        });
-        Ext.Array.each(settingsPanel.query('field[name="attributes.replication.assetPathRegex"]'), function(field) {
-          field.setHidden(true);
-        });
       }
     }
+    Ext.resumeLayouts();
   },
 
   /**
    * @private
    */
-  showSelectRecipePanel: function() {
+  showSelectRecipePanel: function () {
     var me = this;
 
     // Show the first panel in the create wizard, and set the breadcrumb
@@ -326,7 +209,7 @@ Ext.define('NX.coreui.controller.Repositories', {
     me.setItemClass(1, NX.Icons.cls('repository-hosted', 'x16'));
 
     // Show the panel
-    me.loadCreateWizard(1, Ext.widget({
+    me.loadCreateWizard(1, true, Ext.widget({
       xtype: 'panel',
       layout: {
         type: 'vbox',
@@ -345,7 +228,7 @@ Ext.define('NX.coreui.controller.Repositories', {
   /**
    * @private
    */
-  showAddRepositoryPanel: function(list, td, cellIndex, model) {
+  showAddRepositoryPanel: function (list, td, cellIndex, model) {
     var me = this,
         formCls = Ext.ClassManager.getByAlias('widget.nx-coreui-repository-' + model.getId());
 
@@ -356,18 +239,10 @@ Ext.define('NX.coreui.controller.Repositories', {
       // Show the second panel in the create wizard, and set the breadcrumb
       me.setItemName(2, NX.I18n.format('Repositories_Create_Title', model.get('name')));
       me.setItemClass(2, NX.Icons.cls('repository-hosted', 'x16'));
-
-      // load the wizard after we have all stores available
-      var format = model.getId().split('-')[0];
-      me.loadCleanupPolicies(format, function() {
-        me.loadCreateWizard(2, {xtype: 'nx-coreui-repository-add', recipe: model});
-        if (model.getId() === 'maven2-proxy' || model.getId() === 'npm-proxy') {
-          me.cleanUpdateProxyFacetContentMaxAge(-1);
-        }
-
-        // Hide unsupported replication fields
-        me.hideUnsupportedReplicationFields(me.getDrilldown(), format);
-      });
+      me.loadCreateWizard(2, true, {xtype: 'nx-coreui-repository-add', recipe: model});
+      if (model.getId() === 'maven2-proxy') {
+        me.cleanUpdateProxyFacetContentMaxAge(-1);
+      }
     }
   },
 
@@ -410,16 +285,16 @@ Ext.define('NX.coreui.controller.Repositories', {
   /**
    * @private
    */
-  deleteModel: function(model) {
+  deleteModel: function (model) {
     var me = this,
         description = me.getDescription(model);
 
     me.getContent().getEl().mask(NX.I18n.get('Repositories_Delete_Mask'));
-    NX.direct.coreui_Repository.remove(model.getId(), function(response) {
+    NX.direct.coreui_Repository.remove(model.getId(), function (response) {
       me.getContent().getEl().unmask();
       me.getStore('Repository').load();
       if (Ext.isObject(response) && response.success) {
-        NX.Messages.success('Repository deleted: ' + description);
+        NX.Messages.add({text: 'Repository deleted: ' + description, type: 'success'});
       }
     });
   },
@@ -428,31 +303,19 @@ Ext.define('NX.coreui.controller.Repositories', {
    * @private
    * Start polling for repository statuses.
    */
-  startStatusPolling: function() {
-    var me = this,
-        uiSettings = NX.State.getValue('uiSettings'),
-        statusInterval = 5;
-
-    me.updateFormatSpecificProxyRepoURLs();
+  startStatusPolling: function () {
+    var me = this;
 
     if (me.statusProvider) {
       me.statusProvider.disconnect();
     }
-
-    if (uiSettings) {
-      statusInterval = uiSettings.statusIntervalAnonymous || statusInterval;
-      if (NX.State.getUser()) {
-        statusInterval = uiSettings.statusIntervalAuthenticated || statusInterval;
-      }
-    }
-
     me.statusProvider = Ext.direct.Manager.addProvider({
       type: 'polling',
       url: NX.direct.api.POLLING_URLS.coreui_Repository_readStatus,
-      interval: statusInterval * 1000,
+      interval: 5000,
       baseParams: {},
       listeners: {
-        data: function(provider, event) {
+        data: function (provider, event) {
           if (event.data && event.data.success && event.data.data) {
             me.updateRepositoryModels(event.data.data);
           }
@@ -470,7 +333,7 @@ Ext.define('NX.coreui.controller.Repositories', {
    * @private
    * Stop polling for repository statuses.
    */
-  stopStatusPolling: function() {
+  stopStatusPolling: function () {
     var me = this;
 
     if (me.statusProvider) {
@@ -487,10 +350,10 @@ Ext.define('NX.coreui.controller.Repositories', {
    * Updates Repository store records with values returned by status polling.
    * @param {Array} repositoryStatuses array of status objects
    */
-  updateRepositoryModels: function(repositoryStatuses) {
+  updateRepositoryModels: function (repositoryStatuses) {
     var me = this;
 
-    Ext.Array.each(repositoryStatuses, function(repositoryStatus) {
+    Ext.Array.each(repositoryStatuses, function (repositoryStatus) {
       var repositoryModel = me.getStore('Repository').findRecord('name', repositoryStatus.repositoryName);
       if (repositoryModel) {
         if (!Ext.Object.equals(repositoryModel.get('status'), repositoryStatus)) {
@@ -505,7 +368,7 @@ Ext.define('NX.coreui.controller.Repositories', {
    * Start / Stop status pooling when server is disconnected/connected.
    * @param receiving if we are receiving or not status from server (server connected/disconnected)
    */
-  onStateReceivingChanged: function(receiving) {
+  onStateReceivingChanged: function (receiving) {
     var me = this;
 
     if (me.getList() && receiving) {
@@ -520,13 +383,13 @@ Ext.define('NX.coreui.controller.Repositories', {
    * @private
    * Rebuild repository index for the selected Repository.
    */
-  rebuildIndex: function() {
+  rebuildIndex: function () {
     var me = this,
         model = me.getList().getSelectionModel().getLastSelected();
 
-    NX.direct.coreui_Repository.rebuildIndex(model.getId(), function(response) {
+    NX.direct.coreui_Repository.rebuildIndex(model.getId(), function (response) {
       if (Ext.isObject(response) && response.success) {
-        NX.Messages.success('Repository index rebuilt: ' + me.getDescription(model));
+        NX.Messages.add({text: 'Repository index rebuilt: ' + me.getDescription(model), type: 'success'});
       }
     });
   },
@@ -535,13 +398,13 @@ Ext.define('NX.coreui.controller.Repositories', {
    * @private
    * Invalidate caches for the selected proxy Repository.
    */
-  invalidateCache: function() {
+  invalidateCache: function () {
     var me = this,
         model = me.getList().getSelectionModel().getLastSelected();
 
-    NX.direct.coreui_Repository.invalidateCache(model.getId(), function(response) {
+    NX.direct.coreui_Repository.invalidateCache(model.getId(), function (response) {
       if (Ext.isObject(response) && response.success) {
-        NX.Messages.success('Repository caches invalidated: ' + me.getDescription(model));
+        NX.Messages.add({text: 'Repository caches invalidated: ' + me.getDescription(model), type: 'success'});
       }
     });
   },
@@ -550,35 +413,32 @@ Ext.define('NX.coreui.controller.Repositories', {
    * @private
    * Enables button if the select repository is a proxy or hosted repository.
    */
-  bindIfProxyOrHostedAndEditable: function(button) {
-    var me = this;
-
-    //bind the enable/disable state to whether user has perms to edit a repo
+  bindIfProxyOrHostedAndEditable: function (button) {
+    var permittedCondition;
     button.mon(
         NX.Conditions.and(
-            NX.Conditions.isPermitted('nexus:repository-admin:*:*:edit'),
-            NX.Conditions.watchEvents(me.getObservables(), me.watchEventsHandler({editRecord: true}))
+            permittedCondition = NX.Conditions.isPermitted('nexus:repository-admin:*:*:edit'),
+            NX.Conditions.gridHasSelection('nx-coreui-repository-list', function (model) {
+              permittedCondition.setPermission(
+                  'nexus:repository-admin:' + model.get('format') + ':' + model.get('name') + ':edit'
+              );
+              return true;
+            })
         ),
         {
-          satisfied: function() {
-            button.enable();
-          },
-          unsatisfied: function() {
-            button.disable();
-          }
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
         }
     );
-
-    //bind the show/hide state to whether the repo is proxy or hosted
     button.mon(
-        NX.Conditions.watchEvents(me.getObservables(), me.watchEventsHandler({proxyOrHosted: true})),
+        NX.Conditions.gridHasSelection('nx-coreui-repository-list', function (model) {
+          return model.get('type') === 'proxy' || model.get('type') === 'hosted';
+        }),
         {
-          satisfied: function() {
-            button.show();
-          },
-          unsatisfied: function() {
-            button.hide();
-          }
+          satisfied: button.show,
+          unsatisfied: button.hide,
+          scope: button
         }
     );
   },
@@ -587,35 +447,32 @@ Ext.define('NX.coreui.controller.Repositories', {
    * @private
    * Enables button if the select repository is a proxy or group repository.
    */
-  bindIfProxyOrGroupAndEditable: function(button) {
-    var me = this;
-
-    //bind the enable/disable state to whether user has perms to edit a repo
+  bindIfProxyOrGroupAndEditable: function (button) {
+    var permittedCondition;
     button.mon(
         NX.Conditions.and(
-            NX.Conditions.isPermitted('nexus:repository-admin:*:*:edit'),
-            NX.Conditions.watchEvents(me.getObservables(), me.watchEventsHandler({editRecord: true}))
+            permittedCondition = NX.Conditions.isPermitted('nexus:repository-admin:*:*:edit'),
+            NX.Conditions.gridHasSelection('nx-coreui-repository-list', function (model) {
+              permittedCondition.setPermission(
+                  'nexus:repository-admin:' + model.get('format') + ':' + model.get('name') + ':edit'
+              );
+              return true;
+            })
         ),
         {
-          satisfied: function() {
-            button.enable();
-          },
-          unsatisfied: function() {
-            button.disable();
-          }
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
         }
     );
-
-    //bind the show/hide state to whether the repo is proxy or group
     button.mon(
-        NX.Conditions.watchEvents(me.getObservables(), me.watchEventsHandler({proxyOrGroup: true})),
+        NX.Conditions.gridHasSelection('nx-coreui-repository-list', function (model) {
+          return model.get('type') === 'proxy' || model.get('type') === 'group';
+        }),
         {
-          satisfied: function() {
-            button.show();
-          },
-          unsatisfied: function() {
-            button.hide();
-          }
+          satisfied: button.show,
+          unsatisfied: button.hide,
+          scope: button
         }
     );
   },
@@ -625,16 +482,13 @@ Ext.define('NX.coreui.controller.Repositories', {
    * @protected
    * Enable 'New' when user has 'add' permission.
    */
-  bindNewButton: function(button) {
+  bindNewButton: function (button) {
     button.mon(
         NX.Conditions.isPermitted('nexus:repository-admin:*:*:add'),
         {
-          satisfied: function() {
-            button.enable();
-          },
-          unsatisfied: function() {
-            button.disable();
-          }
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
         }
     );
   },
@@ -643,180 +497,24 @@ Ext.define('NX.coreui.controller.Repositories', {
    * @protected
    * Enable 'Delete' when user has 'delete' permission for selected repository.
    */
-  bindDeleteButton: function(button) {
-    var me = this;
-
+  bindDeleteButton: function (button) {
+    var permittedCondition;
     button.mon(
         NX.Conditions.and(
-            NX.Conditions.isPermitted('nexus:repository-admin:*:*:delete'),
-            NX.Conditions.watchEvents(me.getObservables(), me.watchEventsHandler({deleteRecord: true}))
+            permittedCondition = NX.Conditions.isPermitted('nexus:repository-admin:*:*:delete'),
+            NX.Conditions.gridHasSelection('nx-coreui-repository-list', function (model) {
+              permittedCondition.setPermission(
+                  'nexus:repository-admin:' + model.get('format') + ':' + model.get('name') + ':delete'
+              );
+              return true;
+            })
         ),
         {
-          satisfied: function() {
-            button.enable();
-          },
-          unsatisfied: function() {
-            button.disable();
-          }
+          satisfied: button.enable,
+          unsatisfied: button.disable,
+          scope: button
         }
     );
-  },
-
-  /**
-   * @private
-   */
-  getObservables: function() {
-    var me = this;
-    return [
-      {observable: me.getStore('Repository'), events: ['load']},
-      {observable: Ext.History, events: ['change']}
-    ];
-  },
-
-  /**
-   * @private
-   */
-  watchEventsHandler: function(options) {
-    var me = this,
-        store = me.getStore('Repository');
-
-    return function() {
-      var repositoryId = me.getModelIdFromBookmark(),
-          model = repositoryId ? store.findRecord('name', repositoryId, 0, false, true, true) : undefined;
-
-      if (model) {
-        if (model.data.attributes && model.data.attributes.replication && model.data.attributes.replication.enabled) {
-          me.showInfo(NX.I18n.format('Repository_Replication_InformationMessage',
-              model.data.attributes.replication.connectionName, model.data.attributes.replication.sourceRepoName));
-        }
-        if (options.deleteRecord) {
-          return NX.Permissions.check(
-              'nexus:repository-admin:' + model.get('format') + ':' + model.get('name') + ':delete');
-        }
-        else if (options.editRecord) {
-          return NX.Permissions.check(
-              'nexus:repository-admin:' + model.get('format') + ':' + model.get('name') + ':edit');
-        }
-        else if (options.proxyOrGroup) {
-          return model.get('type') === 'proxy' || model.get('type') === 'group';
-        }
-        else if (options.proxyOrHosted) {
-          return model.get('type') === 'proxy' || model.get('type') === 'hosted';
-        }
-      }
-
-      return false;
-    };
-  },
-
-  loadCleanupPolicies: function(format, callback) {
-    this.getStore('CleanupPolicy').load({
-      callback: callback,
-      params: {
-        filter: [
-          {
-            property: 'format',
-            value: format
-          }
-        ]
-      }
-    });
-  },
-
-  checkFirewallCapabilitiesStatus: function(repositoryName, callback) {
-    NX.direct.firewall_RepositoryStatus.readCapabilitiesStatus(repositoryName, function (response) {
-      if (Ext.isObject(response) && response.success && response.data != null) {
-        callback(response.data === true);
-      } else {
-        callback(false);
-      }
-    });
-  },
-
-  checkFirewallCapabilitiesStatusForPypi: function(repositoryName, callback) {
-    NX.direct.firewall_RepositoryStatus.readCapabilitiesStatus(repositoryName, function (response) {
-      if (Ext.isObject(response) && response.success && response.data != null) {
-        callback(response.data === true);
-      }
-      else {
-        callback(false);
-      }
-    });
-  },
-
-  onNugetProxyVersionChange: function(element, newValue) {
-    var me = this,
-        store = me.getStore('Repository');
-
-    var nugetVersion = newValue['attributes.nugetProxy.nugetVersion'];
-
-    var repositoryId = me.getModelIdFromBookmark(),
-        model = repositoryId ? store.findRecord('name', repositoryId, 0, false, true, true) : undefined;
-    if (model) {
-      var repositoryUrl = model.get('url');
-      if (nugetVersion == 'V3') {
-        if (Ext.String.endsWith(repositoryUrl, 'index.json')) {
-          return;
-        }
-        repositoryUrl += 'index.json';
-      }
-      else {
-        repositoryUrl = repositoryUrl.replace('index.json', '');
-      }
-      model.set('url', repositoryUrl);
-      model.commit(true);
-
-      var form = element.up('form'),
-          repositoryUrlField = form.down('textfield[name=url]');
-
-      if (repositoryUrl && repositoryUrlField) {
-        repositoryUrlField.setValue(repositoryUrl);
-      }
-    }
-  },
-
-  /**
-   * @private
-   * Update NuGet proxy repositories URLs with 'index.json' suffix for V3.
-   */
-  updateFormatSpecificProxyRepoURLs: function() {
-    var me = this,
-        store = me.getStore('Repository');
-
-    // wait until the repositories list loaded
-    store.on('load', function() {
-      store.each(function(record) {
-        var format = record.get('format');
-        var name = record.get('name');
-        var type = record.get('type');
-
-        // update nuget-v3-proxy and conda-proxy repo URLs only in the model
-        if (type === 'proxy') {
-          var model = store.findRecord('name', name);
-          if (model) {
-            var repoUrl = model.get('url');
-
-            if (format === 'nuget') {
-              var nugetProxy = model.get('attributes')['nugetProxy'] || {};
-              var nugetVersion = nugetProxy['nugetVersion'];
-
-              if (nugetVersion === 'V3' && !Ext.String.endsWith(repoUrl, 'index.json')) {
-                repoUrl += 'index.json';
-                model.set('url', repoUrl);
-                model.commit(true);
-              }
-            }
-            if (format === 'conda') {
-              if (!Ext.String.endsWith(repoUrl, 'main')) {
-                repoUrl += 'main';
-                model.set('url', repoUrl);
-                model.commit(true);
-              }
-            }
-          }
-        }
-      });
-    });
   }
 
 });

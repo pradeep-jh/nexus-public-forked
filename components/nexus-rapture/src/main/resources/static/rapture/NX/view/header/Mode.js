@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -41,13 +37,6 @@ Ext.define('NX.view.header.Mode', {
     title: undefined,
 
     /**
-     * Mode button text.
-     *
-     * @cfg {String}
-     */
-    text: undefined,
-
-    /**
      * Mode button tooltip.
      *
      * @cfg {String}
@@ -55,12 +44,11 @@ Ext.define('NX.view.header.Mode', {
     tooltip: undefined,
 
     /**
-     * Mode icon class
+     * Mode button glyph.
      *
      * @cfg {String}
      */
-    iconCls: undefined,
-
+    glyph: undefined,
 
     /**
      * If button should auto hide when no features are available for selected mode.
@@ -77,16 +65,10 @@ Ext.define('NX.view.header.Mode', {
     collapseMenu: false
   },
 
-  publishes: {
-    text: true,
-    tooltip: true
-  },
-
   /**
    * Absolute layout for caret positioning over button.
    */
-  // layout: 'absolute',
-  // TODO: Absolute layout breaks on the latest versions of ExtJS 6 so we'll need a different way to accomplish this
+  layout: 'absolute',
 
   /**
    * @override
@@ -94,28 +76,33 @@ Ext.define('NX.view.header.Mode', {
   initComponent: function() {
     var me = this;
 
-    me.setViewModel({
-      data: {
-        text: me.getText(),
-        tooltip: me.getTooltip()
-      }
-    });
+    me.addEvents(
+        /**
+         * Fired when mode has been selected.
+         *
+         * @event selected
+         * @param {NX.view.header.Mode} mode
+         */
+        'selected'
+    );
 
     Ext.apply(me, {
       items: [
         {
           xtype: 'button',
-          ui: 'nx-mode',
+          ui: 'nx-header',
           cls: 'nx-modebutton',
           scale: 'medium',
+          height: 39,
           // min-width here as the user-mode extends past this with user-name
-          minWidth: 49,
+          minWidth: 39,
           toggleGroup: 'mode',
           allowDepress: false,
+          tooltip: me.tooltip,
+          glyph: me.glyph,
           handler: function(button) {
             me.fireEvent('selected', me);
           },
-          iconCls: me.iconCls,
           // copied autoEl from Ext.button.Button
           autoEl: {
             tag: 'a',
@@ -123,19 +110,37 @@ Ext.define('NX.view.header.Mode', {
             unselectable: 'on',
             // expose mode name on element for testability to target button by mode name
             'data-name': me.name
-          },
-
-          bind: {
-            text: '{text:htmlEncode}',
-            tooltip: '{tooltip:htmlEncode}'
-          },
-
-          ariaLabel: Ext.String.htmlEncode(me.text ? me.text : me.title)
+          }
+        },
+        {
+          // css magic renders caret look
+          xtype: 'container',
+          cls: 'nx-caret',
+          width: 0,
+          height: 0,
+          x: 14,
+          y: 34
         }
       ]
     });
 
     me.callParent();
+  },
+
+  /**
+   * @public
+   * @param {String} text
+   */
+  setText: function(text) {
+    this.down('button').setText(text);
+  },
+
+  /**
+   * @public
+   * @param {String} tip
+   */
+  setTooltip: function(tip) {
+    this.down('button').setTooltip(tip);
   },
 
   /**

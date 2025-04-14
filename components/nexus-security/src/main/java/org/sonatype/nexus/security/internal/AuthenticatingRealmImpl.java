@@ -18,8 +18,6 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
-import org.sonatype.nexus.security.NexusSimpleAuthenticationInfo;
-import org.sonatype.nexus.security.RealmCaseMapping;
 import org.sonatype.nexus.security.config.CUser;
 import org.sonatype.nexus.security.config.SecurityConfigurationManager;
 import org.sonatype.nexus.security.user.UserNotFoundException;
@@ -27,23 +25,17 @@ import org.sonatype.nexus.security.user.UserNotFoundException;
 import org.apache.shiro.authc.AccountException;
 import org.apache.shiro.authc.AuthenticationInfo;
 import org.apache.shiro.authc.AuthenticationToken;
-import org.apache.shiro.authc.CredentialsException;
 import org.apache.shiro.authc.DisabledAccountException;
 import org.apache.shiro.authc.SimpleAuthenticationInfo;
-import org.apache.shiro.authc.UnknownAccountException;
 import org.apache.shiro.authc.UsernamePasswordToken;
 import org.apache.shiro.authc.credential.CredentialsMatcher;
 import org.apache.shiro.authc.credential.PasswordMatcher;
 import org.apache.shiro.authc.credential.PasswordService;
 import org.apache.shiro.realm.AuthenticatingRealm;
 import org.apache.shiro.realm.Realm;
-import org.apache.shiro.subject.SimplePrincipalCollection;
 import org.eclipse.sisu.Description;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static  org.sonatype.nexus.security.internal.DefaultRealmConstants.DEFAULT_REALM_NAME;
-import static  org.sonatype.nexus.security.internal.DefaultRealmConstants.DESCRIPTION;
 
 /**
  * Default {@link AuthenticatingRealm}.
@@ -51,15 +43,15 @@ import static  org.sonatype.nexus.security.internal.DefaultRealmConstants.DESCRI
  * This realm ONLY handles authentication.
  */
 @Singleton
-@Named(DEFAULT_REALM_NAME)
-@Description(DESCRIPTION)
+@Named(AuthenticatingRealmImpl.NAME)
+@Description("Local Authenticating Realm")
 public class AuthenticatingRealmImpl
     extends AuthenticatingRealm
     implements Realm
 {
   private static final Logger logger = LoggerFactory.getLogger(AuthenticatingRealmImpl.class);
 
-  public static final String NAME = DEFAULT_REALM_NAME;
+  public static final String NAME = "NexusAuthenticatingRealm";
 
   private static final int MAX_LEGACY_PASSWORD_LENGTH = 40;
 
@@ -67,13 +59,9 @@ public class AuthenticatingRealmImpl
 
   private final PasswordService passwordService;
 
-  private final boolean orient;
-
   @Inject
-  public AuthenticatingRealmImpl(
-      final SecurityConfigurationManager configuration,
-      final PasswordService passwordService,
-      @Named("${nexus.orient.enabled:-false}") final boolean orient)
+  public AuthenticatingRealmImpl(final SecurityConfigurationManager configuration,
+                                 final PasswordService passwordService)
   {
     this.configuration = configuration;
     this.passwordService = passwordService;
@@ -81,9 +69,8 @@ public class AuthenticatingRealmImpl
     PasswordMatcher passwordMatcher = new PasswordMatcher();
     passwordMatcher.setPasswordService(this.passwordService);
     setCredentialsMatcher(passwordMatcher);
-    setName(DEFAULT_REALM_NAME);
+    setName(NAME);
     setAuthenticationCachingEnabled(true);
-    this.orient = orient;
   }
 
   @Override
@@ -95,14 +82,14 @@ public class AuthenticatingRealmImpl
       user = configuration.readUser(upToken.getUsername());
     }
     catch (UserNotFoundException e) {
-      throw new UnknownAccountException("User '" + upToken.getUsername() + "' cannot be retrieved.", e);
+      throw new AccountException("User '" + upToken.getUsername() + "' cannot be retrieved.", e);
     }
 
     if (user.getPassword() == null) {
-      throw new CredentialsException("User '" + upToken.getUsername() + "' has no password, cannot authenticate.");
+      throw new AccountException("User '" + upToken.getUsername() + "' has no password, cannot authenticate.");
     }
 
-    if (user.isActive()) {
+    if (CUser.STATUS_ACTIVE.equals(user.getStatus())) {
       // Check for legacy user that has unsalted password hash
       // Update if unsalted password hash and valid credentials were specified
       if (hasLegacyPassword(user) && isValidCredentials(upToken, user)) {
@@ -138,8 +125,7 @@ public class AuthenticatingRealmImpl
           updated = true;
         }
         catch (ConcurrentModificationException e) {
-          logger.debug("Could not re-hash user '{}' password as user was concurrently being updated. Retrying...",
-              user.getId());
+          logger.debug("Could not re-hash user '{}' password as user was concurrently being updated. Retrying...", user.getId());
         }
       }
       while (!updated);
@@ -154,7 +140,7 @@ public class AuthenticatingRealmImpl
    * Checks to see if the credentials in token match the credentials stored on user
    *
    * @param token the username/password token containing the credentials to verify
-   * @param user  object containing the stored credentials
+   * @param user object containing the stored credentials
    * @return true if credentials match, false otherwise
    */
   private boolean isValidCredentials(final UsernamePasswordToken token, final CUser user) {
@@ -172,7 +158,8 @@ public class AuthenticatingRealmImpl
   }
 
   /**
-   * Checks to see if the specified user is a legacy user. A legacy user has an unsalted password.
+   * Checks to see if the specified user is a legacy user.
+   * A legacy user has an unsalted password.
    */
   private boolean hasLegacyPassword(final CUser user) {
     //Legacy users have a shorter, unsalted, SHA1 or MD5 based hash
@@ -180,15 +167,6 @@ public class AuthenticatingRealmImpl
   }
 
   private AuthenticationInfo createAuthenticationInfo(final CUser user) {
-    return orient ? new NexusSimpleAuthenticationInfo(user.getId(), user.getPassword().toCharArray(),
-        new RealmCaseMapping(getName(), true)) :
-        new SimpleAuthenticationInfo(user.getId(), user.getPassword().toCharArray(), getName());
-  }
-
-  /**
-   * Exposed to support flushing authc cache for a specific user
-   */
-  protected void clearCache(final String userId) {
-    clearCache(new SimplePrincipalCollection(userId, DEFAULT_REALM_NAME));
+    return new SimpleAuthenticationInfo(user.getId(), user.getPassword().toCharArray(), getName());
   }
 }

@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -27,14 +23,11 @@ Ext.define('NX.Conditions', {
     'NX.util.condition.Conjunction',
     'NX.util.condition.Disjunction',
     'NX.util.condition.FormHasRecord',
-    'NX.util.condition.FormIs',
     'NX.util.condition.GridHasSelection',
     'NX.util.condition.IsPermitted',
     'NX.util.condition.StoreHasRecords',
-    'NX.util.condition.MultiListener',
     'NX.util.condition.WatchState',
-    'NX.util.condition.NeverSatisfied',
-    'NX.util.condition.HasNoFirewall'
+    'NX.util.condition.NeverSatisfied'
   ],
 
   /**
@@ -54,7 +47,6 @@ Ext.define('NX.Conditions', {
   },
 
   /**
-   * @param {Ext.app.Controller} the controller to use to detect events on the grid
    * @param {String} grid a grid selector as specified by {@link Ext.ComponentQuery#query}
    * @param {Function} [fn] to be called when grid has a selection to perform additional checks on the passed in model
    * @returns {NX.util.condition.GridHasSelection}
@@ -70,24 +62,6 @@ Ext.define('NX.Conditions', {
    */
   formHasRecord: function (form, fn) {
     return Ext.create('NX.util.condition.FormHasRecord', { form: form, fn: fn });
-  },
-
-  /**
-   * @param {Array} [listenerConfigs] An array of objects { observable: o, events:[] }
-   * @param {Function} [fn] A function to be called when an event occurs.
-   * @returns {NX.util.condition.MultiListener}
-   */
-  watchEvents: function (listenerConfigs, fn) {
-    return Ext.create('NX.util.condition.MultiListener', { fn: fn, listenerConfigs: listenerConfigs });
-  },
-
-  /**
-   * @param {String|Ext.Component} [form] A selector or a reference to a form
-   * @param {Function} [condition] A function to evaluate against the form to fire the satisfied or unsatisfied event
-   * @returns {NX.util.condition.FormIs}
-   */
-  formIs: function (form, condition) {
-    return Ext.create('NX.util.condition.FormIs', { form: form, condition: condition });
   },
 
   /**
@@ -125,15 +99,6 @@ Ext.define('NX.Conditions', {
    */
   never: function() {
     return Ext.create('NX.util.condition.NeverSatisfied');
-  },
-
-  /**
-   * Checks if this NXRM instance does not have firewall
-   *
-   * @returns
-   */
-  hasNoFirewall: function() {
-    return Ext.create('NX.util.condition.HasNoFirewall');
   }
 
 });

@@ -15,11 +15,8 @@ package org.sonatype.nexus.internal.security.apikey;
 import javax.inject.Inject;
 import javax.inject.Named;
 
-import org.sonatype.nexus.common.event.EventManager;
-import org.sonatype.nexus.scheduling.Cancelable;
 import org.sonatype.nexus.scheduling.TaskSupport;
-import org.sonatype.nexus.security.authc.apikey.ApiKeyService;
-import org.sonatype.nexus.security.usertoken.event.UserTokenPurgedEvent;
+import org.sonatype.nexus.security.authc.apikey.ApiKeyStore;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -27,34 +24,27 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * Purge orphaned API keys task.
  *
  * @since 3.0
- * @see ApiKeyService#purgeApiKeys()
+ * @see ApiKeyStore#purgeApiKeys()
  */
 @Named
 public class PurgeApiKeysTask
     extends TaskSupport
-    implements Cancelable
 {
-  private final ApiKeyInternalService apiKeyService;
-
-  private final EventManager eventManager;
+  private final ApiKeyStore store;
 
   @Inject
-  public PurgeApiKeysTask(final ApiKeyInternalService store, final EventManager eventManager) {
-    this.apiKeyService = checkNotNull(store);
-    this.eventManager = checkNotNull(eventManager);
+  public PurgeApiKeysTask(final ApiKeyStore store) {
+    this.store = checkNotNull(store);
   }
 
   @Override
   protected Void execute() throws Exception {
-    int deleted = apiKeyService.purgeApiKeys();
-    if (deleted > 0) {
-      eventManager.post(new UserTokenPurgedEvent(deleted));
-    }
+    store.purgeApiKeys();
     return null;
   }
 
   @Override
   public String getMessage() {
-    return "Deleting orphaned API keys";
+    return "Purging orphaned API keys";
   }
 }

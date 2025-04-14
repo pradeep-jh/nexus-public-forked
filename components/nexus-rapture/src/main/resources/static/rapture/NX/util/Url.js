@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -37,15 +33,6 @@ Ext.define('NX.util.Url', {
   baseUrl: NX.app.baseUrl,
 
   /**
-   * Returns the relative path of the Nexus server.  Path never ends with '/'.
-   *
-   * @public
-   * @property {String}
-   * @readonly
-   */
-  relativePath: NX.app.relativePath,
-
-  /**
    * Returns a cache-busting urlSuffix provided by the Nexus server.
    *
    * @public
@@ -58,7 +45,7 @@ Ext.define('NX.util.Url', {
    * @public
    */
   urlOf: function (path) {
-    var baseUrl = this.relativePath;
+    var baseUrl = this.baseUrl;
 
     if (!Ext.isEmpty(path)) {
       if (Ext.String.endsWith(baseUrl, '/')) {
@@ -70,21 +57,6 @@ Ext.define('NX.util.Url', {
       return baseUrl + path;
     }
     return this.baseUrl;
-  },
-
-  absolutePath: function (path) {
-    return this.baseUrl + '/' + path;
-  },
-
-  licenseUrl: function () {
-    var edition = NX.State.getEdition();
-    if ('EVAL' === edition || 'OC' === edition) {
-      return NX.util.Url.urlOf('/OC-LICENSE.html')
-    } else if ('COMMUNITY' === edition) {
-      return NX.util.Url.urlOf('/CE-LICENSE.html')
-    } else {
-      return NX.util.Url.urlOf('/PRO-LICENSE.html')
-    }
   },
 
   /**
@@ -106,7 +78,7 @@ Ext.define('NX.util.Url', {
     } else {
       id = '';
     }
-    return '<a href="' + url + '" target="' + target + '"' + id + ' rel="noopener">' + Ext.htmlEncode(text) + '</a>';
+    return '<a href="' + url + '" target="' + target + '"' + id + '>' + text + '</a>';
   },
 
   /**
@@ -115,8 +87,8 @@ Ext.define('NX.util.Url', {
    * @public
    * @param {String} value to copy
    */
-  asCopyWidget: function (value, repoFormat) {
-    return '<button onclick="Ext.widget(\'nx-copywindow\', { copyText: \'' + value + '\', repoFormat: \'' + repoFormat + '\' });" title="' + value + '"><i class="fa fa-clipboard"></i> copy</button>';
+  asCopyWidget: function (value) {
+    return '<button onclick="Ext.widget(\'nx-copywindow\', { copyText: \'' + value + '\' });" title="' + value + '"><i class="fa fa-clipboard"></i> copy</button>';
   },
 
   /**

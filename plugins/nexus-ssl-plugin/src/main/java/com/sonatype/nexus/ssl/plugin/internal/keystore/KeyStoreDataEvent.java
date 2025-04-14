@@ -12,12 +12,10 @@
  */
 package com.sonatype.nexus.ssl.plugin.internal.keystore;
 
-import java.security.KeyStore;
-
 import org.sonatype.nexus.common.entity.EntityVersion;
 
 /**
- * Event sent out when {@link KeyStore} data changes.
+ * Event for {@link KeyStoreData} entity.
  *
  * @since 3.1
  */

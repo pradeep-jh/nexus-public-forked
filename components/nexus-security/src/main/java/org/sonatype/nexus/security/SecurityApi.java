@@ -16,21 +16,16 @@ import java.util.List;
 
 import org.sonatype.nexus.common.script.ScriptApi;
 import org.sonatype.nexus.security.anonymous.AnonymousConfiguration;
-import org.sonatype.nexus.security.authz.NoSuchAuthorizationManagerException;
 import org.sonatype.nexus.security.role.Role;
-import org.sonatype.nexus.security.user.NoSuchUserManagerException;
 import org.sonatype.nexus.security.user.User;
-import org.sonatype.nexus.security.user.UserNotFoundException;
 
 /**
- * Security provisioning capabilities of the repository manager.
- *
+ * Security provisioning capabilities of the repository manager. 
  * @since 3.0
  */
 public interface SecurityApi
     extends ScriptApi
 {
-  @Override
   default String getName() {
     return "security";
   }
@@ -43,28 +38,17 @@ public interface SecurityApi
   /**
    * Add a new User to the system.
    */
-  User addUser(
-      String id,
-      String firstName,
-      String lastName,
-      String email,
-      boolean active,
-      String password,
-      List<String> roleIds) throws NoSuchUserManagerException;
+  User addUser(String id, String firstName, String lastName, String email, boolean active, String password,
+               List<String> roleIds);
 
   /**
    * Add a new Role to the system.
    */
-  Role addRole(
-      String id,
-      String name,
-      String description,
-      List<String> privileges,
-      List<String> roles) throws NoSuchAuthorizationManagerException;
+  Role addRole(String id, String name, String description, List<String> privileges, List<String> roles);
 
   /**
    * Set the Roles on a given User.
    */
-  User setUserRoles(String userId, List<String> roleIds) throws UserNotFoundException, NoSuchUserManagerException;
-
+  User setUserRoles(String userId, List<String> roleIds);
+  
 }

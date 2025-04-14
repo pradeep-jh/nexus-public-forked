@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus</groupId>
     <artifactId>nexus-components</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-commands</artifactId>
@@ -35,7 +35,7 @@
 
     <dependency>
       <groupId>org.osgi</groupId>
-      <artifactId>osgi.core</artifactId>
+      <artifactId>org.osgi.core</artifactId>
     </dependency>
 
     <dependency>
@@ -57,11 +57,7 @@
         <configuration>
           <instructions>
             <!-- embed a local copy of these utility classes so we can re-use them -->
-            <Embed-Dependency>org.apache.karaf.shell.core;
-              org.apache.karaf.shell.core;inline=
-                org/apache/karaf/shell/impl/action/command/*|
-                org/apache/felix/gogo/runtime/Token.class
-            </Embed-Dependency>
+            <Private-Package>org.apache.karaf.shell.impl.action.command;-split-package:=merge-first</Private-Package>
           </instructions>
         </configuration>
       </plugin>

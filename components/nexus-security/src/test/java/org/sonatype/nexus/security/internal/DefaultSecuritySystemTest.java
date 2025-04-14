@@ -17,17 +17,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.sonatype.nexus.common.event.EventManager;
 import org.sonatype.nexus.security.AbstractSecurityTest;
 import org.sonatype.nexus.security.SecuritySystem;
-import org.sonatype.nexus.security.UserPrincipalsExpired;
 import org.sonatype.nexus.security.authz.AuthorizationManager;
 import org.sonatype.nexus.security.authz.MockAuthorizationManagerB;
 import org.sonatype.nexus.security.role.Role;
 import org.sonatype.nexus.security.role.RoleIdentifier;
-import org.sonatype.nexus.security.user.NoSuchUserManagerException;
 import org.sonatype.nexus.security.user.User;
-import org.sonatype.nexus.security.user.UserNotFoundException;
 import org.sonatype.nexus.security.user.UserStatus;
 
 import com.google.inject.AbstractModule;
@@ -41,19 +37,7 @@ import org.apache.shiro.subject.PrincipalCollection;
 import org.apache.shiro.subject.SimplePrincipalCollection;
 import org.apache.shiro.subject.Subject;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.fail;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 
 /**
  * Tests for {@link DefaultSecuritySystem}.
@@ -61,12 +45,6 @@ import static org.mockito.Mockito.verify;
 public class DefaultSecuritySystemTest
     extends AbstractSecurityTest
 {
-  @Mock
-  EventManager eventManager;
-
-  @Rule
-  public ExpectedException expectedException = ExpectedException.none();
-
   @Override
   protected void customizeModules(List<Module> modules) {
     super.customizeModules(modules);
@@ -82,21 +60,11 @@ public class DefaultSecuritySystemTest
     });
   }
 
-  @Before
-  public void setup() throws Exception {
-    reset(eventManager);
-  }
-
   @Override
   protected void tearDown() throws Exception {
     this.getSecuritySystem().stop();
 
     super.tearDown();
-  }
-
-  @Override
-  public EventManager getEventManager() {
-    return eventManager;
   }
 
   @Test
@@ -111,7 +79,7 @@ public class DefaultSecuritySystemTest
 
     try {
       subject.login(new UsernamePasswordToken("jcoder", "INVALID"));
-      fail("expected AuthenticationException");
+      Assert.fail("expected AuthenticationException");
     }
     catch (AuthenticationException e) {
       // expected
@@ -151,7 +119,7 @@ public class DefaultSecuritySystemTest
     PrincipalCollection principal = new SimplePrincipalCollection("jcool", "ANYTHING");
     try {
       securitySystem.checkPermission(principal, "INVALID-ROLE:*");
-      fail("expected: AuthorizationException");
+      Assert.fail("expected: AuthorizationException");
     }
     catch (AuthorizationException e) {
       // expected
@@ -201,15 +169,6 @@ public class DefaultSecuritySystemTest
   }
 
   @Test
-  public void testSearchRoles() throws Exception {
-    SecuritySystem securitySystem = this.getSecuritySystem();
-
-    Set<Role> roles = securitySystem.searchRoles("sourceB", "query");
-    // Search is equal to listRoles for not LDAP sources
-    Assert.assertEquals(securitySystem.listRoles(), roles);
-  }
-
-  @Test
   public void testAddUser() throws Exception {
     SecuritySystem securitySystem = this.getSecuritySystem();
 
@@ -223,58 +182,5 @@ public class DefaultSecuritySystemTest
     user.addRole(new RoleIdentifier("default", "test-role1"));
 
     Assert.assertNotNull(securitySystem.addUser(user, "test123"));
-  }
-
-  @Test
-  public void testUpdateUser_changePasswordStatus() throws Exception {
-    SecuritySystem securitySystem = this.getSecuritySystem();
-
-    securitySystem.addUser(createUser("testUpdateUser", UserStatus.changepassword), "test123");
-
-    securitySystem.updateUser(createUser("testUpdateUser", UserStatus.disabled));
-
-    boolean foundExpiredEvent = false;
-    ArgumentCaptor<Object> eventArgument = ArgumentCaptor.forClass(Object.class);
-    verify(eventManager, times(2)).post(eventArgument.capture());
-    for (Object argValue : eventArgument.getAllValues()) {
-      if (argValue instanceof UserPrincipalsExpired) {
-        UserPrincipalsExpired expired = (UserPrincipalsExpired) argValue;
-        assertThat(expired.getUserId(), is("testUpdateUser"));
-        foundExpiredEvent = true;
-      }
-    }
-
-    if (!foundExpiredEvent) {
-      fail("UserPrincipalsExpired event was not fired");
-    }
-  }
-
-  @Test
-  public void testChangePassword_AfterUserLogin() throws UserNotFoundException, NoSuchUserManagerException {
-    expectedException.expect(AuthorizationException.class);
-    expectedException.expectMessage("jcoder is not permitted to change the password for fakeuser");
-
-    SecuritySystem securitySystem = this.getSecuritySystem();
-    Subject subject = securitySystem.getSubject();
-    subject.login(new UsernamePasswordToken("jcoder", "jcoder"));
-
-    // change my own
-    securitySystem.changePassword("jcoder", "newpassword");
-
-    // change another user's password
-    securitySystem.changePassword("fakeuser", "newpassword");
-  }
-
-  private User createUser(String name, UserStatus status) {
-    User user = new User();
-    user.setEmailAddress("email@foo.com");
-    user.setName(name);
-    user.setSource("MockUserManagerA");
-    user.setStatus(status);
-    user.setUserId(name);
-
-    user.addRole(new RoleIdentifier("default", "test-role1"));
-
-    return user;
   }
 }

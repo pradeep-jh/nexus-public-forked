@@ -25,14 +25,13 @@ import org.apache.commons.jexl3.JexlException;
 import org.junit.Test;
 
 import static com.google.common.collect.Streams.stream;
-import static org.sonatype.nexus.selector.CselValidator.validateCselExpression;
 
 public class CselValidatorTest
     extends TestSupport
 {
   public static final String BASEDIR = new File(System.getProperty("basedir", "")).getAbsolutePath();
 
-  private JexlEngine engine = new JexlEngine();
+  private CselValidator validator = new CselValidator();
 
   private ObjectMapper mapper = new ObjectMapper();
 
@@ -40,37 +39,27 @@ public class CselValidatorTest
   public void parsesAllValidContentSelectors() throws Exception {
     URL jsonFile = this.getClass().getResource("/validJexlContentSelectors.json");
     JsonNode contentSelectors = mapper.readTree(jsonFile);
-    stream(contentSelectors).map(JsonNode::asText).forEach(this::validateExpression);
+    stream(contentSelectors).map(JsonNode::asText).forEach(validator::validate);
   }
 
   @Test(expected = JexlException.Parsing.class)
   public void failsToParseInvalidContentSelectors() throws Exception {
-    validateExpression("invalid content selector");
-  }
-
-  @Test(expected = JexlException.class)
-  public void failsToParseCoordinateContentSelectors() throws Exception {
-    validateExpression("coordinate.groupId == \"com.sonatype\"");
+    validator.validate("invalid content selector");
   }
 
   @Test(expected = JexlException.class)
   public void failsToValidateInvalidContentSelectors() throws Exception {
-    validateExpression("a.b.c = false");
+    validator.validate("a.b.c = false");
   }
 
-  @Test(expected = JexlException.class)
+  @Test(expected = UnsupportedOperationException.class)
   public void failsToValidateEmbeddedSingleQuoteInStrings() throws Exception {
-    validateExpression("format == \"'\"");
+    validator.validate("format == \"'\"");
   }
 
-  @Test(expected = JexlException.class)
+  @Test(expected = UnsupportedOperationException.class)
   public void failsToValidateEmbeddedDoubleQuoteInStrings() throws Exception {
-    validateExpression("format == '\"'");
-  }
-
-  @Test(expected = JexlException.class)
-  public void failsToValidateInvalidRegex() throws Exception {
-    validateExpression("path =~ '*foo*'");
+    validator.validate("format == '\"'");
   }
 
   public static File resolveBaseFile(final String path) {
@@ -79,9 +68,5 @@ public class CselValidatorTest
 
   public static Path resolveBasePath(final String path) {
     return Paths.get(BASEDIR, path);
-  }
-
-  private void validateExpression(final String expression) {
-    validateCselExpression(engine.parseExpression(expression));
   }
 }

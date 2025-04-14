@@ -57,12 +57,12 @@ public class HttpClientAuditor
       data.setType(CHANGED_TYPE);
       data.setContext(SYSTEM_CONTEXT);
 
-      Map<String, Object> attributes = data.getAttributes();
+      Map<String, String> attributes = data.getAttributes();
 
       ConnectionConfiguration connection = configuration.getConnection();
       if (connection != null) {
         attributes.put("connection.timeout", string(connection.getTimeout()));
-        attributes.put("connection.retries", string(connection.getRetries()));
+        attributes.put("connection.maximumRetries", string(connection.getMaximumRetries()));
         attributes.put("connection.userAgentSuffix", string(connection.getUserAgentSuffix()));
         attributes.put("connection.useTrustStore", string(connection.getUseTrustStore()));
       }
@@ -84,10 +84,9 @@ public class HttpClientAuditor
     return prefix + "." + suffix;
   }
 
-  private static void proxy(
-      final Map<String, Object> attributes,
-      final String prefix,
-      final ProxyServerConfiguration server)
+  private static void proxy(final Map<String,String> attributes,
+                            final String prefix,
+                            final ProxyServerConfiguration server)
   {
     if (server == null) {
       return;
@@ -112,7 +111,6 @@ public class HttpClientAuditor
         attributes.put(key(prefix, "authentication.domain"), nrlm.getDomain());
         // omit password
       }
-      attributes.put(key(prefix, "authentication.preemptive"), auth.isPreemptive());
     }
   }
 }

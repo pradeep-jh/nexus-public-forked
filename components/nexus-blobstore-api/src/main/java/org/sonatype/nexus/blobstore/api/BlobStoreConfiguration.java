@@ -15,31 +15,72 @@ package org.sonatype.nexus.blobstore.api;
 import java.util.Map;
 
 import org.sonatype.nexus.common.collect.NestedAttributesMap;
+import org.sonatype.nexus.common.entity.Entity;
+
+import com.google.common.collect.Maps;
+
+import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
- * All of the configuration for a particular {@link BlobStore}
- * 
+ * {@link BlobStore} configuration.
+ *
  * @since 3.0
  */
-public interface BlobStoreConfiguration
+public class BlobStoreConfiguration
+  extends Entity
 {
-  String getName();
+  private String name;
+  
+  private String type;
+  
+  private Map<String, Map<String, Object>> attributes;
+  
+  public String getName() {
+    return name;
+  }
 
-  void setName(final String name);
+  public void setName(final String name) {
+    this.name = name;
+  }
 
-  String getType();
+  public String getType() {
+    return type;
+  }
 
-  void setType(final String type);
+  public void setType(final String type) {
+    this.type = type;
+  }
 
-  Map<String, Map<String, Object>> getAttributes();
+  public Map<String, Map<String, Object>> getAttributes() {
+    return attributes;
+  }
 
-  void setAttributes(final Map<String, Map<String, Object>> attributes);
+  public void setAttributes(final Map<String, Map<String, Object>> attributes) {
+    this.attributes = attributes;
+  }
 
-  NestedAttributesMap attributes(final String key);
+  public NestedAttributesMap attributes(final String key) {
+    checkNotNull(key);
 
-  BlobStoreConfiguration copy(String name);
+    if (attributes == null) {
+      attributes = Maps.newHashMap();
+    }
 
-  boolean isWritable();
+    Map<String,Object> map = attributes.get(key);
+    if (map == null) {
+      map = Maps.newHashMap();
+      attributes.put(key, map);
+    }
 
-  void setWritable(final boolean writable);
+    return new NestedAttributesMap(key, map);
+  }
+
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + "{" +
+        "name='" + name + '\'' +
+        ", type='" + type + '\'' +
+        ", attributes=" + attributes +
+        '}';
+  }
 }

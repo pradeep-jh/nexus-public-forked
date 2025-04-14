@@ -23,6 +23,7 @@ import org.sonatype.nexus.security.internal.AuthorizingRealmImpl;
 import org.sonatype.nexus.security.privilege.Privilege;
 import org.sonatype.nexus.security.privilege.WildcardPrivilegeDescriptor;
 import org.sonatype.nexus.security.realm.MockRealm;
+import org.sonatype.nexus.security.realm.RealmConfiguration;
 import org.sonatype.nexus.security.realm.RealmManager;
 import org.sonatype.nexus.security.user.MockUserManager;
 import org.sonatype.nexus.security.user.UserManager;
@@ -83,7 +84,9 @@ public class ExternalRoleMappedTest
 
     // add MockRealm to config
     RealmManager realmManager = lookup(RealmManager.class);
-    realmManager.setConfiguredRealmIds(ImmutableList.of("Mock", AuthorizingRealmImpl.NAME));
+    RealmConfiguration realmConfiguration = new RealmConfiguration();
+    realmConfiguration.setRealmNames(ImmutableList.of("Mock", AuthorizingRealmImpl.NAME));
+    realmManager.setConfiguration(realmConfiguration);
 
     // jcohen has the role mockrole1, there is also test role with the same ID, which means jcohen automaticly has
     // this test role

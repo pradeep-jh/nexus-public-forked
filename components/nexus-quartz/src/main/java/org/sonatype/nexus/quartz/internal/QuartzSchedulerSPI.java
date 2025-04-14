@@ -13,54 +13,51 @@
 package org.sonatype.nexus.quartz.internal;
 
 import java.lang.reflect.Field;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.BiConsumer;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
+import javax.inject.Singleton;
 
 import org.sonatype.nexus.common.app.ManagedLifecycle;
+import org.sonatype.nexus.common.event.EventAware;
 import org.sonatype.nexus.common.event.EventHelper;
 import org.sonatype.nexus.common.event.EventManager;
-import org.sonatype.nexus.common.log.LastShutdownTimeService;
 import org.sonatype.nexus.common.node.NodeAccess;
 import org.sonatype.nexus.common.stateguard.Guarded;
 import org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport;
 import org.sonatype.nexus.common.text.Strings2;
 import org.sonatype.nexus.common.thread.TcclBlock;
+import org.sonatype.nexus.quartz.internal.orient.JobCreatedEvent;
+import org.sonatype.nexus.quartz.internal.orient.JobDeletedEvent;
+import org.sonatype.nexus.quartz.internal.orient.JobUpdatedEvent;
+import org.sonatype.nexus.quartz.internal.orient.TriggerCreatedEvent;
+import org.sonatype.nexus.quartz.internal.orient.TriggerDeletedEvent;
+import org.sonatype.nexus.quartz.internal.orient.TriggerUpdatedEvent;
 import org.sonatype.nexus.quartz.internal.task.QuartzTaskFuture;
 import org.sonatype.nexus.quartz.internal.task.QuartzTaskInfo;
 import org.sonatype.nexus.quartz.internal.task.QuartzTaskJob;
 import org.sonatype.nexus.quartz.internal.task.QuartzTaskJobListener;
 import org.sonatype.nexus.quartz.internal.task.QuartzTaskState;
-import org.sonatype.nexus.scheduling.CurrentState;
 import org.sonatype.nexus.scheduling.TaskConfiguration;
 import org.sonatype.nexus.scheduling.TaskInfo;
 import org.sonatype.nexus.scheduling.TaskRemovedException;
-import org.sonatype.nexus.scheduling.TaskState;
-import org.sonatype.nexus.scheduling.schedule.Cron;
-import org.sonatype.nexus.scheduling.schedule.Manual;
 import org.sonatype.nexus.scheduling.schedule.Now;
 import org.sonatype.nexus.scheduling.schedule.Schedule;
 import org.sonatype.nexus.scheduling.schedule.ScheduleFactory;
 import org.sonatype.nexus.scheduling.spi.SchedulerSPI;
-import org.sonatype.nexus.thread.DatabaseStatusDelayedExecutor;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.eventbus.Subscribe;
 import org.quartz.JobBuilder;
 import org.quartz.JobDataMap;
 import org.quartz.JobDetail;
@@ -70,90 +67,81 @@ import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.SchedulerMetaData;
 import org.quartz.Trigger;
-import org.quartz.Trigger.TriggerState;
-import org.quartz.TriggerKey;
 import org.quartz.UnableToInterruptJobException;
 import org.quartz.core.QuartzScheduler;
+import org.quartz.impl.DefaultThreadExecutor;
+import org.quartz.impl.DirectSchedulerFactory;
+import org.quartz.impl.SchedulerRepository;
+import org.quartz.spi.JobFactory;
 import org.quartz.spi.JobStore;
+import org.quartz.spi.ThreadExecutor;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Maps.filterKeys;
-import static java.util.Collections.emptyMap;
-import static org.quartz.TriggerBuilder.newTrigger;
 import static org.quartz.TriggerKey.triggerKey;
 import static org.quartz.impl.matchers.GroupMatcher.jobGroupEquals;
 import static org.quartz.impl.matchers.KeyMatcher.keyEquals;
 import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.SERVICES;
 import static org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport.State.STARTED;
 import static org.sonatype.nexus.quartz.internal.task.QuartzTaskJobListener.listenerName;
-import static org.sonatype.nexus.quartz.internal.task.QuartzTaskUtils.configurationOf;
-import static org.sonatype.nexus.quartz.internal.task.QuartzTaskUtils.updateJobData;
-import static org.sonatype.nexus.scheduling.TaskConfiguration.LAST_RUN_STATE_END_STATE;
 import static org.sonatype.nexus.scheduling.TaskDescriptorSupport.LIMIT_NODE_KEY;
-import static org.sonatype.nexus.scheduling.TaskState.INTERRUPTED;
-import static org.sonatype.nexus.scheduling.TaskState.RUNNING;
-import static org.sonatype.nexus.scheduling.schedule.Schedule.SCHEDULE_START_AT;
-import static org.sonatype.nexus.scheduling.schedule.Schedule.stringToDate;
 
 /**
  * Quartz {@link SchedulerSPI}.
  *
  * @since 3.0
  */
+@Named
 @ManagedLifecycle(phase = SERVICES)
-public abstract class QuartzSchedulerSPI
+@Singleton
+public class QuartzSchedulerSPI
     extends StateGuardLifecycleSupport
-    implements SchedulerSPI
+    implements SchedulerSPI, EventAware
 {
-  public static final String MISSING_TRIGGER_RECOVERY = ".missingTriggerRecovery";
+  private static final String SCHEDULER_NAME = "nexus";
 
-  protected static final String GROUP_NAME = "nexus";
+  private static final String GROUP_NAME = "nexus";
 
   private static final Set<String> INHERITED_CONFIG_KEYS = ImmutableSet.of(LIMIT_NODE_KEY);
 
-  protected final EventManager eventManager;
+  private final EventManager eventManager;
 
   private final NodeAccess nodeAccess;
 
-  protected final Provider<JobStore> jobStoreProvider;
+  private final Provider<JobStore> jobStoreProvider;
 
-  protected final ScheduleFactory scheduleFactory;
+  private final JobFactory jobFactory;
 
-  private final Provider<Scheduler> schedulerProvider;
+  private final int threadPoolSize;
 
-  protected final QuartzTriggerConverter triggerConverter;
+  private final ScheduleFactory scheduleFactory;
 
-  private final LastShutdownTimeService lastShutdownTimeService;
+  private final QuartzTriggerConverter triggerConverter;
 
-  private final DatabaseStatusDelayedExecutor delayedExecutor;
+  private Scheduler scheduler;
 
-  private final boolean recoverInterruptedJobs;
-
-  protected Scheduler scheduler;
-
-  protected QuartzScheduler quartzScheduler;
+  private QuartzScheduler quartzScheduler;
 
   private boolean active;
 
-  @SuppressWarnings("squid:S00107") // suppress constructor parameter count
   @Inject
-  public QuartzSchedulerSPI(
-      final EventManager eventManager,
-      final NodeAccess nodeAccess,
-      final Provider<JobStore> jobStoreProvider,
-      final Provider<Scheduler> schedulerProvider,
-      final LastShutdownTimeService lastShutdownTimeService,
-      final DatabaseStatusDelayedExecutor delayedExecutor,
-      @Named("${nexus.quartz.recoverInterruptedJobs:-true}") final boolean recoverInterruptedJobs)
+  public QuartzSchedulerSPI(final EventManager eventManager,
+                            final NodeAccess nodeAccess,
+                            final Provider<JobStore> jobStoreProvider,
+                            final JobFactory jobFactory,
+                            @Named("${nexus.quartz.poolSize:-20}") final int threadPoolSize)
+      throws Exception
   {
     this.eventManager = checkNotNull(eventManager);
     this.nodeAccess = checkNotNull(nodeAccess);
     this.jobStoreProvider = checkNotNull(jobStoreProvider);
-    this.schedulerProvider = checkNotNull(schedulerProvider);
-    this.lastShutdownTimeService = checkNotNull(lastShutdownTimeService);
-    this.recoverInterruptedJobs = recoverInterruptedJobs;
-    this.delayedExecutor = checkNotNull(delayedExecutor);
+    this.jobFactory = checkNotNull(jobFactory);
+
+    checkArgument(threadPoolSize > 0, "Invalid thread-pool size: %s", threadPoolSize);
+    this.threadPoolSize = threadPoolSize;
+    log.info("Thread-pool size: {}", threadPoolSize);
 
     this.scheduleFactory = new QuartzScheduleFactory();
     this.triggerConverter = new QuartzTriggerConverter(this.scheduleFactory);
@@ -167,22 +155,18 @@ public abstract class QuartzSchedulerSPI
   }
 
   @VisibleForTesting
-  public Scheduler getScheduler() {
+  Scheduler getScheduler() {
     return scheduler;
-  }
-
-  @VisibleForTesting
-  public void setScheduler(final Scheduler scheduler) {
-    this.scheduler = scheduler;
   }
 
   //
   // Lifecycle
   //
+
   @Override
   protected void doStart() throws Exception {
     // create new scheduler
-    scheduler = schedulerProvider.get();
+    scheduler = createScheduler();
 
     try {
       // access internal scheduler to simulate signals for remote updates
@@ -196,120 +180,56 @@ public abstract class QuartzSchedulerSPI
     }
 
     // re-attach listeners right after scheduler is available
-    reattachListeners();
-  }
-
-  private void reattachListeners() {
-    final Optional<Date> lastShutdownTime = lastShutdownTimeService.estimateLastShutdownTime();
-    forEachNexusJob((final Trigger trigger, final JobDetail jobDetail) -> {
-      try {
-        updateLastRunStateInfo(jobDetail, lastShutdownTime);
-      }
-      catch (SchedulerException e) {
-        log.error("Error updating last run state for {}", jobDetail.getKey(), e);
-      }
-    });
-
-    forEachNexusJob((final Trigger trigger, final JobDetail jobDetail) -> {
-      try {
-        stubJobListener(jobDetail);
-      }
-      catch (SchedulerException e) {
-        log.error("Error attaching job listener to {}", jobDetail.getKey(), e);
-      }
-    });
-
-    delayedExecutor.execute(() -> {
-      forEachNexusJob((final Trigger trigger, final JobDetail jobDetail) -> {
-        try {
-          updateJobListener(trigger);
-        }
-        catch (SchedulerException e) {
-          log.error("Error attaching job listener to {}", jobDetail.getKey(), e);
-        }
-      });
-
-      if (recoverInterruptedJobs) {
-        forEachNexusJob(this::recoverJob);
-      }
-    });
-  }
-
-  private void forEachNexusJob(final BiConsumer<Trigger, JobDetail> consumer) {
-    try {
-      for (Entry<Trigger, JobDetail> entry : getNexusJobs().entrySet()) {
-        consumer.accept(entry.getKey(), entry.getValue());
-      }
-    }
-    catch (SchedulerException e) {
-      log.error("Error getting jobs to process", e);
-    }
-  }
-
-  @VisibleForTesting
-  public void recoverJob(final Trigger trigger, final JobDetail jobDetail) {
-    if (shouldRecoverJob(trigger, jobDetail)) {
-      try {
-        Trigger newTrigger = newTrigger()
-            .usingJobData(trigger.getJobDataMap())
-            .withDescription("Recovery of " + trigger.getDescription())
-            .forJob(jobDetail)
-            .startNow()
-            .build();
-        log.info("Recovering job {}", newTrigger.getJobKey());
-        scheduler.scheduleJob(newTrigger);
-      }
-      catch (SchedulerException e) {
-        log.error("Failed to recover job {}", trigger.getJobKey(), e);
-      }
-    }
-  }
-
-  private static Boolean shouldRecoverJob(final Trigger trigger, final JobDetail jobDetail) {
-    return (jobDetail.requestsRecovery() && isInterruptedJob(jobDetail)) || isRunNow(trigger);
+    reattachJobListeners();
   }
 
   /**
-   * Checks the last run time against its last trigger fire time.
-   * If the trigger's last fire time doesn't match with the jobs last fire time,
-   * then the {@link TaskState} is set to interrupted
-   *
-   * @param nexusLastRunTime - approximate time at which the last instance of nexus was shutdown
+   * Create a new {@link Scheduler} and set to stand-by mode.
    */
-  @VisibleForTesting
-  public void updateLastRunStateInfo(
-      final JobDetail jobDetail,
-      final Optional<Date> nexusLastRunTime) throws SchedulerException
-  {
-    Optional<Date> latestFireWrapper = scheduler.getTriggersOfJob(jobDetail.getKey())
-        .stream()
-        .filter(Objects::nonNull)
-        .map(Trigger::getPreviousFireTime)
-        .filter(Objects::nonNull)
-        .max(Date::compareTo);
-
-    if (latestFireWrapper.isPresent()) {
-      TaskConfiguration taskConfig = configurationOf(jobDetail);
-      Date latestFire = latestFireWrapper.get();
-
-      if (!taskConfig.hasLastRunState() || taskConfig.getLastRunState().getRunStarted().before(latestFire)) {
-        long estimatedDuration = Math.max(nexusLastRunTime.orElse(latestFire).getTime() - latestFire.getTime(), 0);
-        taskConfig.setLastRunState(INTERRUPTED, latestFire, estimatedDuration);
-
-        log.warn("Updating lastRunState to interrupted for jobKey {} taskConfig: {}", jobDetail.getKey(), taskConfig);
-        try {
-          updateJobData(jobDetail, taskConfig);
-          scheduler.addJob(jobDetail, true, true);
-        }
-        catch (RuntimeException e) {
-          log.warn("Problem updating lastRunState to interrupted for jobKey {}", jobDetail.getKey(), e);
-        }
+  private Scheduler createScheduler() throws SchedulerException {
+    // ensure executed threads have TCCL set
+    ThreadExecutor threadExecutor = new DefaultThreadExecutor()
+    {
+      @Override
+      public void execute(final Thread thread) {
+        thread.setContextClassLoader(QuartzSchedulerSPI.class.getClassLoader());
+        super.execute(thread);
       }
-    }
+    };
+
+    // create Scheduler (implicitly registers it with repository)
+    DirectSchedulerFactory.getInstance().createScheduler(
+        SCHEDULER_NAME,
+        nodeAccess.getId(), // instance-id
+        new QuartzThreadPool(threadPoolSize),
+        threadExecutor,
+        jobStoreProvider.get(),
+        null, // scheduler plugin-map
+        null, // rmi-registry host
+        0,    // rmi-registry port
+        -1,   // idle-wait time
+        -1,   // db-failure retry-interval
+        true, // jmx-export
+        null, // custom jmx object-name, lets use the default
+        1,    // max batch-size
+        0L    // batch time-window
+    );
+    Scheduler scheduler = DirectSchedulerFactory.getInstance().getScheduler(SCHEDULER_NAME);
+    scheduler.setJobFactory(jobFactory);
+
+    // re-logging with version, as by default we limit quartz logging to WARN, hiding its default version logging
+    log.info("Quartz Scheduler v{}", scheduler.getMetaData().getVersion());
+
+    scheduler.standby();
+
+    return scheduler;
   }
 
   @Override
   protected void doStop() throws Exception {
+    // shutdown and unregister the scheduler instance
+    scheduler.shutdown();
+    SchedulerRepository.getInstance().remove(SCHEDULER_NAME);
     scheduler = null;
   }
 
@@ -342,15 +262,13 @@ public abstract class QuartzSchedulerSPI
   }
 
   private void applyActive() throws SchedulerException {
-    try (TcclBlock tccl = TcclBlock.begin(this)) {
-      if (!active && !scheduler.isInStandbyMode()) {
-        scheduler.standby();
-        log.info("Scheduler put into stand-by mode");
-      }
-      else if (active && scheduler.isInStandbyMode()) {
-        scheduler.start();
-        log.info("Scheduler put into ready mode");
-      }
+    if (!active && !scheduler.isInStandbyMode()) {
+      scheduler.standby();
+      log.info("Scheduler put into stand-by mode");
+    }
+    else if (active && scheduler.isInStandbyMode()) {
+      scheduler.start();
+      log.info("Scheduler put into ready mode");
     }
   }
 
@@ -359,88 +277,71 @@ public abstract class QuartzSchedulerSPI
   //
 
   /**
-   * Schedules a manually executable trigger for a job missing a trigger and adds marker for health check reporting
+   * Re-attach listeners to all existing jobs.
    */
-  private Trigger scheduleJobWithManualTrigger(
-      final JobKey jobKey,
-      final JobDetail jobDetail,
-      final TriggerKey triggerKey) throws SchedulerException
-  {
-    log.error("Missing trigger for key: {}", jobKey);
-    Trigger trigger = triggerConverter.convert(new Manual())
-        .usingJobData(jobDetail.getJobDataMap())
-        .usingJobData(MISSING_TRIGGER_RECOVERY, jobKey.getName())
-        .withIdentity(triggerKey)
-        .withDescription(jobDetail.getDescription())
-        .forJob(jobDetail)
-        .build();
-    log.info("Rescheduling job '{}' with manual trigger", jobDetail.getDescription());
-    scheduler.scheduleJob(trigger);
-    return trigger;
+  @VisibleForTesting
+  void reattachJobListeners() throws SchedulerException {
+    log.debug("Re-attaching listeners to jobs");
+
+    // Install job supporting listeners for each NX task being scheduled
+    Set<JobKey> jobKeys = scheduler.getJobKeys(jobGroupEquals(QuartzSchedulerSPI.GROUP_NAME));
+    for (JobKey jobKey : jobKeys) {
+      JobDetail jobDetail = scheduler.getJobDetail(jobKey);
+      if (jobDetail == null) {
+        log.error("Missing job-detail for key: {}", jobKey);
+        continue;
+      }
+
+      Trigger trigger = scheduler.getTrigger(triggerKey(jobKey.getName(), jobKey.getGroup()));
+      if (trigger == null) {
+        log.error("Missing trigger for key: {}", jobKey);
+        continue;
+      }
+
+      attachJobListener(jobDetail, trigger);
+
+      if (isRunNow(trigger)) {
+        scheduler.rescheduleJob(trigger.getKey(), trigger);
+        scheduler.resumeJob(jobKey);
+      }
+    }
   }
 
   /**
    * Attach {@link QuartzTaskJobListener} to job.
    */
-  protected QuartzTaskJobListener attachJobListener(
-      final JobDetail jobDetail,
-      final Trigger trigger) throws SchedulerException
+  private QuartzTaskJobListener attachJobListener(final JobDetail jobDetail,
+                                                  final Trigger trigger) throws SchedulerException
   {
     log.debug("Initializing task-state: jobDetail={}, trigger={}", jobDetail, trigger);
 
     Date now = new Date();
-    TaskConfiguration taskConfiguration = configurationOf(jobDetail);
+    TaskConfiguration taskConfiguration = QuartzTaskJob.configurationOf(jobDetail);
     Schedule schedule = triggerConverter.convert(trigger);
     QuartzTaskState taskState = new QuartzTaskState(
         taskConfiguration,
         schedule,
-        trigger.getFireTimeAfter(now));
+        trigger.getFireTimeAfter(now)
+    );
 
     QuartzTaskFuture future = null;
-    if (scheduler.getTriggerState(trigger.getKey()) == TriggerState.BLOCKED) {
-      // This is a task already running
-      future = new QuartzTaskFuture(
-          this,
-          jobDetail.getKey(),
-          taskConfiguration.getTaskLogName(),
-          trigger.getStartTime(), // TODO verify this
-          schedule,
-          null);
-    }
-    else if (schedule instanceof Now) {
+    if (schedule instanceof Now) {
       future = new QuartzTaskFuture(
           this,
           jobDetail.getKey(),
           taskConfiguration.getTaskLogName(),
           now,
           schedule,
-          null);
+          null
+      );
     }
 
     QuartzTaskJobListener listener = new QuartzTaskJobListener(
         listenerName(jobDetail.getKey()),
         eventManager,
         this,
-        new QuartzTaskInfo(eventManager, this, jobDetail.getKey(), taskState, future));
-
-    scheduler.getListenerManager().addJobListener(listener, keyEquals(jobDetail.getKey()));
-
-    return listener;
-  }
-
-  /**
-   * Creates a stub of a {@link QuartzTaskJobListener} attached to the job with scheduling unset.
-   * See NEXUS-18983
-   */
-  private QuartzTaskJobListener stubJobListener(final JobDetail jobDetail) throws SchedulerException {
-    log.debug("Stubbing task-state: jobDetail={}", jobDetail);
-
-    TaskConfiguration taskConfiguration = configurationOf(jobDetail);
-    Schedule schedule = scheduleFactory.manual();
-    QuartzTaskState taskState = new QuartzTaskState(taskConfiguration, schedule, null);
-
-    QuartzTaskJobListener listener = new QuartzTaskJobListener(listenerName(jobDetail.getKey()), eventManager, this,
-        new QuartzTaskInfo(eventManager, this, jobDetail.getKey(), taskState, null));
+        new QuartzTaskInfo(eventManager, this, jobDetail.getKey(), taskState, future)
+    );
 
     scheduler.getListenerManager().addJobListener(listener, keyEquals(jobDetail.getKey()));
 
@@ -456,33 +357,39 @@ public abstract class QuartzSchedulerSPI
     return (QuartzTaskJobListener) scheduler.getListenerManager().getJobListener(name);
   }
 
-  protected void updateJobListener(final JobDetail jobDetail) throws SchedulerException {
+  private void updateJobListener(final JobDetail jobDetail) throws SchedulerException {
     QuartzTaskJobListener toBeUpdated = findJobListener(jobDetail.getKey());
     if (toBeUpdated != null) {
       QuartzTaskInfo taskInfo = toBeUpdated.getTaskInfo();
-      taskInfo.setNexusTaskStateIfWaiting(
+      taskInfo.setNexusTaskStateIfInState(
+          TaskInfo.State.WAITING,
           new QuartzTaskState(
-              taskInfo.getConfiguration().apply(configurationOf(jobDetail)),
+              taskInfo.getConfiguration().apply(QuartzTaskJob.configurationOf(jobDetail)),
               taskInfo.getSchedule(),
-              taskInfo.getCurrentState().getNextRun()),
-          taskInfo.getTaskFuture());
+              taskInfo.getCurrentState().getNextRun()
+          ),
+          taskInfo.getTaskFuture()
+      );
     }
   }
 
-  protected void updateJobListener(final Trigger trigger) throws SchedulerException {
+  private void updateJobListener(final Trigger trigger) throws SchedulerException {
     QuartzTaskJobListener toBeUpdated = findJobListener(trigger.getJobKey());
     if (toBeUpdated != null) {
       QuartzTaskInfo taskInfo = toBeUpdated.getTaskInfo();
-      taskInfo.setNexusTaskStateIfWaiting(
+      taskInfo.setNexusTaskStateIfInState(
+          TaskInfo.State.WAITING,
           new QuartzTaskState(
               taskInfo.getConfiguration(),
               triggerConverter.convert(trigger),
-              trigger.getFireTimeAfter(new Date())),
-          taskInfo.getTaskFuture());
+              trigger.getFireTimeAfter(new Date())
+          ),
+          taskInfo.getTaskFuture()
+      );
     }
   }
 
-  protected void removeJobListener(final JobKey jobKey) throws SchedulerException {
+  private void removeJobListener(final JobKey jobKey) throws SchedulerException {
     String name = listenerName(jobKey);
     QuartzTaskJobListener toBeRemoved = (QuartzTaskJobListener) scheduler.getListenerManager().getJobListener(name);
     if (toBeRemoved != null) {
@@ -570,8 +477,7 @@ public abstract class QuartzSchedulerSPI
   public List<TaskInfo> listsTasks() {
     try {
       // returns all tasks which are NOT removed or done
-      return allTasks().values()
-          .stream()
+      return allTasks().values().stream()
           .filter((task) -> !task.isRemovedOrDone())
           .collect(Collectors.toList());
     }
@@ -582,30 +488,8 @@ public abstract class QuartzSchedulerSPI
 
   @Override
   @Guarded(by = STARTED)
-  public List<String> getMissingTriggerDescriptions() {
-    try {
-      try (TcclBlock tccl = TcclBlock.begin(this)) {
-        Set<JobKey> jobKeys = scheduler.getJobKeys(jobGroupEquals(GROUP_NAME));
-        List<String> missingJobDescriptions = new ArrayList<>();
-        for (JobKey jobKey : jobKeys) {
-          Trigger trigger = scheduler.getTrigger(triggerKey(jobKey.getName(), jobKey.getGroup()));
-          if (trigger.getJobDataMap().containsKey(MISSING_TRIGGER_RECOVERY)) {
-            missingJobDescriptions.add(trigger.getDescription());
-          }
-        }
-        return missingJobDescriptions;
-      }
-    }
-    catch (SchedulerException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  @Override
-  @Guarded(by = STARTED)
-  public TaskInfo scheduleTask(
-      final TaskConfiguration config,
-      final Schedule schedule)
+  public TaskInfo scheduleTask(final TaskConfiguration config,
+                               final Schedule schedule)
   {
     checkState(!EventHelper.isReplicating(), "Replication in progress");
 
@@ -614,10 +498,75 @@ public abstract class QuartzSchedulerSPI
       QuartzTaskInfo old = findTaskById(config.getId());
 
       if (old != null) {
-        return updateJob(old, config, schedule);
+
+        checkState(!(old.getSchedule() instanceof Now), "Run 'now' task cannot be rescheduled");
+        checkState(!old.isRemovedOrDone(), "Done task cannot be rescheduled");
+        QuartzTaskFuture future = old.getTaskFuture();
+        if (future != null) { // is running
+          checkState(!(schedule instanceof Now), "Running task cannot be rescheduled with 'now'");
+        }
+
+        log.debug("Task {} : {} rescheduled {} -> {} ",
+            old.getJobKey().getName(),
+            old.getConfiguration().getTaskLogName(),
+            old.getSchedule(),
+            schedule
+        );
+
+        JobDetail jobDetail = buildJob(config, old.getJobKey());
+        Trigger trigger = buildTrigger(schedule, jobDetail);
+
+        scheduler.addJob(jobDetail, true, true);
+        scheduler.rescheduleJob(trigger.getKey(), trigger);
+
+        // update TaskInfo, but only if it's WAITING, as running one will pick up the change by job listener when done
+        old.setNexusTaskStateIfInState(
+            TaskInfo.State.WAITING,
+            new QuartzTaskState(
+                config,
+                schedule,
+                trigger.getFireTimeAfter(new Date())
+            ),
+            future
+        );
+
+        if (!config.isEnabled()) {
+          scheduler.pauseJob(old.getJobKey());
+        }
+        else {
+          scheduler.resumeJob(old.getJobKey());
+        }
+
+        return old;
       }
       else {
-        return createNewJob(config, schedule);
+        // Use always new jobKey, as if THIS task reschedules THIS/itself, "new" should not interfere with "this"
+        // Currently only healthcheck does this, by rescheduling itself
+        JobKey jobKey = JobKey.jobKey(UUID.randomUUID().toString(), GROUP_NAME);
+
+        // get trigger, but use identity of jobKey
+        // This is only for simplicity, as is not a requirement: NX job:triggers are 1:1 so tying them as this is ok
+        // ! create the trigger before eventual TaskInfo remove bellow to avoid task removal in case of an invalid trigger
+        JobDetail jobDetail = buildJob(config, jobKey);
+        Trigger trigger = buildTrigger(schedule, jobDetail);
+
+        log.debug("Task {} : {} scheduled with key: {} and schedule: {}",
+            config.getId(),
+            config.getTaskLogName(),
+            jobKey.getName(),
+            schedule
+        );
+
+        // register job specific listener with initial state
+        QuartzTaskJobListener listener = attachJobListener(jobDetail, trigger);
+
+        scheduler.scheduleJob(jobDetail, trigger);
+
+        if (!config.isEnabled()) {
+          scheduler.pauseJob(jobKey);
+        }
+
+        return listener.getTaskInfo();
       }
     }
     catch (SchedulerException e) {
@@ -625,103 +574,10 @@ public abstract class QuartzSchedulerSPI
     }
   }
 
-  protected QuartzTaskInfo createNewJob(
-      final TaskConfiguration config,
-      final Schedule schedule) throws SchedulerException
-  {
-    // Use always new jobKey, as if THIS task reschedules THIS/itself, "new" should not interfere with "this"
-    // Currently only healthcheck does this, by rescheduling itself
-    JobKey jobKey = JobKey.jobKey(UUID.randomUUID().toString(), GROUP_NAME);
-
-    // get trigger, but use identity of jobKey
-    // This is only for simplicity, as is not a requirement: NX job:triggers are 1:1 so tying them as this is ok
-    // ! create the trigger before eventual TaskInfo remove bellow to avoid task removal in case of an invalid trigger
-    JobDetail jobDetail = buildJob(config, jobKey);
-    Trigger trigger = buildTrigger(schedule, jobDetail);
-
-    log.debug("Task {} : {} scheduled with key: {} and schedule: {}",
-        config.getId(),
-        config.getTaskLogName(),
-        jobKey.getName(),
-        schedule);
-
-    // register job specific listener with initial state
-    QuartzTaskJobListener listener = attachJobListener(jobDetail, trigger);
-
-    scheduler.scheduleJob(jobDetail, trigger);
-
-    if (!config.isEnabled()) {
-      scheduler.pauseJob(jobKey);
-    }
-
-    return listener.getTaskInfo();
-  }
-
-  protected QuartzTaskInfo updateJob(
-      final QuartzTaskInfo old,
-      final TaskConfiguration config,
-      final Schedule schedule) throws SchedulerException
-  {
-    checkState(!(old.getSchedule() instanceof Now), "Run 'now' task cannot be rescheduled");
-    checkState(!old.isRemovedOrDone(), "Done task cannot be rescheduled");
-    QuartzTaskFuture future = old.getTaskFuture();
-    if (future != null) { // is running
-      checkState(!(schedule instanceof Now), "Running task cannot be rescheduled with 'now'");
-    }
-
-    log.debug("Task {} : {} rescheduled {} -> {} ",
-        old.getJobKey().getName(),
-        old.getConfiguration().getTaskLogName(),
-        old.getSchedule(),
-        schedule);
-
-    JobDetail jobDetail = buildJob(config, old.getJobKey());
-    Trigger trigger = buildTrigger(schedule, jobDetail);
-
-    scheduler.addJob(jobDetail, true, true);
-    scheduler.rescheduleJob(trigger.getKey(), trigger);
-
-    JobDataMap jobData = trigger.getJobDataMap();
-    String type = jobData.getString(Schedule.SCHEDULE_TYPE);
-
-    if (Cron.TYPE.equals(type)) {
-      verifyCron(jobData);
-    }
-
-    // update TaskInfo, but only if it's WAITING, as running one will pick up the change by job listener when done
-    old.setNexusTaskStateIfWaiting(
-        new QuartzTaskState(
-            config,
-            schedule,
-            trigger.getFireTimeAfter(new Date())),
-        future);
-
-    if (!config.isEnabled()) {
-      scheduler.pauseJob(old.getJobKey());
-    }
-    else {
-      scheduler.resumeJob(old.getJobKey());
-    }
-
-    return old;
-  }
-
-  private void verifyCron(final JobDataMap jobData) throws SchedulerException {
-    Date startAt = stringToDate(jobData.getString(SCHEDULE_START_AT));
-    String cronExpression = jobData.getString(Cron.SCHEDULE_CRON_EXPRESSION);
-    try {
-      scheduleFactory.cron(startAt, cronExpression);
-    }
-    catch (Exception e) {
-      throw new SchedulerException(e);
-    }
-  }
-
   private JobDetail buildJob(final TaskConfiguration config, final JobKey jobKey) {
     return JobBuilder.newJob(QuartzTaskJob.class)
         .withIdentity(jobKey)
         .withDescription(config.getName())
-        .requestRecovery(config.isRecoverable())
         .usingJobData(new JobDataMap(config.asMap()))
         .build();
   }
@@ -772,7 +628,7 @@ public abstract class QuartzSchedulerSPI
   /**
    * Returns all tasks for the {@link #GROUP_NAME} group, which also have attached job-listeners.
    */
-  protected Map<JobKey, QuartzTaskInfo> allTasks() throws SchedulerException {
+  private Map<JobKey, QuartzTaskInfo> allTasks() throws SchedulerException {
     try (TcclBlock tccl = TcclBlock.begin(this)) {
       Map<JobKey, QuartzTaskInfo> result = new HashMap<>();
 
@@ -784,7 +640,7 @@ public abstract class QuartzSchedulerSPI
         }
         else {
           // TODO: Sort out if this is normal or edge-case indicative of a bug or not
-          log.debug("Job missing listener; omitting from results: {}", jobKey);
+          log.warn("Job missing listener; omitting from results: {}", jobKey);
         }
       }
 
@@ -792,38 +648,13 @@ public abstract class QuartzSchedulerSPI
     }
   }
 
-  private Map<Trigger, JobDetail> getNexusJobs() throws SchedulerException {
-    Map<Trigger, JobDetail> nexusJobs = new HashMap<>();
-    try (TcclBlock tccl = TcclBlock.begin(this)) {
-      Set<JobKey> jobKeys = scheduler.getJobKeys(jobGroupEquals(GROUP_NAME));
-      for (JobKey jobKey : jobKeys) {
-        JobDetail jobDetail = scheduler.getJobDetail(jobKey);
-        if (jobDetail == null) {
-          log.error("Missing job-detail for key: {}", jobKey);
-          continue;
-        }
-
-        TriggerKey triggerKey = triggerKey(jobKey.getName(), jobKey.getGroup());
-        Trigger trigger = scheduler.getTrigger(triggerKey);
-        if (trigger == null) {
-          trigger = scheduleJobWithManualTrigger(jobKey, jobDetail, triggerKey);
-        }
-
-        nexusJobs.put(trigger, jobDetail);
-      }
-    }
-    return nexusJobs;
-  }
-
   /**
    * Returns task-info for given identifier, or null.
    */
   @Nullable
-  @VisibleForTesting
-  protected QuartzTaskInfo findTaskById(final String id) throws SchedulerException {
+  private QuartzTaskInfo findTaskById(final String id) throws SchedulerException {
     try (TcclBlock tccl = TcclBlock.begin(this)) {
-      return allTasks().values()
-          .stream()
+      return allTasks().values().stream()
           .filter((task) -> task.getId().equals(id))
           .findFirst()
           .orElse(null);
@@ -850,11 +681,11 @@ public abstract class QuartzSchedulerSPI
    * Used by {@link QuartzTaskInfo#runNow()}.
    */
   @Guarded(by = STARTED)
-  public void runNow(
-      final String triggerSource,
-      final JobKey jobKey,
-      final QuartzTaskInfo taskInfo,
-      final QuartzTaskState taskState) throws TaskRemovedException, SchedulerException
+  public void runNow(final String triggerSource,
+                     final JobKey jobKey,
+                     final QuartzTaskInfo taskInfo,
+                     final QuartzTaskState taskState)
+      throws TaskRemovedException, SchedulerException
   {
     checkState(active, "Cannot run tasks while scheduler is paused");
 
@@ -863,7 +694,7 @@ public abstract class QuartzSchedulerSPI
     // avoid marking local state as running if task is limited to run on a different node
     if (!isLimitedToAnotherNode(config)) {
       taskInfo.setNexusTaskState(
-          RUNNING,
+          TaskInfo.State.RUNNING,
           taskState,
           new QuartzTaskFuture(
               this,
@@ -871,7 +702,9 @@ public abstract class QuartzSchedulerSPI
               config.getTaskLogName(),
               new Date(),
               scheduleFactory().now(),
-              triggerSource));
+              triggerSource
+          )
+      );
     }
 
     try (TcclBlock tccl = TcclBlock.begin(this)) {
@@ -904,80 +737,93 @@ public abstract class QuartzSchedulerSPI
     }
   }
 
-  @Guarded(by = STARTED)
-  @Override
-  public boolean cancel(final String id, final boolean mayInterruptIfRunning) {
-    return Optional.ofNullable(id)
-        .map(this::getTaskById)
-        .map(TaskInfo::getCurrentState)
-        .map(CurrentState::getFuture)
-        .map(f -> f.cancel(mayInterruptIfRunning))
-        .orElse(false);
-  }
+  @Subscribe
+  public void on(JobCreatedEvent event) {
+    if (!event.isLocal() && isStarted()) {
+      JobDetail jobDetail = event.getJob().getValue();
 
-  @Nullable
-  @Override
-  public TaskInfo getTaskByTypeId(final String typeId) {
-    return getTaskByTypeId(typeId, emptyMap());
-  }
-
-  @Nullable
-  @Override
-  public TaskInfo getTaskByTypeId(final String typeId, final Map<String, String> config) {
-    checkNotNull(typeId);
-    checkNotNull(config);
-    return listsTasks().stream()
-        .filter(t -> typeId.equals(t.getTypeId()))
-        .filter(matchConfig(config))
-        .findFirst()
-        .orElse(null);
-  }
-
-  @Override
-  public boolean findAndSubmit(final String typeId) {
-    return findAndSubmit(typeId, emptyMap());
-  }
-
-  public boolean findWaitingTask(final String typeId, final Map<String, String> config) {
-    TaskInfo taskInfo = getTaskByTypeId(typeId, config);
-    if (taskInfo == null) {
-      return false;
-    }
-    else {
-      return taskInfo.getCurrentState().getState().isWaiting() || taskInfo.getCurrentState().getState().isRunning();
+      // simulate signals Quartz would have sent
+      quartzScheduler.getSchedulerSignaler().signalSchedulingChange(0L);
+      quartzScheduler.notifySchedulerListenersJobAdded(jobDetail);
     }
   }
 
-  @Override
-  public boolean findAndSubmit(final String typeId, final Map<String, String> config) {
-    checkNotNull(typeId);
-    checkNotNull(config);
-    TaskInfo taskInfo = getTaskByTypeId(typeId, config);
-    if (taskInfo == null) {
-      return false;
+  @Subscribe
+  public void on(JobUpdatedEvent event) throws SchedulerException {
+    if (!event.isLocal() && isStarted()) {
+      JobDetail jobDetail = event.getJob().getValue();
+
+      updateJobListener(jobDetail);
+
+      // simulate signals Quartz would have sent
+      quartzScheduler.getSchedulerSignaler().signalSchedulingChange(0L);
+      quartzScheduler.notifySchedulerListenersJobAdded(jobDetail);
     }
-    else {
-      try {
-        if (!taskInfo.getCurrentState().getState().isRunning()) {
-          taskInfo.runNow();
-        }
+  }
+
+  @Subscribe
+  public void on(JobDeletedEvent event) throws SchedulerException {
+    if (!event.isLocal() && isStarted()) {
+      JobDetail jobDetail = event.getJob().getValue();
+
+      // simulate signals Quartz would have sent
+      quartzScheduler.getSchedulerSignaler().signalSchedulingChange(0L);
+      quartzScheduler.notifySchedulerListenersJobDeleted(jobDetail.getKey());
+
+      removeJobListener(jobDetail.getKey());
+    }
+  }
+
+  @Subscribe
+  public void on(TriggerCreatedEvent event) throws SchedulerException {
+    if (!event.isLocal() && isStarted()) {
+      Trigger trigger = event.getTrigger().getValue();
+      if (!isRunNow(trigger)) {
+
+        attachJobListener(jobStoreProvider.get().retrieveJob(trigger.getJobKey()), trigger);
+
+        // simulate signals Quartz would have sent
+        quartzScheduler.getSchedulerSignaler().signalSchedulingChange(getNextFireMillis(trigger));
+        quartzScheduler.notifySchedulerListenersSchduled(trigger);
       }
-      catch (TaskRemovedException e) {
-        log.error("Unable to submit task: {}", taskInfo, e);
+      else if (isLimitedToThisNode(trigger)) {
+        // special "run-now" task which was created on a different node to where it will run
+        // when this happens we ping the scheduler to make sure it runs as soon as possible
+        quartzScheduler.getSchedulerSignaler().signalSchedulingChange(0L);
+        quartzScheduler.notifySchedulerListenersSchduled(trigger);
       }
-      return true;
     }
   }
 
-  private Predicate<TaskInfo> matchConfig(final Map<String, String> config) {
-    return t -> {
-      TaskConfiguration tc = t.getConfiguration();
-      return config.entrySet()
-          .stream()
-          .filter(e -> e.getKey() != null)
-          .filter(e -> e.getValue() != null)
-          .allMatch(e -> e.getValue().equals(tc.getString(e.getKey())));
-    };
+  @Subscribe
+  public void on(TriggerUpdatedEvent event) throws SchedulerException {
+    if (!event.isLocal() && isStarted()) {
+      Trigger trigger = event.getTrigger().getValue();
+      if (!isRunNow(trigger)) {
+
+        updateJobListener(trigger);
+
+        // simulate signals Quartz would have sent
+        quartzScheduler.getSchedulerSignaler().signalSchedulingChange(getNextFireMillis(trigger));
+        quartzScheduler.notifySchedulerListenersUnscheduled(trigger.getKey());
+        quartzScheduler.notifySchedulerListenersSchduled(trigger);
+      }
+    }
+  }
+
+  @Subscribe
+  public void on(TriggerDeletedEvent event) throws SchedulerException {
+    if (!event.isLocal() && isStarted()) {
+      Trigger trigger = event.getTrigger().getValue();
+      if (!isRunNow(trigger)) {
+
+        // simulate signals Quartz would have sent
+        quartzScheduler.getSchedulerSignaler().signalSchedulingChange(0L);
+        quartzScheduler.notifySchedulerListenersUnscheduled(trigger.getKey());
+
+        removeJobListener(trigger.getJobKey());
+      }
+    }
   }
 
   /**
@@ -997,20 +843,16 @@ public abstract class QuartzSchedulerSPI
     return false;
   }
 
-  protected boolean isLimitedToThisNode(final Trigger trigger) {
+  private boolean isLimitedToThisNode(final Trigger trigger) {
     // can skip isClustered check because this method is only called when in HA mode
     return nodeAccess.getId().equals(trigger.getJobDataMap().getString(LIMIT_NODE_KEY));
   }
 
-  protected static boolean isRunNow(final Trigger trigger) {
+  private static boolean isRunNow(final Trigger trigger) {
     return Now.TYPE.equals(trigger.getJobDataMap().getString(Schedule.SCHEDULE_TYPE));
   }
 
-  private static boolean isInterruptedJob(final JobDetail jobDetail) {
-    return INTERRUPTED.name().equals(jobDetail.getJobDataMap().getString(LAST_RUN_STATE_END_STATE));
-  }
-
-  protected static long getNextFireMillis(final Trigger trigger) {
+  private static long getNextFireMillis(final Trigger trigger) {
     Date nextFireTime = trigger.getNextFireTime();
     return nextFireTime != null ? nextFireTime.getTime() : 0L;
   }

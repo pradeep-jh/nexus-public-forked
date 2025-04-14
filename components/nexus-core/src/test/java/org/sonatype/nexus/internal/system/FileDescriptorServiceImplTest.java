@@ -20,8 +20,8 @@ import org.mockito.Mock;
 import org.slf4j.Logger;
 
 import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -60,8 +60,7 @@ public class FileDescriptorServiceImplTest
 
   @Test
   public void doNotLogOnGoodFileDescriptors() {
-    FileDescriptorServiceImpl fileDescriptorService =
-        new TestFileDescriptorService(fileDescriptorProvider.with(MINIMUM_FILE_DESCRIPTOR_COUNT));
+    FileDescriptorServiceImpl fileDescriptorService = new TestFileDescriptorService(fileDescriptorProvider.with(MINIMUM_FILE_DESCRIPTOR_COUNT));
     fileDescriptorService.doStart();
     fileDescriptorService.isFileDescriptorLimitOk();
     verify(mockLogger, never()).warn(eq(WARNING_HEADER));

@@ -12,8 +12,6 @@
  */
 package org.sonatype.nexus.logging.task;
 
-import javax.annotation.Nullable;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -53,10 +51,10 @@ public class SeparateTaskLogTaskLoggerTest
     verifyLog(TASK_LOG_ONLY, " Type: {}", taskLogInfo.getTypeId());
     verifyLog(TASK_LOG_ONLY, " Name: {}", taskLogInfo.getName());
     verifyLog(TASK_LOG_ONLY, " Description: {}", taskLogInfo.getMessage());
-    verify(mockLogger).debug(TASK_LOG_ONLY, "Task configuration: {}", taskLogInfo);
+    verify(mockLogger).debug(TASK_LOG_ONLY, "Task configuration: {}", taskLogInfo.toString());
 
     // assert the discriminator ID.
-    assertThat(MDC.get(LOGBACK_TASK_DISCRIMINATOR_ID).matches("typeId-\\d{17}\\b"), is(true));
+    assertThat(MDC.get(LOGBACK_TASK_DISCRIMINATOR_ID).matches("typeId-\\d{14}\\b"), is(true));
   }
 
   @After
@@ -100,22 +98,6 @@ public class SeparateTaskLogTaskLoggerTest
       @Override
       public String toString() {
         return "toString";
-      }
-
-      @Nullable
-      @Override
-      public String getString(final String key) {
-        return null;
-      }
-
-      @Override
-      public boolean getBoolean(final String key, final boolean defaultValue) {
-        return false;
-      }
-
-      @Override
-      public int getInteger(final String key, final int defaultValue) {
-        return 0;
       }
     };
   }

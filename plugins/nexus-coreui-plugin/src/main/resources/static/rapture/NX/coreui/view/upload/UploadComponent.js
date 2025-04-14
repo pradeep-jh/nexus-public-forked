@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -25,20 +21,8 @@ Ext.define('NX.coreui.view.upload.UploadComponent', {
     extend: 'NX.view.AddPanel',
     alias: 'widget.nx-coreui-upload-component',
     requires: [
-      'NX.I18n',
-      'Ext.util.Cookies',
-      'NX.coreui.view.upload.facet.DefaultUploadFacet'
+      'NX.I18n'
     ],
-    uses: [
-      'NX.coreui.view.upload.facet.Maven2UploadFacet'
-    ],
-  /**
-   * Facet for describing upload page per format, if not specified DefaultUploadFacet will be used.
-   * Also facet class should be added in uses section upper.
-   * @alias nx-coreui-upload-facet-{format}
-   * @type {DefaultUploadFacet}
-   */
-  uploadFacet: undefined,
 
     /**
      * @override
@@ -52,21 +36,147 @@ Ext.define('NX.coreui.view.upload.UploadComponent', {
 
     loadRecord: function(uploadDefinition, repository) {
       var me = this;
-      var formatXtype = 'nx-coreui-upload-facet-' + repository.get('format');
-      var facetNameByAlias = Ext.ClassManager.getNameByAlias('widget.' + formatXtype);
-      var uploadFacetAlias = facetNameByAlias ? formatXtype : 'nx-coreui-upload-facet-default';
 
-      me.uploadFacet = Ext.create({
-        xtype: uploadFacetAlias,
-        uploadDefinition: uploadDefinition,
-        repository: repository,
-        panel: me
-      });
-      me.uploadFacet.addWidget();
+      me.uploadDefinition = uploadDefinition;
+      me.repository = repository;
+
+      me.removeAll(true);
+      me.add([{
+          xtype: 'nx-settingsform',
+          api: {
+              submit: 'NX.direct.coreui_Upload.doUpload'
+          },
+          buttons: [{
+              text: NX.I18n.get('FeatureGroups_Upload_Form_Upload_Button'),
+              action: 'upload',
+              formBind: true,
+              ui: 'nx-primary'
+          }, {
+              text: NX.I18n.get('FeatureGroups_Upload_Form_Discard_Button'),
+              action: 'cancel'
+          }],
+          items: [{
+              xtype: 'fieldcontainer',
+              width: 700,
+              items: [{
+                  xtype: 'fieldset',
+                  cls: 'nx-form-section',
+                  itemId: 'nx-coreui-upload-component-assets',
+                  title: NX.I18n.get('FeatureGroups_Upload_Asset_Form_Title'),
+                  items: [me.createRow(true), {
+                      xtype: 'button',
+                      text: NX.I18n.get('FeatureGroups_Upload_Asset_Form_Add_Asset_Button'),
+                      action: 'add_asset',
+                      hidden: !me.uploadDefinition.get('multipleUpload')
+                  }]
+              },{
+                  xtype: 'fieldset',
+                  cls: 'nx-form-section',
+                  layout: {
+                      type: 'vbox',
+                      align: 'stretch'
+                  },
+                  title: NX.I18n.get('FeatureGroups_Upload_Component_Form_Title'),
+                  items: me.uploadDefinition.get('componentFields').map(me.createComponentField, this),
+                  hidden: me.uploadDefinition.get('componentFields').length === 0
+              },{
+                  xtype: 'hidden',
+                  name: 'repositoryName',
+                  value: repository.get('name')
+              }]
+          }],
+          dockedItems: [{
+              xtype: 'panel',
+              itemId: 'nx-coreui-upload-success-message',
+              ui: 'nx-drilldown-message',
+              cls: 'nx-drilldown-info',
+              iconCls: NX.Icons.cls('tick', 'x16'),
+              hidden: true,
+              dock: 'bottom'
+          }]
+      }]);
     },
 
     addAssetRow: function() {
+      var me = this,
+          assetPanel = me.down('#nx-coreui-upload-component-assets');
+
+      if (assetPanel) {
+        var row = me.createRow(false),
+            fields = row.items,
+            suffix = assetPanel.items.items.length / (1 + fields.length);
+
+        fields.forEach(function(field) {
+          field.name += suffix;
+        });
+
+        assetPanel.insert(assetPanel.items.items.length - 1, row);
+      }
+    },
+
+    createRow: function(firstRow) {
+      var me = this,
+          row = {
+              xtype: 'panel',
+              layout: 'column',
+              cls: 'nx-repeated-row',
+              items: [{
+                  xtype: 'fileuploadfield',
+                  cls: 'nx-float-left',
+                  allowBlank: false,
+                  submitValue: true,
+                  buttonText: NX.I18n.get('FeatureGroups_Upload_Form_Browse_Button'),
+                  buttonConfig: {
+                      glyph: 'xf016@FontAwesome' /* fa-file-o */
+                  },
+                  fieldLabel: firstRow ? NX.I18n.get('FeatureGroups_Upload_Asset_Form_File_Label') : undefined,
+                  name: 'file',
+                  width: '150px'
+              }]
+          };
+
+      var assetFields = me.uploadDefinition.get('assetFields');
+
+      assetFields.forEach(function(assetField) {
+          row.items.push(me.createAssetField(assetField, !firstRow));
+      });
+
+      if (!firstRow) {
+          row.items.push({
+              xtype: 'button',
+              text: NX.I18n.get('FeatureGroups_Upload_Asset_Form_Remove_Button'),
+              action: 'remove_upload_asset'
+          });
+      }
+
+      return row;
+    },
+
+    createComponentField: function (field) {
       var me = this;
-      return me.uploadFacet.addAssetRow();
+      return me.createField(field, false);
+    },
+
+    createAssetField: function(field, hideLabel) {
+      var me = this;
+      return me.createField(field, hideLabel, '100px', 'nx-float-left');
+    },
+
+    createField: function (field, hideLabel, width, cls) {
+      var widget = {
+        allowBlank: field.optional,
+        name: field.name,
+        fieldLabel: hideLabel ? undefined : field.displayName,
+        width: width,
+        cls: cls
+      };
+
+      if (field.type === 'STRING') {
+        widget.xtype = 'textfield';
+      }
+      else if (field.type === 'BOOLEAN') {
+        widget.xtype = 'checkbox';
+      }
+      return widget;
     }
   });

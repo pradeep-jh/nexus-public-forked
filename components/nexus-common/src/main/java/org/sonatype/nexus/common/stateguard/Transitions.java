@@ -44,9 +44,4 @@ public @interface Transitions
    * Continue to transition the state for the following exceptions.
    */
   Class<? extends Exception>[] ignore() default {};
-
-  /**
-   * Lock before transition.
-   */
-  boolean requiresWriteLock() default true;
 }

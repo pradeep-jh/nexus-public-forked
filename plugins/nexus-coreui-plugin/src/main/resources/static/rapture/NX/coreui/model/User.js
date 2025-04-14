@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -23,18 +19,13 @@
  */
 Ext.define('NX.coreui.model.User', {
   extend: 'Ext.data.Model',
-  idProperty: {
-    name: 'id',
-    convert: function(value, record) {
-      return Ext.htmlEncode(record.get('userId'));
-    }
-  },
+  idProperty: 'userId',
   fields: [
-    {name: 'userId', type: 'string', sortType: 'asUCText' },
-    {name: 'version', type: 'int', sortType: 'asUCText'},
+    {name: 'userId', type: 'string', sortType: 'asUCText'},
+    {name: 'version', type: 'string', sortType: 'asUCText'},
     {name: 'realm', type: 'string', sortType: 'asUCText'},
-    {name: 'firstName', type: 'string', sortType: 'asUCText' },
-    {name: 'lastName', type: 'string', sortType: 'asUCText' },
+    {name: 'firstName', type: 'string', sortType: 'asUCText'},
+    {name: 'lastName', type: 'string', sortType: 'asUCText'},
     {name: 'email', type: 'string', sortType: 'asUCText'},
     {name: 'status', type: 'string', sortType: 'asUCText'},
     {name: 'roles', type: 'auto' /*array*/},

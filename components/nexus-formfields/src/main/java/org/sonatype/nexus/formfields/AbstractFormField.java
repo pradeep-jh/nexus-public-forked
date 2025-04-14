@@ -160,9 +160,4 @@ public abstract class AbstractFormField<T>
     }
     return attributes;
   }
-
-  public AbstractFormField<T> withAttribute(String key, Object value) {
-    getAttributes().put(key, value);
-    return this;
-  }
 }

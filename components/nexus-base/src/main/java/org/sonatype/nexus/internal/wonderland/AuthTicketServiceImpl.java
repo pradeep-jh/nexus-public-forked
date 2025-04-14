@@ -12,19 +12,12 @@
  */
 package org.sonatype.nexus.internal.wonderland;
 
-import java.util.Optional;
-
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
 import org.sonatype.goodies.common.ComponentSupport;
 import org.sonatype.nexus.common.wonderland.AuthTicketService;
-import org.sonatype.nexus.wonderland.AuthTicketCache;
-
-import org.apache.shiro.SecurityUtils;
-import org.apache.shiro.subject.Subject;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -44,47 +37,23 @@ public class AuthTicketServiceImpl
   private final AuthTicketCache authTicketCache;
 
   @Inject
-  public AuthTicketServiceImpl(
-      final AuthTicketGenerator authTicketGenerator,
-      final AuthTicketCache authTicketCache)
+  public AuthTicketServiceImpl(final AuthTicketGenerator authTicketGenerator,
+                               final AuthTicketCache authTicketCache)
   {
     this.authTicketGenerator = checkNotNull(authTicketGenerator);
     this.authTicketCache = checkNotNull(authTicketCache);
   }
 
   @Override
-  public String createTicket(final String user, final String realmName) {
+  public String createTicket() {
     String ticket = authTicketGenerator.generate();
-    authTicketCache.add(user, ticket, realmName);
+    authTicketCache.add(ticket);
     return ticket;
   }
 
   @Override
-  @Nullable
-  public String createTicket() {
-    Subject subject = SecurityUtils.getSubject();
-    if (subject != null) {
-      Optional<String> realmName = subject.getPrincipals().getRealmNames().stream().findFirst();
-      return createTicket(subject.getPrincipal().toString(), realmName.orElse(null));
-    }
-
-    return null;
-  }
-
-  @Override
-  public boolean redeemTicket(final String user, final String ticket, final String realmName) {
-    checkNotNull(ticket);
-    return authTicketCache.remove(user, ticket, realmName);
-  }
-
-  @Override
   public boolean redeemTicket(final String ticket) {
-    Subject subject = SecurityUtils.getSubject();
-    if (subject != null) {
-      Optional<String> realmName = subject.getPrincipals().getRealmNames().stream().findFirst();
-      return redeemTicket(subject.getPrincipal().toString(), ticket, realmName.orElse(null));
-    }
-
-    return false;
+    checkNotNull(ticket);
+    return authTicketCache.remove(ticket);
   }
 }

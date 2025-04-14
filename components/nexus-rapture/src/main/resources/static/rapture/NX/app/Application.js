@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -30,7 +26,6 @@ Ext.define('NX.app.Application', {
     'Ext.direct.Manager',
     'Ext.state.Manager',
     'Ext.state.LocalStorageProvider',
-    'Ext.util.Cookies',
     'Ext.util.LocalStorage',
     'NX.view.Viewport',
     'NX.util.Url',
@@ -43,6 +38,15 @@ Ext.define('NX.app.Application', {
   },
 
   uses: [
+    // framework patches
+    'Ext.patch.Ticket_15227',
+    'Ext.patch.Ticket_17866',
+    'Ext.patch.Ticket_18960',
+    'Ext.patch.Ticket_18964',
+    'Ext.patch.Ticket_21425',
+    'Ext.patch.Ticket_22557_1',
+    'Ext.patch.Ticket_22557_2',
+
     // direct overrides
     'NX.ext.direct.RemotingProvider',
     'NX.ext.form.action.DirectLoad',
@@ -54,14 +58,6 @@ Ext.define('NX.app.Application', {
     'NX.ext.form.field.Checkbox',
     'NX.ext.form.field.Display',
     'NX.ext.form.field.Number',
-
-    // panel overrides
-    'NX.ext.panel.Panel',
-    'NX.ext.panel.ResponsivePanel',
-    'NX.ext.panel.Header',
-
-    // toolbar overrides
-    'NX.ext.toolbar.Toolbar',
 
     // custom form fields
     'NX.ext.form.OptionalFieldSet',
@@ -81,22 +77,11 @@ Ext.define('NX.app.Application', {
     'NX.ext.grid.plugin.Filtering',
 
     // grid overrides
-    'NX.ext.grid.Panel',
-    'NX.ext.grid.column.Column',
     'NX.ext.grid.column.Date',
 
     // custom grid columns
     'NX.ext.grid.column.Icon',
-    'NX.ext.grid.column.CopyLink',
-
-    // view overrides
-    'NX.ext.view.BoundList',
-
-    // animated card layout
-    'NX.ext.layout.container.Card',
-
-    // Override for ExtJS 6.6
-    'NX.ext.chart.legend.SpriteLegend'
+    'NX.ext.grid.column.CopyLink'
   ],
 
   name: 'NX',
@@ -121,7 +106,6 @@ Ext.define('NX.app.Application', {
    */
   controllers: [
     'Copy',
-    'DependencySnippet',
     'Logging',
     'State',
     'Bookmarking',
@@ -129,11 +113,8 @@ Ext.define('NX.app.Application', {
     'Features',
     'Icon',
     'KeyNav',
-    'Permissions',
-    'AnalyticsOptOut',
-    'UpgradeAlert',
-    'UpgradeModal',
-    'CEBanners'
+    'Message',
+    'Permissions'
   ],
 
   /**
@@ -172,12 +153,6 @@ Ext.define('NX.app.Application', {
     },
     bundleActive: function (symbolicName) {
       return NX.State.getValue('activeBundles').indexOf(symbolicName) > -1;
-    },
-    capabilityActive: function (typeName) {
-      return Ext.Array.contains(NX.State.getValue('capabilityActiveTypes'), typeName);
-    },
-    capabilityCreated: function (typeName) {
-      return Ext.Array.contains(NX.State.getValue('capabilityCreatedTypes'), typeName);
     }
   },
 
@@ -195,9 +170,7 @@ Ext.define('NX.app.Application', {
    * @param {NX.app.Application} app this class
    */
   init: function (app) {
-    var me = this,
-        csrfToken = Ext.util.Cookies.get('NX-ANTI-CSRF-TOKEN'),
-        basePath, hostname;
+    var me = this;
 
     //<if debug>
     me.logInfo('Initializing');
@@ -205,29 +178,18 @@ Ext.define('NX.app.Application', {
     //</if>
 
     // Configure blank image URL
-    Ext.BLANK_IMAGE_URL = NX.util.Url.relativePath + '/static/rapture/resources/images/s.gif';
+    Ext.BLANK_IMAGE_URL = NX.util.Url.baseUrl + '/static/rapture/resources/images/s.gif';
 
-    if (!csrfToken) {
-      basePath = NX.util.Url.baseUrl.substring(window.location.origin.length) || null;
-      hostname = window.location.hostname;
-      if ((Ext.isEdge || Ext.isIE) && hostname && hostname.indexOf('.') === -1) {
-        // IE & Edge won't set a cookie for domains without a TLD
-        hostname = null;
-      }
-      csrfToken = Math.random().toString();
-      Ext.util.Cookies.set('NX-ANTI-CSRF-TOKEN', csrfToken, null, basePath, hostname);
-    }
-
-    Ext.Ajax.setDefaultHeaders({
-      'X-Nexus-UI': 'true',
-      'NX-ANTI-CSRF-TOKEN': csrfToken
-    });
+    Ext.Ajax.defaultHeaders = {
+      // HACK: Setting request header to allow analytics to tell if the request came from the UI or not
+      // HACK: This has some issues, will only catch ajax requests, etc... but may be fine for now
+      'X-Nexus-UI': 'true'
+    };
 
     app.initErrorHandler();
     app.initDirect();
     app.initState();
   },
-  // },
 
   /**
    * Hook into browser error handling (in order to log them).
@@ -267,7 +229,10 @@ Ext.define('NX.app.Application', {
    * @private
    */
   handleError: function (error) {
-    NX.Messages.error(this.errorAsString(error));
+    NX.Messages.add({
+      type: 'danger',
+      text: this.errorAsString(error)
+    });
   },
 
   /**
@@ -301,7 +266,6 @@ Ext.define('NX.app.Application', {
     remotingProvider.maxRetries = 0;
 
     // default request timeout to 60 seconds
-    // note this will be overridden by UiSessionTimeout.js where we load the user config
     remotingProvider.timeout = 60 * 1000;
 
     //<if debug>
@@ -364,9 +328,6 @@ Ext.define('NX.app.Application', {
       }
     });
 
-    // Initialize react code
-    window.onStart();
-
     becomeReady = function () {
       // hide the loading mask after we have loaded
       Ext.get('loading').remove();
@@ -375,9 +336,6 @@ Ext.define('NX.app.Application', {
       // mark app as ready
       me.logInfo('Ready');
       me.ready = true;
-
-      // Relayout if necessary (fix for React breadcrumbs)
-      Ext.ComponentQuery.query('#breadcrumb')[0].updateLayout();
     };
 
     // FIXME: Need a better way to know when the UI is actually rendered so we can hide the mask

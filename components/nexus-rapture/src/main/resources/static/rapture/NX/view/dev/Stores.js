@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -56,20 +52,29 @@ Ext.define('NX.view.dev.Stores', {
           queryMode: 'local',
           displayField: 'id',
           valueField: 'id',
-          triggers: {
-            search: {
-              cls: 'x-form-search-trigger',
-              handler: function () {
-                this.getStore().load();
-              }
-            }
+          trigger2Cls: 'x-form-search-trigger',
+          onTrigger2Click: function () {
+            this.getStore().load();
           },
           store: Ext.create('Ext.data.Store', {
             fields: ['id'],
             data: Ext.data.StoreManager,
             proxy: {
               type: 'memory',
-              reader: Ext.create('NX.data.reader.dev.StoresReader')
+              reader: {
+                type: 'json',
+                read: function (data) {
+                  var stores = [];
+
+                  data.each(function (store) {
+                    stores.push({
+                      id: store.storeId
+                    });
+                  });
+
+                  return this.readRecords(stores);
+                }
+              }
             },
             sorters: {property: 'id', direction: 'ASC'}
           })
@@ -78,13 +83,13 @@ Ext.define('NX.view.dev.Stores', {
           xtype: 'button',
           text: 'Load store',
           action: 'load',
-          iconCls: 'x-fa fa-arrow-circle-down'
+          glyph: 'xf0ab@FontAwesome' /* fa-arrow-circle-down */
         },
         {
           xtype: 'button',
           text: 'Clear store',
           action: 'clear',
-          iconCls: 'x-fa fa-eraser'
+          glyph: 'xf12d@FontAwesome' /* fa-eraser */
         }
       ]
     });
@@ -92,19 +97,4 @@ Ext.define('NX.view.dev.Stores', {
     me.callParent();
   }
 
-});
-
-Ext.define('NX.data.reader.dev.StoresReader', {
-  extend: 'Ext.data.reader.Json',
-  read: function (data) {
-    var stores = [];
-
-    data.each(function (store) {
-      stores.push({
-        id: store.storeId
-      });
-    });
-
-    return this.readRecords(stores);
-  }
 });

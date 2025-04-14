@@ -15,12 +15,10 @@ package org.sonatype.nexus.repository.maven.tasks;
 import javax.inject.Named;
 import javax.inject.Singleton;
 
-import org.sonatype.nexus.common.upgrade.AvailabilityVersion;
 import org.sonatype.nexus.formfields.FormField;
 import org.sonatype.nexus.formfields.NumberTextFormField;
 import org.sonatype.nexus.formfields.RepositoryCombobox;
 import org.sonatype.nexus.repository.maven.PurgeUnusedSnapshotsFacet;
-import org.sonatype.nexus.repository.maven.VersionPolicy;
 import org.sonatype.nexus.scheduling.TaskDescriptorSupport;
 
 import static org.sonatype.nexus.repository.RepositoryTaskSupport.REPOSITORY_NAME_FIELD_ID;
@@ -31,13 +29,12 @@ import static org.sonatype.nexus.repository.maven.tasks.PurgeMavenUnusedSnapshot
  *
  * @since 3.0
  */
-@AvailabilityVersion(from = "1.0")
 @Named
 @Singleton
 public class PurgeMavenUnusedSnapshotsTaskDescriptor
     extends TaskDescriptorSupport
 {
-  public static final String TASK_NAME = "Maven - Delete unused SNAPSHOT";
+  public static final String TASK_NAME = "Purge unused Maven snapshot versions";
 
   public static final String TYPE_ID = "repository.maven.purge-unused-snapshots";
 
@@ -54,15 +51,13 @@ public class PurgeMavenUnusedSnapshotsTaskDescriptor
         new RepositoryCombobox(
             REPOSITORY_NAME_FIELD_ID,
             "Repository",
-            "Select the repository to delete unused snapshot versions from",
+            "Select the repository to purge unused snapshot versions from",
             FormField.MANDATORY
-        ).includingAnyOfFacets(PurgeUnusedSnapshotsFacet.class)
-            .excludingAnyOfVersionPolicies(VersionPolicy.RELEASE.name())
-            .includeAnEntryForAllRepositories(),
+        ).includingAnyOfFacets(PurgeUnusedSnapshotsFacet.class).includeAnEntryForAllRepositories(),
         new NumberTextFormField(
             LAST_USED_FIELD_ID,
             "Last used in days",
-            "Delete all snapshots that were last used before given number of days",
+            "Purge all snapshots that were last used before given number of days",
             FormField.MANDATORY
         ).withInitialValue(LAST_USED_INIT_VALUE).withMinimumValue(LAST_USED_MIN_VALUE)
     );

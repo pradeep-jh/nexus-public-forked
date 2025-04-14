@@ -21,11 +21,7 @@ import static com.google.common.base.Preconditions.checkState;
  */
 public class CRoleBuilder
 {
-  private final CRole model;
-
-  CRoleBuilder(final CRole model) {
-    this.model = model;
-  }
+  private final CRole model = new CRole();
 
   public CRoleBuilder id(final String id) {
     model.setId(id);

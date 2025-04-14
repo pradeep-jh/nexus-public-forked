@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -29,6 +25,16 @@ Ext.define('NX.util.Validator', {
   ],
 
   /**
+   * @private
+   */
+  default_url_options: {
+    protocols: ['http', 'https', 'ftp'],
+    require_tld: false,
+    require_protocol: false,
+    allow_underscores: false
+  },
+
+  /**
    * Changes to this property should be sync'd in:
    * components/nexus-validation/src/main/java/org/sonatype/nexus/validation/constraint/NamePatternConstants.java
    * @private
@@ -40,7 +46,7 @@ Ext.define('NX.util.Validator', {
    * is the same as default ExtJS email vtype.
    * @private
    */
-  nxEmailRegex : /^(")?(?:[^\."])(?:(?:[\.])?(?:[\w\-!#$%&'*+/=?^_`{|}~]))*\1@(\w[\-\w]*\.?){1,5}([A-Za-z]){2,60}$/,
+  nxEmailRegex : /^(")?(?:[^\."])(?:(?:[\.])?(?:[\w\-!#$%&'*+/=?^_`{|}~]))*\1@(\w[\-\w]*\.){1,5}([A-Za-z]){2,60}$/,
 
   /**
    * A regular expression to detect a valid hostname according to RFC 1123.
@@ -56,23 +62,11 @@ Ext.define('NX.util.Validator', {
   ),
 
   /**
-   * A regular expression to detect a possibly valid URL
-   * @private
-   */
-  nxUrlRegex: /^https?:\/\/[^"<>^`{|}]+$/i,
-
-  /**
    * A regular expression to detect whether we have leading and trailing white space
    *
    * @private
    */
   nxLeadingAndTrailingWhiteSpaceRegex : /^[ \s]+|[ \s]+$/,
-
-  /**
-   * Regular expression to validate docker subdomain
-   * @private
-   */
-  nxSubdomainRegex : /^[a-zA-Z](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$/,
 
   /**
    * @public
@@ -102,21 +96,52 @@ Ext.define('NX.util.Validator', {
         'nx-trim': function(val) {
           return !NX.util.Validator.nxLeadingAndTrailingWhiteSpaceRegex.test(val);
         },
-        'nx-trimText': NX.I18n.get('Util_Validator_Trim'),
-        'nx-url': function(val) {
-          return NX.util.Validator.nxUrlRegex.test(val);
-        },
-        'nx-urlText': NX.I18n.get('Util_Validator_Url'),
-        'nx-subdomain': function(val) {
-          return NX.util.Validator.nxSubdomainRegex.test(val);
-        },
-        'nx-subdomainText': NX.I18n.get('Util_Validator_Subdomain_Text'),
+        'nx-trimText': NX.I18n.get('Util_Validator_Trim')
       }
     ];
 
     Ext.each(me.vtypes, function(vtype) {
       me.registerVtype(vtype);
     });
+  },
+
+  /**
+   * Validate if given string is a URL.
+   * Based on: https://github.com/chriso/validator.js (MIT license)
+   *
+   * @public
+   * @param {String} str
+   * @param {Object} options (optional)
+   * @returns {boolean}
+   */
+  isURL: function (str, options) {
+
+    // Apply options
+    options = options || {};
+    options = Ext.applyIf(options, this.default_url_options);
+
+    // Short-circuit when empty
+    if (Ext.isEmpty(str)) {
+      return options.allow_blank;
+    }
+
+    // Ensure that the URL is of proper length
+    if (str.length >= 2083) {
+      return false;
+    }
+
+    // Check the URL syntax
+    var separators = '-?-?' + (options.allow_underscores ? '_?' : '');
+    var url = new RegExp('^(?!mailto:)(?:(?:' + options.protocols.join('|') + ')://)' +
+        (options.require_protocol ? '' : '?') +
+        '(?:\\S+(?::\\S*)?@)?(?:(?:(?:[1-9]\\d?|1\\d\\d|2[01]\\d|22[0-3])(?:\\.(?:1?\\d{1,2}|2[0-4]\\d|25[0-5])){2}(?:\\.(?:[0-9]\\d?|1\\d\\d|2[0-4]\\d|25[0-4]))|(?:(?:www.)?)?(?:(?:[a-z\\u00a1-\\uffff0-9]+' +
+        separators + ')*[a-z\\u00a1-\\uffff0-9]+)(?:\\.(?:[a-z\\u00a1-\\uffff0-9]+' + separators +
+        ')*[a-z\\u00a1-\\uffff0-9]+)*(?:\\.(?:[a-z\\u00a1-\\uffff]{1,}))' + (options.require_tld ? '' : '?') +
+        ')|localhost)(?::(\\d{1,5}))?(?:(?:/|\\?|#)[^\\s]*)?$', 'i');
+    var match = str.match(url),
+        port = match ? match[1] : 0;
+
+    return !!(match && (!port || (port > 0 && port <= 65535)));
   }
 
 });

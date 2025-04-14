@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -49,21 +45,13 @@ Ext.define('NX.coreui.view.capability.CapabilitySettingsForm', {
       },
       {
         xtype: 'checkbox',
+        boxLabel: NX.I18n.get('Capability_CapabilitySettingsForm_Enabled_FieldLabel'),
         name: 'enabled',
         allowBlank: false,
         checked: true,
-        inputValue: true,
-        hidden: true
+        editable: true
       },
-      {
-        xtype: 'displayfield',
-        name: 'enabledLabel',
-        value: '',
-      },
-      {
-        xtype: 'nx-coreui-formfield-settingsfieldset',
-        delimiter: ','
-      }
+      { xtype: 'nx-coreui-formfield-settingsfieldset' }
     ];
 
     me.editableMarker = NX.I18n.get('Capability_CapabilityAdd_Create_Error');
@@ -83,28 +71,9 @@ Ext.define('NX.coreui.view.capability.CapabilitySettingsForm', {
         capabilityTypeModel = NX.getApplication().getStore('CapabilityType').getById(model.get('typeId')),
         settingsFieldSet = me.down('nx-coreui-formfield-settingsfieldset');
 
-    me.setEnabledLabel(model);
-
     me.callParent(arguments);
     if (capabilityTypeModel) {
       settingsFieldSet.importProperties(model.get('properties'), capabilityTypeModel.get('formFields'));
-    }
-  },
-
-  setEnabledLabel: function(model) {
-    var me = this,
-        label = me.getForm().findField('enabledLabel'),
-        isEnabled = model.get('enabled'),
-        isCreate = model.crudState === 'C',
-        text
-
-    if (isCreate) {
-      label.setVisible(false);
-    } else {
-      text = isEnabled 
-        ? NX.I18n.get('Capability_Settings_Enabled_Label') 
-        : NX.I18n.get('Capability_Settings_Disabled_Label');
-      me.getForm().findField('enabledLabel').setValue(text);
     }
   },
 
@@ -115,7 +84,7 @@ Ext.define('NX.coreui.view.capability.CapabilitySettingsForm', {
    */
   getValues: function() {
     var me = this,
-        values = me.getForm().getValues(),
+        values = me.getForm().getFieldValues(),
         capability = {
           id: values.id,
           typeId: values.typeId,

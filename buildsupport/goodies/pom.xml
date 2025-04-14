@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.sonatype.nexus.buildsupport</groupId>
     <artifactId>nexus-buildsupport</artifactId>
-    <version>3.77.0-08</version>
+    <version>3.7.1-02</version>
   </parent>
 
   <artifactId>nexus-buildsupport-goodies</artifactId>
@@ -28,7 +28,7 @@
   <packaging>pom</packaging>
 
   <properties>
-    <goodies.version>2.3.8</goodies.version>
+    <goodies.version>2.2.4</goodies.version>
   </properties>
 
   <dependencyManagement>
@@ -62,12 +62,6 @@
         <groupId>org.sonatype.goodies</groupId>
         <artifactId>goodies-prefs</artifactId>
         <version>${goodies.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.sonatype.goodies</groupId>
-        <artifactId>package-url-java</artifactId>
-        <version>1.1.1</version>
       </dependency>
 
       <dependency>

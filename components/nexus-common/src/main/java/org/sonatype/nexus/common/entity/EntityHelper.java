@@ -66,15 +66,6 @@ public class EntityHelper
   }
 
   /**
-   * @param id
-   * @return a DetachedEntityId
-   */
-  @Nonnull
-  public static EntityId id(final String id) {
-    return new DetachedEntityId(id);
-  }
-
-  /**
    * Returns version of entity.
    */
   @Nonnull
@@ -83,14 +74,5 @@ public class EntityHelper
     // sanity version should never be null
     checkState(version != null, "Missing entity-version");
     return version;
-  }
-
-  /**
-   * @since 3.20
-   */
-  public static void clearMetadata(final Object entity) {
-    if (entity instanceof Entity) {
-      ((Entity) entity).setEntityMetadata(null);
-    }
   }
 }

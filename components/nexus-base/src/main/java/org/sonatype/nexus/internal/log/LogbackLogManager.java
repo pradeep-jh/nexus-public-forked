@@ -14,24 +14,19 @@ package org.sonatype.nexus.internal.log;
 
 import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Stream;
+
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -43,13 +38,9 @@ import org.sonatype.nexus.common.log.LogConfigurationCustomizer;
 import org.sonatype.nexus.common.log.LogManager;
 import org.sonatype.nexus.common.log.LoggerLevel;
 import org.sonatype.nexus.common.log.LoggerLevelChangedEvent;
-import org.sonatype.nexus.common.log.LoggerOverridesReloadEvent;
 import org.sonatype.nexus.common.log.LoggersResetEvent;
 import org.sonatype.nexus.common.stateguard.Guarded;
 import org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport;
-import org.sonatype.nexus.internal.log.overrides.datastore.LoggerOverridesEvent;
-import org.sonatype.nexus.internal.log.overrides.datastore.LoggerOverridesEvent.Action;
-import org.sonatype.nexus.logging.task.TaskLogHome;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
@@ -57,24 +48,18 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
 import ch.qos.logback.core.FileAppender;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.eventbus.Subscribe;
 import com.google.common.io.ByteStreams;
 import com.google.inject.Key;
-import org.apache.commons.io.FilenameUtils;
 import org.eclipse.sisu.BeanEntry;
 import org.eclipse.sisu.Mediator;
 import org.eclipse.sisu.inject.BeanLocator;
 import org.slf4j.ILoggerFactory;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.impl.StaticLoggerBinder;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toSet;
-import static org.slf4j.Logger.ROOT_LOGGER_NAME;
 import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.KERNEL;
-import static org.sonatype.nexus.common.log.LoggerLevel.DEFAULT;
-import static org.sonatype.nexus.common.log.LoggerLevel.INFO;
 import static org.sonatype.nexus.common.stateguard.StateGuardLifecycleSupport.State.STARTED;
 
 /**
@@ -95,13 +80,10 @@ public class LogbackLogManager
 
   private final LoggerOverrides overrides;
 
-  private final List<String> allowedFilePrefixes = Arrays.asList(TASKS_PREFIX, REPLICATION_PREFIX);
-
   @Inject
-  public LogbackLogManager(
-      final EventManager eventManager,
-      final BeanLocator beanLocator,
-      final LoggerOverrides overrides)
+  public LogbackLogManager(final EventManager eventManager,
+                           final BeanLocator beanLocator,
+                           final LoggerOverrides overrides)
   {
     this.eventManager = checkNotNull(eventManager);
     this.beanLocator = checkNotNull(beanLocator);
@@ -113,7 +95,7 @@ public class LogbackLogManager
    * Mediator to register customizers.
    */
   private static class CustomizerMediator
-      implements Mediator<Named, LogConfigurationCustomizer, LogbackLogManager>
+    implements Mediator<Named, LogConfigurationCustomizer, LogbackLogManager>
   {
     @Override
     public void add(final BeanEntry<Named, LogConfigurationCustomizer> entry, final LogbackLogManager watcher) {
@@ -132,8 +114,6 @@ public class LogbackLogManager
 
     // watch for LogConfigurationCustomizer components
     beanLocator.watch(Key.get(LogConfigurationCustomizer.class, Named.class), new CustomizerMediator(), this);
-
-    eventManager.register(this);
   }
 
   private void configure() {
@@ -144,90 +124,60 @@ public class LogbackLogManager
 
     // load and apply overrides
     overrides.load();
-    applyOverrides();
+    for (Entry<String, LoggerLevel> entry : overrides) {
+      setLogbackLoggerLevel(entry.getKey(), LogbackLevels.convert(entry.getValue()));
+    }
   }
 
   @Override
   protected void doStop() throws Exception {
     // inform logback to shutdown
     loggerContext().stop();
-    eventManager.unregister(this);
-  }
-
-  @Override
-  @Guarded(by = STARTED)
-  public Optional<String> getLogFor(final String loggerName) {
-    return getLogFor(loggerName, appenders());
-  }
-
-  @Override
-  @Guarded(by = STARTED)
-  public Optional<File> getLogFileForLogger(final String loggerName) {
-    return getLogFor(loggerName).map(this::getLogFile);
-  }
-
-  @VisibleForTesting
-  static Optional<String> getLogFor(final String loggerName, final Collection<Appender<ILoggingEvent>> appenders) {
-    return appenders.stream()
-        .filter(appender -> loggerName.equals(appender.getName()))
-        .filter(FileAppender.class::isInstance)
-        .map(fileAppender -> ((FileAppender<?>) fileAppender).getFile())
-        .map(FilenameUtils::getName)
-        .filter(Objects::nonNull)
-        .findFirst();
   }
 
   @Override
   @Guarded(by = STARTED)
   public Set<File> getLogFiles() {
-    return appenders().stream()
-        .filter(FileAppender.class::isInstance)
-        .map(fileAppender -> ((FileAppender<?>) fileAppender).getFile())
-        .map(File::new)
-        .filter(file -> file.length() > 0)
-        .collect(toSet());
+    HashSet<File> files = new HashSet<>();
+
+    for (Appender<?> appender : appenders()) {
+      if (appender instanceof FileAppender) {
+        String path = ((FileAppender<?>) appender).getFile();
+        files.add(new File(path));
+      }
+    }
+
+    return files;
   }
 
   @Override
   @Nullable
   @Guarded(by = STARTED)
   public File getLogFile(final String fileName) {
-    final String filePrefix = allowedFilePrefixes.stream()
-        .filter(fileName::startsWith)
-        .findAny()
-        .orElse("");
-
-    return requireNonNull(getAllLogFiles(fileName)).stream()
-        .filter(file -> fileName.equals(filePrefix + file.getName()))
-        .findFirst()
-        .orElseGet(() -> {
-          logFileNotFound(fileName);
-          return null;
-        });
-  }
-
-  @VisibleForTesting
-  void logFileNotFound(String fileName) {
-    log.info("Unable to find log file: {}", fileName);
+    Set<File> files = getLogFiles();
+    for (File file : files) {
+      if (file.getName().equals(fileName)) {
+        return file;
+      }
+    }
+    return null;
   }
 
   @Override
   @Nullable
   @Guarded(by = STARTED)
   public InputStream getLogFileStream(final String fileName, final long from, final long count) throws IOException {
-    log.debug("Retrieving log file");
+    log.debug("Retrieving log file: {}", fileName);
 
-    boolean containsPathSeparator = fileName.contains(File.pathSeparator) || fileName.contains("/");
-    boolean startsWithAllowedPrefix = allowedFilePrefixes.stream().anyMatch(fileName::startsWith);
-    if (!startsWithAllowedPrefix && containsPathSeparator) {
-      log.warn("Cannot retrieve log files with path separators in their name, unless it is a task or replication log");
+    // checking for platform or normalized path-separator (on unix these are the same)
+    if (fileName.contains(File.pathSeparator) || fileName.contains("/")) {
+      log.warn("Cannot retrieve log files with path separators in their name");
       return null;
     }
 
     File file = getLogFile(fileName);
     if (file == null || !file.exists()) {
-      log.info("Log file does not exist: {}", fileName);
-      log.debug("Failed to find logfile: {}", fileName);
+      log.warn("Log file does not exist: {}", fileName);
       return null;
     }
 
@@ -238,24 +188,14 @@ public class LogbackLogManager
       fromByte = Math.max(0, file.length() - bytesCount);
     }
 
-    InputStream input = new BufferedInputStream(Files.newInputStream(file.toPath()));
+    InputStream input = new BufferedInputStream(new FileInputStream(file));
     if (fromByte == 0 && bytesCount >= file.length()) {
       return input;
     }
     else {
-      long skippedBytes = 0;
-      while (skippedBytes < fromByte) {
-        skippedBytes += input.skip(fromByte - skippedBytes);
-      }
+      input.skip(fromByte);
       return ByteStreams.limit(input, bytesCount);
     }
-  }
-
-  @Override
-  @Nullable
-  @Guarded(by = STARTED)
-  public InputStream getLogFileStream(final String fileName) throws IOException {
-    return getLogFileStream(fileName, 0, Long.MAX_VALUE);
   }
 
   @Override
@@ -282,7 +222,7 @@ public class LogbackLogManager
       // skip if there is already a logger with a set level in context
       if (!loggers.containsKey(name)) {
         // resolve effective level of logger
-        if (DEFAULT == level) {
+        if (LoggerLevel.DEFAULT == level) {
           level = getLoggerEffectiveLevel(entry.getKey());
         }
         loggers.put(name, level);
@@ -308,13 +248,18 @@ public class LogbackLogManager
   public void resetLoggers() {
     log.debug("Resetting loggers");
 
-    resetAllLoggers();
+    // reset all overridden logger levels to null (inherit from parent)
+    for (Map.Entry<String, LoggerLevel> entry : overrides) {
+      if (!Logger.ROOT_LOGGER_NAME.equals(entry.getKey())) {
+        setLogbackLoggerLevel(entry.getKey(), null);
+      }
+    }
 
     // clear overrides cache and update persistence
     overrides.reset();
 
     // reset root level to default
-    setLoggerLevel(ROOT_LOGGER_NAME, DEFAULT);
+    setLoggerLevel(Logger.ROOT_LOGGER_NAME, LoggerLevel.DEFAULT);
 
     // re-apply customizations
     applyCustomizations();
@@ -339,13 +284,13 @@ public class LogbackLogManager
     log.debug("Set logger level: {}={}", name, level);
     LoggerLevel calculated = null;
 
-    if (ROOT_LOGGER_NAME.equals(name)) {
-      calculated = (level == DEFAULT ? INFO : level);
+    if (Logger.ROOT_LOGGER_NAME.equals(name)) {
+      calculated = (level == LoggerLevel.DEFAULT ? LoggerLevel.INFO : level);
       overrides.set(name, calculated);
     }
     else {
       // else we customize the logger overrides configuration
-      if (level == DEFAULT) {
+      if (level == LoggerLevel.DEFAULT) {
         boolean customizedByUser = overrides.contains(name) && !customizations.containsKey(name);
         unsetLoggerLevel(name);
         if (customizedByUser) {
@@ -353,7 +298,7 @@ public class LogbackLogManager
         }
         else {
           LoggerLevel customizedLevel = customizations.get(name);
-          if (customizedLevel != null && customizedLevel != DEFAULT) {
+          if (customizedLevel != null && customizedLevel != LoggerLevel.DEFAULT) {
             calculated = customizedLevel;
           }
         }
@@ -373,22 +318,6 @@ public class LogbackLogManager
     eventManager.post(new LoggerLevelChangedEvent(name, level));
   }
 
-  /**
-   * Directly set a logger level without interpreting customisations or overrides.
-   * Useful when needing to force a level and not interact with persistence.
-   */
-  @Override
-  @Guarded(by = STARTED)
-  public void setLoggerLevelDirect(final String name, @Nullable final LoggerLevel level) {
-    if (level == null) {
-      unsetLogger(name);
-      return;
-    }
-
-    log.debug("Set logger level direct: {}={}", name, level);
-    setLogbackLoggerLevel(name, LogbackLevels.convert(level));
-  }
-
   @Override
   @Guarded(by = STARTED)
   public void unsetLoggerLevel(final String name) {
@@ -398,7 +327,12 @@ public class LogbackLogManager
       overrides.save();
     }
 
-    unsetLogger(name);
+    if (Logger.ROOT_LOGGER_NAME.equals(name)) {
+      setLogbackLoggerLevel(name, Level.INFO);
+    }
+    else {
+      setLogbackLoggerLevel(name, null);
+    }
 
     eventManager.post(new LoggerLevelChangedEvent(name, null));
   }
@@ -424,86 +358,9 @@ public class LogbackLogManager
   /**
    * Helper to set a named logback logger level.
    */
-  public void setLogbackLoggerLevel(final String name, @Nullable final Level level) {
+  private void setLogbackLoggerLevel(final String name, @Nullable final Level level) {
     log.trace("Set logback logger level: {}={}", name, level);
     loggerContext().getLogger(name).setLevel(level);
-  }
-
-  /**
-   * Helper to unset a named logback logger level.
-   */
-  private void unsetLogger(final String name) {
-    if (ROOT_LOGGER_NAME.equals(name)) {
-      setLogbackLoggerLevel(name, Level.INFO);
-    }
-    else {
-      setLogbackLoggerLevel(name, null);
-    }
-  }
-
-  /**
-   * Reset all overridden logger levels to null (inherit from parent)
-   */
-  private void resetAllLoggers() {
-    for (Entry<String, LoggerLevel> entry : overrides) {
-      if (!ROOT_LOGGER_NAME.equals(entry.getKey())) {
-        setLogbackLoggerLevel(entry.getKey(), null);
-      }
-    }
-  }
-
-  @Subscribe
-  public void on(final LoggerOverridesReloadEvent event) {
-    log.debug("Received event {}. Reload logger overrides", event);
-    applyOverrides();
-  }
-
-  @Subscribe
-  public void on(final LoggerOverridesEvent loggerOverridesEvent) {
-    if (loggerOverridesEvent.isLocal()) {
-      return;
-    }
-    log.debug("Received event {}. Propagating logger overrides changes", loggerOverridesEvent);
-    String name = loggerOverridesEvent.getName();
-    String strLevel = loggerOverridesEvent.getLevel();
-    Level level = Objects.isNull(strLevel) ? null : Level.toLevel(strLevel);
-    Map<String, LoggerLevel> loggerLevels = overrides.syncWithDBAndGet();
-
-    if (loggerOverridesEvent.getAction() == Action.CHANGE) {
-      log.trace("Setting log level to {} for logger named '{}' in the scope of log overrides propagation", name, level);
-      LoggerLevel loggerLevel = LoggerLevel.valueOf(strLevel);
-      loggerLevels.put(name, loggerLevel);
-      setLogbackLoggerLevel(name, level);
-      eventManager.post(new LoggerLevelChangedEvent(name, loggerLevel));
-    }
-    else if (loggerOverridesEvent.getAction() == Action.RESET) {
-      log.trace("Reset log level for logger named '{}' in the scope of log overrides propagation", name);
-      loggerLevels.remove(name);
-      unsetLogger(name);
-      eventManager.post(new LoggerLevelChangedEvent(name, null));
-    }
-    else if (loggerOverridesEvent.getAction() == Action.RESET_ALL) {
-      log.trace("Resetting all logger levels in the scope of log overrides propagation");
-      resetAllLoggers();
-
-      // clear overrides cache
-      loggerLevels.clear();
-
-      // reset root level to default
-      setLoggerLevel(ROOT_LOGGER_NAME, DEFAULT);
-      loggerLevels.put(ROOT_LOGGER_NAME, INFO);
-      setLogbackLoggerLevel(ROOT_LOGGER_NAME, LogbackLevels.convert(INFO));
-      eventManager.post(new LoggerLevelChangedEvent(ROOT_LOGGER_NAME, DEFAULT));
-
-      // re-apply customizations
-      applyCustomizations();
-
-      eventManager.post(new LoggersResetEvent());
-    }
-  }
-
-  private void applyOverrides() {
-    overrides.forEach(entry -> setLogbackLoggerLevel(entry.getKey(), LogbackLevels.convert(entry.getValue())));
   }
 
   //
@@ -523,7 +380,7 @@ public class LogbackLogManager
       customizations.put(name, level);
 
       // only apply customization if there is not an override, and the level is not DEFAULT
-      if (!overrides.contains(name) && level != DEFAULT) {
+      if (!overrides.contains(name) && level != LoggerLevel.DEFAULT) {
         setLogbackLoggerLevel(name, LogbackLevels.convert(level));
       }
     });
@@ -536,7 +393,7 @@ public class LogbackLogManager
     log.debug("Applying customizations");
 
     for (Entry<String, LoggerLevel> entry : customizations.entrySet()) {
-      if (entry.getValue() != DEFAULT) {
+      if (entry.getValue() != LoggerLevel.DEFAULT) {
         setLogbackLoggerLevel(entry.getKey(), LogbackLevels.convert(entry.getValue()));
       }
     }
@@ -565,60 +422,13 @@ public class LogbackLogManager
    */
   private static Collection<Appender<ILoggingEvent>> appenders() {
     List<Appender<ILoggingEvent>> result = new ArrayList<>();
-    for (ch.qos.logback.classic.Logger log : loggerContext().getLoggerList()) {
+    for (Logger l : loggerContext().getLoggerList()) {
+      ch.qos.logback.classic.Logger log = (ch.qos.logback.classic.Logger) l;
       Iterator<Appender<ILoggingEvent>> iter = log.iteratorForAppenders();
       while (iter.hasNext()) {
         result.add(iter.next());
       }
     }
     return result;
-  }
-
-  /**
-   * Helper to get log files
-   */
-  @VisibleForTesting
-  Set<File> getAllLogFiles(final String fileName) {
-
-    if (fileName.startsWith(TASKS_PREFIX) && fileName.endsWith(".log")) {
-      try (Stream<Path> tasks = Files.list(Paths.get(requireNonNull(TaskLogHome.getTaskLogsHome())))) {
-        return tasks.map(Path::toFile).collect(toSet());
-      }
-      catch (IOException e) {
-        log.error("Unable to list files in the tasks directory", e);
-        return Collections.emptySet();
-      }
-    }
-    else if (fileName.startsWith(REPLICATION_PREFIX) && fileName.endsWith(".log")) {
-      try (Stream<Path> tasks = Files.list(Paths.get(TaskLogHome.getReplicationLogsHome().orElse("replication/")))) {
-        return tasks.map(Path::toFile).collect(toSet());
-      }
-      catch (IOException e) {
-        log.error("Unable to list files in the replication directory", e);
-        return Collections.emptySet();
-      }
-    }
-    else {
-      return getLogFiles();
-    }
-  }
-
-  public final boolean isValidLogFile(java.nio.file.Path path) {
-    boolean isValid = path.getFileName().toString().toLowerCase().endsWith(".log");
-    if (log.isDebugEnabled() && !isValid) {
-      log.debug("File {} skipped as not valid log file", path.getFileName().toString());
-    }
-    return isValid;
-  }
-
-  public Map<String, LoggerLevel> getEffectiveLoggersUpdatedByFetchedOverrides() {
-    Map<String, LoggerLevel> loggersOverrides = overrides.syncWithDBAndGet();
-    Map<String, LoggerLevel> loggers = getLoggers();
-    if (Objects.isNull(loggersOverrides) || loggersOverrides.isEmpty()) {
-      return loggers;
-    }
-
-    loggers.putAll(loggersOverrides);
-    return loggers;
   }
 }

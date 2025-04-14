@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -27,8 +23,6 @@ Ext.define('NX.coreui.view.repository.RepositoryListTemplate', {
   requires: [
     'NX.I18n'
   ],
-
-  hideSize: true,
 
   /**
    * @override
@@ -48,35 +42,17 @@ Ext.define('NX.coreui.view.repository.RepositoryListTemplate', {
         text: NX.I18n.get('Repository_RepositoryList_Name_Header'),
         dataIndex: 'name',
         stateId: 'name',
-        flex: 1,
-        renderer: Ext.htmlEncode
-      },
-      {
-        text: NX.I18n.get('Repository_RepositoryList_Size_Header'),
-        dataIndex: 'size',
-        stateId: 'size',
-        renderer: Ext.util.Format.fileSize,
-        hidden: me.hideSize,
-        hideable: !me.hideSize
+        flex: 1
       },
       {
         text: NX.I18n.get('Repository_RepositoryList_Type_Header'),
         dataIndex: 'type',
-        stateId: 'type',
-        renderer: Ext.htmlEncode
+        stateId: 'type'
       },
       {
         text: NX.I18n.get('Repository_RepositoryList_Format_Header'),
         dataIndex: 'format',
-        stateId: 'format',
-        renderer: Ext.htmlEncode
-      },
-      {
-        text: NX.I18n.get('Repository_RepositoryList_BlobStore_Header'),
-        dataIndex: 'blobStoreName',
-        stateId: 'blobStoreName',
-        flex: 1,
-        hidden: me.hideBlobStore,
+        stateId: 'format'
       },
       {
         header: NX.I18n.get('Repository_RepositoryList_Status_Header'), dataIndex: 'status', stateId: 'status', flex: 1,
@@ -88,10 +64,10 @@ Ext.define('NX.coreui.view.repository.RepositoryListTemplate', {
           'Offline',
           '</tpl>',
           '<tpl if="status.description">',
-          ' - {status.description:htmlEncode}',
+          ' - {status.description}',
           '</tpl>',
           '<tpl if="status.reason">',
-          '<br/><i>{status.reason:htmlEncode}</i>',
+          '<br/><i>{status.reason}</i>',
           '</tpl>')
       },
       {

@@ -15,17 +15,18 @@ package org.sonatype.nexus.quartz;
 import java.util.Date;
 
 import org.sonatype.goodies.testsupport.TestSupport;
+import org.sonatype.nexus.orient.testsupport.DatabaseInstanceRule;
 import org.sonatype.nexus.scheduling.TaskConfiguration;
 import org.sonatype.nexus.scheduling.TaskInfo;
 import org.sonatype.nexus.scheduling.TaskScheduler;
-import org.sonatype.nexus.scheduling.TaskState;
 import org.sonatype.nexus.scheduling.schedule.Hourly;
 import org.sonatype.nexus.scheduling.schedule.Schedule;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 
-import static org.awaitility.Awaitility.await;
+import static com.jayway.awaitility.Awaitility.await;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.hamcrest.Matchers.is;
 
@@ -40,14 +41,14 @@ public abstract class QuartzTestSupport
   
   public static final String RESULT = "This is the expected result";
 
-  //@Rule
-  //public DatabaseInstanceRule database = DatabaseInstanceRule.inMemory("test");
+  @Rule
+  public DatabaseInstanceRule database = DatabaseInstanceRule.inMemory("test");
 
   private TaskSchedulerHelper taskSchedulerHelper;
 
   @Before
   public void before() throws Exception {
-    //taskSchedulerHelper = new TaskSchedulerHelper(database.getInstance());
+    taskSchedulerHelper = new TaskSchedulerHelper(database.getInstance());
     taskSchedulerHelper.init(null, null);
     taskSchedulerHelper.start();
   }
@@ -97,7 +98,7 @@ public abstract class QuartzTestSupport
     await().atMost(RUN_TIMEOUT, MILLISECONDS).until(() -> taskScheduler().getExecutedTaskCount(), is(expectedCount));
   }
 
-  public void assertTaskState(final TaskInfo taskInfo, final TaskState expectedState) {
+  public void assertTaskState(final TaskInfo taskInfo, final TaskInfo.State expectedState) {
     // unfortunately, a task's Future.get() returns before the task state is updated so polling is in order to be safe
     await().atMost(RUN_TIMEOUT, MILLISECONDS).until(() -> taskInfo.getCurrentState().getState(), is(expectedState));
   }

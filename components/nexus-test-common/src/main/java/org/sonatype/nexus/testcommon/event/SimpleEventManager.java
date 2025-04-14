@@ -49,9 +49,4 @@ public class SimpleEventManager
   public boolean isCalmPeriod() {
     return true;
   }
-
-  @Override
-  public boolean isAffinityEnabled() {
-    return false;
-  }
 }

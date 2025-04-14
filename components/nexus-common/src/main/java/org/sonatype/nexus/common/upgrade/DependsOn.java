@@ -36,11 +36,4 @@ public @interface DependsOn
   String model();
 
   String version();
-
-  /**
-   * Set to true if you also change content owned by this dependency during the upgrade.
-   *
-   * @since 3.13
-   */
-  boolean checkpoint() default false;
 }

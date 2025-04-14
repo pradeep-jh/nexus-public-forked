@@ -22,7 +22,6 @@ import org.sonatype.nexus.audit.AuditorSupport;
 import org.sonatype.nexus.common.event.EventAware;
 import org.sonatype.nexus.scheduling.TaskConfiguration;
 import org.sonatype.nexus.scheduling.TaskInfo;
-import org.sonatype.nexus.scheduling.events.TaskBlockedEvent;
 import org.sonatype.nexus.scheduling.events.TaskDeletedEvent;
 import org.sonatype.nexus.scheduling.events.TaskEvent;
 import org.sonatype.nexus.scheduling.events.TaskEventCanceled;
@@ -57,7 +56,6 @@ public class TaskAuditor
     registerType(TaskEventCanceled.class, "cancel-requested");
     registerType(TaskEventStoppedCanceled.class, "canceled");
     registerType(TaskDeletedEvent.class, DELETED_TYPE);
-    registerType(TaskBlockedEvent.class, "blocked");
   }
 
   @Subscribe
@@ -72,7 +70,7 @@ public class TaskAuditor
       data.setType(type(event.getClass()));
       data.setContext(configuration.getTypeName());
 
-      Map<String, Object> attributes = data.getAttributes();
+      Map<String, String> attributes = data.getAttributes();
       // TaskInfo.{id/name/message} are all delegates to configuration
       attributes.put("schedule", string(task.getSchedule()));
       attributes.put("currentState", string(task.getCurrentState()));

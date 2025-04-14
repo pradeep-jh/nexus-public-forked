@@ -57,11 +57,6 @@ public abstract class AuditorSupport
   protected static final String DELETED_TYPE = "deleted";
 
   /**
-   * Common type for deleted events.
-   */
-  protected static final String PURGE_TYPE = "purged";
-
-  /**
    * Common type for changed events.
    */
   protected static final String CHANGED_TYPE = "changed";
@@ -76,7 +71,7 @@ public abstract class AuditorSupport
   /**
    * Mapping of class to simple type names for auditing.
    */
-  private Map<Class, String> typeLookup = new HashMap<>();
+  private Map<Class,String> typeLookup = new HashMap<>();
 
   @Inject
   public void setAuditRecorder(final Provider<AuditRecorder> auditRecorder) {
@@ -139,12 +134,9 @@ public abstract class AuditorSupport
   }
 
   /**
-   * Helper to convert an iterable into a string.
+   * Helper to conviert an iterable into a string.
    */
   protected static String string(final Iterable value) {
-    if (value == null) {
-      return null;
-    }
     return LIST_JOINER.join(value);
   }
 }

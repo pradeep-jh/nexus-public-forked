@@ -13,21 +13,17 @@
 package org.sonatype.nexus.transaction;
 
 import java.lang.annotation.Annotation;
-import java.util.function.Supplier;
 
 import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static org.sonatype.nexus.transaction.TransactionIsolation.STANDARD;
-import static org.sonatype.nexus.transaction.Transactional.DEFAULT_REASON;
-import static org.sonatype.nexus.transaction.UnitOfWork.openSession;
-import static org.sonatype.nexus.transaction.UnitOfWork.peekTransaction;
 
 /**
  * Fluent API for wrapping lambda operations with {@link Transactional} behaviour:
@@ -78,7 +74,7 @@ public class Operations<E extends Exception, B extends Operations<E, B>>
   private static final Class<?>[] NOTHING = {};
 
   @VisibleForTesting
-  static final Transactional DEFAULT_SPEC = new TransactionalImpl(DEFAULT_REASON, NOTHING, NOTHING, NOTHING, STANDARD);
+  static final Transactional DEFAULT_SPEC = new TransactionalImpl(NOTHING, NOTHING, NOTHING);
 
   @VisibleForTesting
   final Transactional spec;
@@ -87,16 +83,7 @@ public class Operations<E extends Exception, B extends Operations<E, B>>
   private final Class<E> throwing;
 
   @Nullable
-  private final TransactionalStore<?> store;
-
-  /**
-   * @see Transactional#reason()
-   * @since 3.20
-   */
-  public final B reason(final String reason) {
-    return (B) copy(new TransactionalImpl(reason, spec.commitOn(), spec.retryOn(), spec.swallow(), spec.isolation()),
-        throwing, store);
-  }
+  private final Supplier<? extends Transaction> db;
 
   /**
    * @see Transactional#commitOn()
@@ -104,8 +91,7 @@ public class Operations<E extends Exception, B extends Operations<E, B>>
   @SafeVarargs
   public final B commitOn(final Class<? extends Exception>... exceptionTypes) {
     Class<?>[] commitOn = deepCheckNotNull(exceptionTypes).clone();
-    return (B) copy(new TransactionalImpl(spec.reason(), commitOn, spec.retryOn(), spec.swallow(), spec.isolation()),
-        throwing, store);
+    return (B) copy(new TransactionalImpl(commitOn, spec.retryOn(), spec.swallow()), throwing, db);
   }
 
   /**
@@ -114,8 +100,7 @@ public class Operations<E extends Exception, B extends Operations<E, B>>
   @SafeVarargs
   public final B retryOn(final Class<? extends Exception>... exceptionTypes) {
     Class<?>[] retryOn = deepCheckNotNull(exceptionTypes).clone();
-    return (B) copy(new TransactionalImpl(spec.reason(), spec.commitOn(), retryOn, spec.swallow(), spec.isolation()),
-        throwing, store);
+    return (B) copy(new TransactionalImpl(spec.commitOn(), retryOn, spec.swallow()), throwing, db);
   }
 
   /**
@@ -124,8 +109,7 @@ public class Operations<E extends Exception, B extends Operations<E, B>>
   @SafeVarargs
   public final B swallow(final Class<? extends Exception>... exceptionTypes) {
     Class<?>[] swallow = deepCheckNotNull(exceptionTypes).clone();
-    return (B) copy(new TransactionalImpl(spec.reason(), spec.commitOn(), spec.retryOn(), swallow, spec.isolation()),
-        throwing, store);
+    return (B) copy(new TransactionalImpl(spec.commitOn(), spec.retryOn(), swallow), throwing, db);
   }
 
   /**
@@ -136,32 +120,23 @@ public class Operations<E extends Exception, B extends Operations<E, B>>
   public final B stereotype(final Class<? extends Annotation> annotationType) {
     Transactional metaSpec = annotationType.getAnnotation(Transactional.class);
     checkArgument(metaSpec != null, "Stereotype annotation is not meta-annotated with @Transactional");
-    return (B) copy(metaSpec, throwing, store);
+    return (B) copy(metaSpec, throwing, db);
   }
 
   /**
    * Assumes the lambda may throw the given checked exception.
    */
   public <X extends Exception> Operations<X, ?> throwing(final Class<X> exceptionType) {
-    return copy(spec, checkNotNull(exceptionType), store);
+    return copy(spec, checkNotNull(exceptionType), db);
   }
 
   /**
-   * Uses the given supplier to acquire {@link TransactionalSession}s.
+   * Uses the given supplier to acquire {@link Transaction}s.
    *
    * @since 3.2
    */
-  public final B withDb(final Supplier<? extends TransactionalSession<?>> db) {
-    return (B) copy(spec, throwing, db::get);
-  }
-
-  /**
-   * Uses the given {@link TransactionalStore} to supply {@link TransactionalSession}s.
-   *
-   * @since 3.19
-   */
-  public final B withStore(final TransactionalStore<?> _store) {
-    return (B) copy(spec, throwing, checkNotNull(_store));
+  public final B withDb(final Supplier<? extends Transaction> txSupplier) {
+    return (B) copy(spec, throwing, checkNotNull(txSupplier));
   }
 
   /**
@@ -190,52 +165,38 @@ public class Operations<E extends Exception, B extends Operations<E, B>>
   /**
    * Custom settings.
    */
-  protected Operations(
-      final Transactional spec,
-      @Nullable final Class<E> throwing,
-      @Nullable final TransactionalStore<?> store)
+  protected Operations(final Transactional spec,
+                       @Nullable final Class<E> throwing,
+                       @Nullable final Supplier<? extends Transaction> db)
   {
     this.spec = checkNotNull(spec);
     this.throwing = throwing;
-    this.store = store;
+    this.db = db;
   }
 
   /**
    * Copies the given settings into a new fluent step.
    */
-  protected <X extends Exception> Operations<X, ?> copy(
-      final Transactional spec,
-      @Nullable final Class<X> throwing,
-      @Nullable final TransactionalStore<?> store)
+  protected <X extends Exception> Operations<X, ?> copy(final Transactional spec,
+                                                        @Nullable final Class<X> throwing,
+                                                        @Nullable final Supplier<? extends Transaction> db)
   {
-    return new Operations<>(spec, throwing, store);
+    return new Operations<>(spec, throwing, db);
   }
 
   /**
    * Invokes the given {@link OperationPoint} using the current settings.
    */
   private <T> T transactional(final OperationPoint<T, E> point) throws E {
-    Transaction tx = peekTransaction();
-    if (tx != null) { // nested transactional session
-      if (store != null) {
-        tx.capture(store);
-      }
-      if (tx.isActive()) {
-        return point.proceed(); // no need to wrap active transaction
-      }
-      return proceedWithTransaction(point, tx);
-    }
-
-    try (TransactionalSession<?> session = openSession(store, spec.isolation())) {
-      return proceedWithTransaction(point, session.getTransaction());
-    }
-  }
-
-  private <T> T proceedWithTransaction(final OperationPoint<T, E> point, final Transaction tx) throws E {
-
     log.trace("Invoking: {} -> {}", spec, point);
 
-    try {
+    final UnitOfWork work = UnitOfWork.createWork();
+
+    if (work.isActive()) {
+      return point.proceed(); // nested transaction, no need to wrap
+    }
+
+    try (final Transaction tx = work.acquireTransaction(db)) {
       return (T) new TransactionalWrapper(spec, point).proceedWithTransaction(tx);
     }
     catch (final Throwable e) {
@@ -244,6 +205,9 @@ public class Operations<E extends Exception, B extends Operations<E, B>>
       }
       Throwables.throwIfUnchecked(e);
       throw new RuntimeException(e);
+    }
+    finally {
+      work.releaseTransaction();
     }
   }
 

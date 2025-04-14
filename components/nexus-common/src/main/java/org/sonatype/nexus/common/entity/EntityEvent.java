@@ -14,9 +14,6 @@ package org.sonatype.nexus.common.entity;
 
 import javax.annotation.Nullable;
 
-import org.sonatype.nexus.common.event.HasAffinity;
-import org.sonatype.nexus.common.event.HasLocality;
-
 import static com.google.common.base.Preconditions.checkNotNull;
 
 /**
@@ -26,13 +23,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 @SuppressWarnings("unchecked")
 public abstract class EntityEvent
-    implements HasAffinity, HasLocality
 {
   private final EntityMetadata metadata;
 
   private String remoteNodeId;
-
-  private String affinity;
 
   private volatile Entity entity;
 
@@ -53,7 +47,6 @@ public abstract class EntityEvent
    *
    * @since 3.1
    */
-  @Override
   public boolean isLocal() {
     return remoteNodeId == null;
   }
@@ -99,20 +92,6 @@ public abstract class EntityEvent
       }
     }
     return (T) entity;
-  }
-
-  @Override
-  public String getAffinity() {
-    return affinity;
-  }
-
-  /**
-   * Declares the affinity for this event.
-   *
-   * @since 3.11
-   */
-  public void setAffinity(final String affinity) {
-    this.affinity = affinity;
   }
 
   @Override

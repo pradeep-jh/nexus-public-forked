@@ -41,7 +41,7 @@ import org.mockito.stubbing.Answer;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -90,10 +90,10 @@ public class DefaultCapabilityReferenceTest
 
     final Conditions conditions = new ConditionsImpl(
         new LogicalConditionsImpl(eventManager),
-        new CapabilityConditionsImpl(eventManager, mock(CapabilityDescriptorRegistry.class),
-            mock(CapabilityRegistry.class)),
+        new CapabilityConditionsImpl(eventManager, mock(CapabilityDescriptorRegistry.class), mock(CapabilityRegistry.class)),
         new NexusConditionsImpl(activeCondition),
-        mock(CryptoConditions.class));
+        mock(CryptoConditions.class)
+    );
 
     activeCondition.start();
 
@@ -107,22 +107,30 @@ public class DefaultCapabilityReferenceTest
         new Answer<ActivationConditionHandler>()
         {
           @Override
-          public ActivationConditionHandler answer(final InvocationOnMock invocation) throws Throwable {
+          public ActivationConditionHandler answer(final InvocationOnMock invocation)
+              throws Throwable
+          {
             return new ActivationConditionHandler(
-                eventManager, conditions, (DefaultCapabilityReference) invocation.getArguments()[0]);
+                eventManager, conditions, (DefaultCapabilityReference) invocation.getArguments()[0]
+            );
           }
-        });
+        }
+    );
 
     when(vchf.create(any(DefaultCapabilityReference.class))).thenAnswer(
         new Answer<ValidityConditionHandler>()
         {
           @Override
-          public ValidityConditionHandler answer(final InvocationOnMock invocation) throws Throwable {
+          public ValidityConditionHandler answer(final InvocationOnMock invocation)
+              throws Throwable
+          {
             return new ValidityConditionHandler(
                 eventManager, capabilityRegistry, conditions,
-                (DefaultCapabilityReference) invocation.getArguments()[0]);
+                (DefaultCapabilityReference) invocation.getArguments()[0]
+            );
           }
-        });
+        }
+    );
 
     underTest = new DefaultCapabilityReference(
         capabilityRegistry,
@@ -132,9 +140,10 @@ public class DefaultCapabilityReferenceTest
         capabilityIdentity("test"),
         capabilityType("TEST"),
         mock(CapabilityDescriptor.class),
-        capability);
+        capability
+    );
 
-    underTest.create(Collections.<String, String>emptyMap(), Collections.emptyMap());
+    underTest.create(Collections.<String, String>emptyMap());
   }
 
   /**
@@ -272,7 +281,7 @@ public class DefaultCapabilityReferenceTest
     assertThat(underTest.isEnabled(), is(true));
     assertThat(underTest.isActive(), is(false));
 
-    underTest.update(properties, previousProperties, properties);
+    underTest.update(properties, previousProperties);
     verify(capability).onUpdate();
     assertThat(underTest.isEnabled(), is(true));
     assertThat(underTest.isActive(), is(false));
@@ -293,7 +302,7 @@ public class DefaultCapabilityReferenceTest
     assertThat(underTest.isEnabled(), is(true));
     assertThat(underTest.isActive(), is(true));
 
-    underTest.update(properties, previousProperties, properties);
+    underTest.update(properties, previousProperties);
     verify(capability).onUpdate();
     assertThat(underTest.isEnabled(), is(true));
     assertThat(underTest.isActive(), is(false));
@@ -321,9 +330,10 @@ public class DefaultCapabilityReferenceTest
         capabilityIdentity("test"),
         capabilityType("TEST"),
         mock(CapabilityDescriptor.class),
-        capability);
+        capability
+    );
     final HashMap<String, String> properties = new HashMap<String, String>();
-    underTest.load(properties, properties);
+    underTest.load(properties);
 
     verify(capability).onLoad();
   }
@@ -336,20 +346,19 @@ public class DefaultCapabilityReferenceTest
     final HashMap<String, String> properties = new HashMap<String, String>();
     properties.put("p", "p");
     final HashMap<String, String> previousProperties = new HashMap<String, String>();
-    underTest.update(properties, previousProperties, properties);
+    underTest.update(properties, previousProperties);
     verify(capability).onUpdate();
   }
 
   /**
    * Calling update does not forwards to capability if properties are same.
    */
-  @SuppressWarnings("java:S2699") // sonar wants an assertion, but we're asserting by throwing an exception
   @Test
   public void updateIsNotForwardedToCapabilityIfSameProperties() throws Exception {
     final HashMap<String, String> properties = new HashMap<String, String>();
     final HashMap<String, String> previousProperties = new HashMap<String, String>();
     doThrow(new AssertionError("Update not expected to be called")).when(capability).onUpdate();
-    underTest.update(properties, previousProperties, properties);
+    underTest.update(properties, previousProperties);
   }
 
   /**

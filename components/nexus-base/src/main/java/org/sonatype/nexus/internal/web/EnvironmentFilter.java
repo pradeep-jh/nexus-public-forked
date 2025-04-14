@@ -35,6 +35,7 @@ import org.eclipse.sisu.Hidden;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.net.HttpHeaders.SERVER;
 import static com.google.common.net.HttpHeaders.X_CONTENT_TYPE_OPTIONS;
+import static com.google.common.net.HttpHeaders.X_FRAME_OPTIONS;
 
 /**
  * Sets up the basic environment for web-requests.
@@ -45,8 +46,8 @@ import static com.google.common.net.HttpHeaders.X_CONTENT_TYPE_OPTIONS;
 @Hidden // hide from DynamicFilterChainManager because we statically install it in WebModule
 @Singleton
 public class EnvironmentFilter
-    extends ComponentSupport
-    implements Filter
+  extends ComponentSupport
+  implements Filter
 {
   private final String serverBanner;
 
@@ -55,20 +56,21 @@ public class EnvironmentFilter
   private final BaseUrlManager baseUrlManager;
 
   @Inject
-  public EnvironmentFilter(
-      final ApplicationVersion applicationVersion,
-      final BaseUrlManager baseUrlManager)
+  public EnvironmentFilter(final ApplicationVersion applicationVersion,
+                           final BaseUrlManager baseUrlManager)
   {
     // cache "Server" header value
     checkNotNull(applicationVersion);
 
     this.serverBanner = String.format("Sonatype Nexus %s %s",
         applicationVersion.getEdition(),
-        applicationVersion.getVersion());
+        applicationVersion.getVersion()
+    );
 
     this.serverHeader = String.format("Nexus/%s (%s)",
         applicationVersion.getVersion(),
-        applicationVersion.getEdition());
+        applicationVersion.getEdition()
+    );
 
     this.baseUrlManager = checkNotNull(baseUrlManager);
   }
@@ -84,10 +86,8 @@ public class EnvironmentFilter
   }
 
   @Override
-  public void doFilter(
-      final ServletRequest request,
-      final ServletResponse response,
-      final FilterChain chain) throws IOException, ServletException
+  public void doFilter(final ServletRequest request, final ServletResponse response, final FilterChain chain)
+      throws IOException, ServletException
   {
     // start with default unknown user-id in MDC
     UserIdMdcHelper.unknown();
@@ -112,6 +112,9 @@ public class EnvironmentFilter
    */
   private void defaultHeaders(final HttpServletResponse response) {
     response.setHeader(SERVER, serverHeader);
+
+    // NEXUS-6569 Add X-Frame-Options header
+    response.setHeader(X_FRAME_OPTIONS, "SAMEORIGIN");
 
     // NEXUS-5023 disable IE for sniffing into response content
     response.setHeader(X_CONTENT_TYPE_OPTIONS, "nosniff");

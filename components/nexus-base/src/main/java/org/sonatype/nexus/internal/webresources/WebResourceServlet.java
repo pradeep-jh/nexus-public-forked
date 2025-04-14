@@ -26,7 +26,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.sonatype.goodies.common.Time;
 import org.sonatype.nexus.common.app.BaseUrlHolder;
 import org.sonatype.nexus.servlet.ServletHelper;
-import org.sonatype.nexus.servlet.XFrameOptions;
 import org.sonatype.nexus.webresources.WebResource;
 import org.sonatype.nexus.webresources.WebResource.Prepareable;
 import org.sonatype.nexus.webresources.WebResourceService;
@@ -41,8 +40,6 @@ import static com.google.common.net.HttpHeaders.CONTENT_LENGTH;
 import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
 import static com.google.common.net.HttpHeaders.IF_MODIFIED_SINCE;
 import static com.google.common.net.HttpHeaders.LAST_MODIFIED;
-import static com.google.common.net.HttpHeaders.X_FRAME_OPTIONS;
-import static com.google.common.net.HttpHeaders.X_XSS_PROTECTION;
 import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
 import static javax.servlet.http.HttpServletResponse.SC_NOT_MODIFIED;
 
@@ -62,47 +59,34 @@ public class WebResourceServlet
 
   private final long maxAgeSeconds;
 
-  private final XFrameOptions xframeOptions;
-
-  private static final String INDEX_PATH = "/index.html";
-
   @Inject
-  public WebResourceServlet(
-      final WebResourceService webResources,
-      final XFrameOptions xframeOptions,
-      @Named("${nexus.webresources.maxAge:-30days}") final Time maxAge)
+  public WebResourceServlet(final WebResourceService webResources,
+                            @Named("${nexus.webresources.maxAge:-30days}") final Time maxAge)
   {
     this.webResources = checkNotNull(webResources);
     this.maxAgeSeconds = checkNotNull(maxAge.toSeconds());
-    this.xframeOptions = checkNotNull(xframeOptions);
     log.info("Max-age: {} ({} seconds)", maxAge, maxAgeSeconds);
   }
 
   @Override
-  protected void doGet(
-      final HttpServletRequest request,
-      final HttpServletResponse response) throws ServletException, IOException
+  protected void doGet(final HttpServletRequest request, final HttpServletResponse response)
+      throws ServletException, IOException
   {
     String path = request.getPathInfo();
 
     // default-page handling
     if ("".equals(path) || "/".equals(path)) {
-      path = INDEX_PATH;
+      path = "/index.html";
     }
     else if (path.endsWith("/")) {
       path += "index.html";
-    }
-    else if (INDEX_PATH.equals(path)) {
-      response.sendRedirect(BaseUrlHolder.getRelativePath()); // prevent browser from sending XHRs to incorrect URL -
-                                                              // NEXUS-14593
-      return;
     }
 
     WebResource resource = webResources.getResource(path);
     if (resource == null) {
       // if there is an index.html for the requested path, redirect to it
-      if (webResources.getResource(path + INDEX_PATH) != null) {
-        String location = String.format("%s%s/", BaseUrlHolder.getRelativePath(), path);
+      if (webResources.getResource(path + "/index.html") != null) {
+        String location = String.format("%s%s/", BaseUrlHolder.get(), path);
         log.debug("Redirecting: {} -> {}", path, location);
         response.sendRedirect(location);
       }
@@ -115,23 +99,19 @@ public class WebResourceServlet
     serveResource(resource, request, response);
   }
 
-  private void serveResource(
-      WebResource resource,
-      final HttpServletRequest request,
-      final HttpServletResponse response) throws IOException
+  private void serveResource(WebResource resource,
+                             final HttpServletRequest request,
+                             final HttpServletResponse response)
+      throws IOException
   {
     log.trace("Serving resource: {}", resource);
-
-    // NEXUS-6569 Add X-Frame-Options header
-    response.setHeader(X_FRAME_OPTIONS, xframeOptions.getValueForPath(request.getPathInfo()));
-    response.setHeader(X_XSS_PROTECTION, "1; mode=block");
 
     // support resources which need to be prepared before serving
     if (resource instanceof Prepareable) {
       resource = ((Prepareable) resource).prepare();
       checkState(resource != null, "Prepared resource is null");
     }
-    checkNotNull(resource);
+    assert resource != null;
 
     String contentType = resource.getContentType();
     if (contentType == null) {

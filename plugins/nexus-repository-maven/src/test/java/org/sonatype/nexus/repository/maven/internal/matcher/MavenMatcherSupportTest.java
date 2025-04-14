@@ -35,10 +35,9 @@ public class MavenMatcherSupportTest
     assertThat(pred.apply("/some-path.txt"), equalTo(true));
     assertThat(pred.apply("/some-path.txt.sha1"), equalTo(true));
     assertThat(pred.apply("/some-path.txt.md5"), equalTo(true));
-    assertThat(pred.apply("/some-path.txt.sha256"), equalTo(true));
-    assertThat(pred.apply("/some-path.txt.sha512"), equalTo(true));
 
     assertThat(pred.apply("some-path.txt"), equalTo(false));
+    assertThat(pred.apply("/some-path.txt.sha512"), equalTo(false));
     assertThat(pred.apply("/some-path.txt.crc"), equalTo(false));
     assertThat(pred.apply("/some-path.tx"), equalTo(false));
     assertThat(pred.apply("/other-path.txt"), equalTo(false));
@@ -51,10 +50,9 @@ public class MavenMatcherSupportTest
     assertThat(pred.apply("/some/prefix/some-path.txt"), equalTo(true));
     assertThat(pred.apply("/some-path.txt.sha1"), equalTo(true));
     assertThat(pred.apply("some/prefix/some-path.txt.md5"), equalTo(true));
-    assertThat(pred.apply("/some-path.txt.sha256"), equalTo(true));
-    assertThat(pred.apply("/some-path.txt.sha512"), equalTo(true));
 
     assertThat(pred.apply("some-path.txt"), equalTo(false));
+    assertThat(pred.apply("/some-path.txt.sha512"), equalTo(false));
     assertThat(pred.apply("/some-path.txt.crc"), equalTo(false));
     assertThat(pred.apply("/some-path.tx"), equalTo(false));
     assertThat(pred.apply("/other-path.txt"), equalTo(false));

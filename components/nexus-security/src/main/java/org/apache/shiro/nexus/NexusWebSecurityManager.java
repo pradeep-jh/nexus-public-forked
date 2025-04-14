@@ -12,9 +12,6 @@
  */
 package org.apache.shiro.nexus;
 
-import java.util.Optional;
-import java.util.Set;
-
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
@@ -24,21 +21,14 @@ import org.sonatype.nexus.cache.CacheHelper;
 import org.sonatype.nexus.common.event.EventManager;
 import org.sonatype.nexus.security.UserIdMdcHelper;
 import org.sonatype.nexus.security.authc.AuthenticationEvent;
-import org.sonatype.nexus.security.authc.AuthenticationFailureReason;
-import org.sonatype.nexus.security.authc.LoginEvent;
-import org.sonatype.nexus.security.authc.NexusAuthenticationException;
 
 import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.authc.AuthenticationToken;
-import org.apache.shiro.session.mgt.eis.CachingSessionDAO;
-import org.apache.shiro.session.mgt.eis.SessionDAO;
 import org.apache.shiro.subject.Subject;
 import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
 import org.apache.shiro.web.mgt.WebSecurityManager;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static java.util.Collections.emptySet;
-import static org.sonatype.nexus.common.app.ManagedLifecycleManager.isShuttingDown;
 
 /**
  * Custom {@link WebSecurityManager}.
@@ -64,13 +54,8 @@ public class NexusWebSecurityManager
   /**
    * Post {@link AuthenticationEvent}.
    */
-  private void post(
-      final AuthenticationToken token,
-      final boolean successful,
-      final Set<AuthenticationFailureReason> authenticationFailureReasons)
-  {
-    eventManager.get()
-        .post(new AuthenticationEvent(token.getPrincipal().toString(), successful, authenticationFailureReasons));
+  private void post(final AuthenticationToken token, final boolean successful) {
+    eventManager.get().post(new AuthenticationEvent(token.getPrincipal().toString(), successful));
   }
 
   /**
@@ -78,27 +63,14 @@ public class NexusWebSecurityManager
    */
   @Override
   public Subject login(Subject subject, final AuthenticationToken token) {
-    //anonymous user isn't allowed to authenticate
-    if ("anonymous".equals(token.getPrincipal())) {
-      throw new AuthenticationException("Cannot login with anonymous user");
-    }
     try {
       subject = super.login(subject, token);
       UserIdMdcHelper.set(subject);
-      post(token, true, emptySet());
-      Optional<String> realmName = subject.getPrincipals().getRealmNames().stream()
-          .filter(realm -> realm.equals("SamlRealm")).findFirst();
-      String principal = subject.getPrincipal().toString();
-      realmName.ifPresent(realm -> eventManager.get().post(new LoginEvent(principal, realm)));
-
+      post(token, true);
       return subject;
     }
-    catch (NexusAuthenticationException e) {
-      post(token, false, e.getAuthenticationFailureReasons());
-      throw e;
-    }
     catch (AuthenticationException e) {
-      post(token, false, emptySet());
+      post(token, false);
       throw e;
     }
   }
@@ -110,20 +82,5 @@ public class NexusWebSecurityManager
   public void logout(final Subject subject) {
     super.logout(subject);
     UserIdMdcHelper.unset();
-  }
-
-  @Override
-  public void destroy() {
-    // underlying manager cannot be restarted, so avoid shutting it down when bouncing the service
-    if (isShuttingDown()) {
-      super.destroy();
-    }
-    else {
-      // null out the session cache to force it to be recreated on the next request after bouncing
-      SessionDAO sessionDAO = ((NexusWebSessionManager) getSessionManager()).getSessionDAO();
-      if (sessionDAO instanceof CachingSessionDAO) {
-        ((CachingSessionDAO) sessionDAO).setActiveSessionsCache(null);
-      }
-    }
   }
 }

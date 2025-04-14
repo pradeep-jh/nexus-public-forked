@@ -20,26 +20,19 @@ package org.sonatype.nexus.common.wonderland;
 public interface AuthTicketService
 {
   /**
-   * Create a new authentication ticket.
+   * Header for passing authentication tickets in via web requests.
    */
-  String createTicket(String user, String realmName);
+  String AUTH_TICKET_HEADER = "X-NX-AuthTicket";
 
   /**
-   * Create a new authentication ticket for the currently logged in user.
+   * Create a new authentication ticket.
    */
   String createTicket();
 
   /**
    * Redeem an authentication ticket.
    *
-   * @return {@code true} if the authentication ticket was redeemed, else {@code false} if the ticket is invalid.
-   */
-  boolean redeemTicket(String user, String ticket, String realmName);
-
-  /**
-   * Redeem an authentication ticket for the currently logged in user.
-   *
-   * @return {@code true} if the authentication ticket was redeemed, else {@code false} if the ticket is invalid.
+   * @return True if the authentication ticket was redeemed, else false if the ticket is invalid.
    */
   boolean redeemTicket(String ticket);
 }

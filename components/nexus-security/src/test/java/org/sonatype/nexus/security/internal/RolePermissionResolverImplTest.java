@@ -22,9 +22,8 @@ import org.sonatype.nexus.security.role.NoSuchRoleException;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mock;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -40,15 +39,12 @@ public class RolePermissionResolverImplTest
 
   private SecurityConfigurationManager securityConfigurationManager;
 
-  @Mock
-  private EventManager eventManager;
-
   @Before
   public void setUp() throws Exception {
     securityConfigurationManager = mock(SecurityConfigurationManager.class);
     when(securityConfigurationManager.readRole(any())).thenThrow(new NoSuchRoleException("Role not found"));
     underTest = new RolePermissionResolverImpl(securityConfigurationManager, Collections.emptyList(),
-        eventManager, 10);
+        mock(EventManager.class), 10);
   }
 
   @Test

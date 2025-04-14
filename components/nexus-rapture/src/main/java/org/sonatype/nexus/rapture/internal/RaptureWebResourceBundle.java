@@ -16,11 +16,9 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
@@ -33,14 +31,13 @@ import org.sonatype.nexus.common.app.BaseUrlHolder;
 import org.sonatype.nexus.common.template.TemplateAccessible;
 import org.sonatype.nexus.common.template.TemplateHelper;
 import org.sonatype.nexus.common.template.TemplateParameters;
+import org.sonatype.nexus.rapture.UiPluginDescriptor;
 import org.sonatype.nexus.rapture.internal.state.StateComponent;
 import org.sonatype.nexus.servlet.ServletHelper;
-import org.sonatype.nexus.ui.UiPluginDescriptor;
 import org.sonatype.nexus.webresources.GeneratedWebResource;
 import org.sonatype.nexus.webresources.WebResource;
 import org.sonatype.nexus.webresources.WebResourceBundle;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -48,7 +45,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import static com.google.common.base.Preconditions.checkNotNull;
-import static java.util.stream.Collectors.toList;
 
 /**
  * Rapture {@link WebResourceBundle}.
@@ -57,7 +53,6 @@ import static java.util.stream.Collectors.toList;
  * <ul>
  * <li>{@code /index.html}</li>
  * <li>{@code /static/rapture/bootstrap.js}</li>
- * <li>{@code /static/rapture/resources/baseapp.css}</li>
  * <li>{@code /static/rapture/app.js}</li>
  * </ul>
  *
@@ -79,49 +74,23 @@ public class RaptureWebResourceBundle
 
   private final List<UiPluginDescriptor> pluginDescriptors;
 
-  private final List<org.sonatype.nexus.rapture.UiPluginDescriptor> extJsPluginDescriptors;
-
   private final Gson gson;
 
-  private final String cacheBuster;
-
-  private final boolean analyticsEnabled;
-
-  public final static String PROPERTY_WEBRESOURCES_CACHEBUSTER = "nexus.webresources.cachebuster";
-
   @Inject
-  public RaptureWebResourceBundle(
-      final ApplicationVersion applicationVersion,
-      final Provider<HttpServletRequest> servletRequestProvider,
-      final Provider<StateComponent> stateComponentProvider,
-      final TemplateHelper templateHelper,
-      final List<UiPluginDescriptor> pluginDescriptors,
-      final List<org.sonatype.nexus.rapture.UiPluginDescriptor> extJsPluginDescriptors,
-      @Nullable @Named("${" + PROPERTY_WEBRESOURCES_CACHEBUSTER + "}") final String cacheBuster,
-      @Named("${nexus.analytics.enabled:-true}") final boolean analyticsEnabled)
+  public RaptureWebResourceBundle(final ApplicationVersion applicationVersion,
+                                  final Provider<HttpServletRequest> servletRequestProvider,
+                                  final Provider<StateComponent> stateComponentProvider,
+                                  final TemplateHelper templateHelper,
+                                  final List<UiPluginDescriptor> pluginDescriptors)
   {
     this.applicationVersion = checkNotNull(applicationVersion);
     this.servletRequestProvider = checkNotNull(servletRequestProvider);
     this.stateComponentProvider = checkNotNull(stateComponentProvider);
     this.templateHelper = checkNotNull(templateHelper);
     this.pluginDescriptors = checkNotNull(pluginDescriptors);
-    this.extJsPluginDescriptors = checkNotNull(extJsPluginDescriptors);
-    this.analyticsEnabled = analyticsEnabled;
-    if (cacheBuster == null) {
-      this.cacheBuster = applicationVersion.getBuildTimestamp();
-    }
-    else {
-      log.info("Setting web resources cache buster value to {} from property {}", cacheBuster,
-          PROPERTY_WEBRESOURCES_CACHEBUSTER);
-      this.cacheBuster = cacheBuster;
-    }
+
     log.info("UI plugin descriptors:");
     for (UiPluginDescriptor descriptor : pluginDescriptors) {
-      log.info("  {}", descriptor.getName());
-    }
-
-    log.info("ExtJS UI plugin descriptors:");
-    for (org.sonatype.nexus.rapture.UiPluginDescriptor descriptor : extJsPluginDescriptors) {
       log.info("  {}", descriptor.getPluginId());
     }
 
@@ -138,9 +107,8 @@ public class RaptureWebResourceBundle
     return ImmutableList.of(
         index_html(),
         bootstrap_js(),
-        baseapp_css(),
-        app_js(),
-        copyright_html());
+        app_js()
+    );
   }
 
   private abstract class TemplateWebResource
@@ -185,14 +153,13 @@ public class RaptureWebResourceBundle
       @Override
       protected byte[] generate() throws IOException {
         return render("index.vm", new TemplateParameters()
-            .set("baseUrl", BaseUrlHolder.get())
-            .set("relativePath", BaseUrlHolder.getRelativePath())
-            .set("debug", isDebug())
-            .set("urlSuffix", generateUrlSuffix())
-            .set("styles", getStyles())
-            .set("scripts", getScripts())
-            .set("util", new TemplateUtil())
-            .set("analyticsEnabled", analyticsEnabled));
+                .set("baseUrl", BaseUrlHolder.get())
+                .set("debug", isDebug())
+                .set("urlSuffix", generateUrlSuffix())
+                .set("styles", getStyles())
+                .set("scripts", getScripts())
+                .set("util", new TemplateUtil())
+        );
       }
     };
   }
@@ -216,61 +183,11 @@ public class RaptureWebResourceBundle
       @Override
       protected byte[] generate() throws IOException {
         return render("bootstrap.vm", new TemplateParameters()
-            .set("baseUrl", BaseUrlHolder.get())
-            .set("relativePath", BaseUrlHolder.getRelativePath())
-            .set("debug", isDebug())
-            .set("urlSuffix", generateUrlSuffix())
-            .set("namespaces", getExtJsNamespaces()));
-      }
-    };
-  }
-
-  /**
-   * The baseapp css file.
-   */
-  private WebResource baseapp_css() {
-    return new TemplateWebResource()
-    {
-      @Override
-      public String getPath() {
-        return "/static/rapture/resources/baseapp.css";
-      }
-
-      @Override
-      public String getContentType() {
-        return CSS;
-      }
-
-      @Override
-      protected byte[] generate() throws IOException {
-        return render("baseapp_css.vm", new TemplateParameters()
-            .set("debug", isDebug())
-            .set("urlSuffix", generateUrlSuffix()));
-      }
-    };
-  }
-
-  /**
-   * The baseapp css file.
-   */
-  private WebResource copyright_html() {
-    return new TemplateWebResource()
-    {
-      @Override
-      public String getPath() {
-        return "/COPYRIGHT.html";
-      }
-
-      @Override
-      public String getContentType() {
-        return HTML;
-      }
-
-      @Override
-      protected byte[] generate() throws IOException {
-
-        return render("COPYRIGHT.vm", new TemplateParameters()
-            .set("edition", applicationVersion.getEdition()));
+                .set("baseUrl", BaseUrlHolder.get())
+                .set("debug", isDebug())
+                .set("urlSuffix", generateUrlSuffix())
+                .set("namespaces", getNamespaces())
+        );
       }
     };
   }
@@ -294,10 +211,11 @@ public class RaptureWebResourceBundle
       @Override
       protected byte[] generate() throws IOException {
         return render("app.vm", new TemplateParameters()
-            .set("baseUrl", BaseUrlHolder.getRelativePath())
-            .set("debug", isDebug())
-            .set("state", gson.toJson(getState()))
-            .set("pluginConfigs", getExtJsPluginConfigs()));
+                .set("baseUrl", BaseUrlHolder.get())
+                .set("debug", isDebug())
+                .set("state", gson.toJson(getState()))
+                .set("pluginConfigs", getPluginConfigs())
+        );
       }
     };
   }
@@ -308,10 +226,7 @@ public class RaptureWebResourceBundle
   private String generateUrlSuffix() {
     StringBuilder buff = new StringBuilder();
     String version = applicationVersion.getVersion();
-    String edition = applicationVersion.getEdition();
     buff.append("_v=").append(version);
-    buff.append("&_e=").append(edition);
-    buff.append("&_c=").append(this.cacheBuster);
 
     // if version is a SNAPSHOT, then append additional timestamp to disable cache
     if (version.endsWith("SNAPSHOT")) {
@@ -344,10 +259,9 @@ public class RaptureWebResourceBundle
   /**
    * Find all plugin configs.
    */
-  @VisibleForTesting
-  List<String> getExtJsPluginConfigs() {
+  private List<String> getPluginConfigs() {
     List<String> classNames = Lists.newArrayList();
-    for (org.sonatype.nexus.rapture.UiPluginDescriptor descriptor : extJsPluginDescriptors) {
+    for (UiPluginDescriptor descriptor : pluginDescriptors) {
       String className = descriptor.getConfigClassName();
       if (className != null) {
         classNames.add(className);
@@ -359,10 +273,9 @@ public class RaptureWebResourceBundle
   /**
    * Determine all plugin namespaces.
    */
-  @VisibleForTesting
-  List<String> getExtJsNamespaces() {
+  private List<String> getNamespaces() {
     List<String> namespaces = Lists.newArrayList();
-    for (org.sonatype.nexus.rapture.UiPluginDescriptor descriptor : extJsPluginDescriptors) {
+    for (UiPluginDescriptor descriptor : pluginDescriptors) {
       String ns = descriptor.getNamespace();
       if (ns != null) {
         namespaces.add(ns);
@@ -384,20 +297,7 @@ public class RaptureWebResourceBundle
    */
   private URI uri(final String path) {
     try {
-      return new URI(String.format("%s/static/rapture/%s", BaseUrlHolder.getRelativePath(), path));
-    }
-    catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  /**
-   * @param path
-   * @return BaseUrlHolder.get() + /static/ + path
-   */
-  private URI relativeToAbsoluteUri(final String path) {
-    try {
-      return new URI(String.format("%s%s", BaseUrlHolder.getRelativePath(), path));
+      return new URI(String.format("%s/static/rapture/%s", BaseUrlHolder.get(), path));
     }
     catch (URISyntaxException e) {
       throw new RuntimeException(e);
@@ -407,81 +307,44 @@ public class RaptureWebResourceBundle
   /**
    * Generate the list of CSS styles to include in the index.html.
    */
-  @VisibleForTesting
-  List<URI> getStyles() {
+  private List<URI> getStyles() {
     List<URI> styles = Lists.newArrayList();
     styles.add(uri(mode("resources/loading-{mode}.css")));
-    styles.add(uri(mode("resources/baseapp.css")));
+    styles.add(uri(mode("resources/baseapp-{mode}.css")));
 
-    // add extjs descriptor styles
-    styles.addAll(getExtJsStyles());
-
-    List<URI> resources = pluginDescriptors.stream()
-        .map(UiPluginDescriptor::getStyles)
-        .flatMap(Collection::stream)
-        .map(this::relativeToAbsoluteUri)
-        .collect(toList());
-    styles.addAll(resources);
-
-    return styles;
-  }
-
-  private List<URI> getExtJsStyles() {
-    List<URI> styles = Lists.newArrayList();
-    for (org.sonatype.nexus.rapture.UiPluginDescriptor descriptor : extJsPluginDescriptors) {
+    // add all plugin styles
+    for (UiPluginDescriptor descriptor : pluginDescriptors) {
       if (descriptor.hasStyle()) {
         String path = String.format("resources/%s-{mode}.css", descriptor.getPluginId());
         styles.add(uri(mode(path)));
       }
     }
+
     return styles;
   }
 
   /**
    * Generate the list of javascript sources to include in the index.html.
    */
-  @VisibleForTesting
-  List<URI> getScripts() {
-    boolean debug = isDebug();
-
+  private List<URI> getScripts() {
     List<URI> scripts = Lists.newArrayList();
 
     scripts.add(uri(mode("baseapp-{mode}.js")));
     scripts.add(uri(mode("extdirect-{mode}.js")));
     scripts.add(uri("bootstrap.js"));
+    scripts.add(uri("d3.v4.min.js"));
 
-    scripts.addAll(
-        extJsPluginDescriptors.stream()
-            .map(descriptor -> descriptor.getScripts(debug))
-            .flatMap(Collection::stream)
-            .map(this::relativeToAbsoluteUri)
-            .collect(toList()));
-
-    List<URI> resources = pluginDescriptors.stream()
-        .map(descriptor -> descriptor.getScripts(debug))
-        .flatMap(Collection::stream)
-        .map(this::relativeToAbsoluteUri)
-        .collect(toList());
-    scripts.addAll(resources);
-
-    if (!debug) {
-      // add all extjs scripts
-      scripts.addAll(getExtJsScripts());
-    }
-
-    scripts.add(uri("app.js"));
-    return scripts;
-  }
-
-  private List<URI> getExtJsScripts() {
-    List<URI> scripts = Lists.newArrayList();
-    for (org.sonatype.nexus.rapture.UiPluginDescriptor descriptor : extJsPluginDescriptors) {
-      if (descriptor.hasScript()) {
-        String path = String.format("%s-prod.js", descriptor.getPluginId());
-        scripts.add(uri(path));
+    // add all "prod" plugin scripts if debug is not enabled
+    if (!isDebug()) {
+      for (UiPluginDescriptor descriptor : pluginDescriptors) {
+        if (descriptor.hasScript()) {
+          String path = String.format("%s-prod.js", descriptor.getPluginId());
+          scripts.add(uri(path));
+        }
       }
     }
 
+    scripts.add(uri("app.js"));
     return scripts;
   }
 }

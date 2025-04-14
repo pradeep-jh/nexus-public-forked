@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -53,10 +49,10 @@ Ext.define('NX.controller.Icon', {
     me.installStylesheet();
 
     // HACK: preload some additional image resources
-    me.preloadImage(NX.util.Url.cacheBustingUrl(NX.util.Url.relativePath + '/static/rapture/resources/images/shared/icon-error.png'));
-    me.preloadImage(NX.util.Url.cacheBustingUrl(NX.util.Url.relativePath + '/static/rapture/resources/images/shared/icon-info.png'));
-    me.preloadImage(NX.util.Url.cacheBustingUrl(NX.util.Url.relativePath + '/static/rapture/resources/images/shared/icon-question.png'));
-    me.preloadImage(NX.util.Url.cacheBustingUrl(NX.util.Url.relativePath + '/static/rapture/resources/images/shared/icon-warning.png'));
+    me.preloadImage(NX.util.Url.cacheBustingUrl(NX.util.Url.baseUrl + '/static/rapture/resources/images/shared/icon-error.png'));
+    me.preloadImage(NX.util.Url.cacheBustingUrl(NX.util.Url.baseUrl + '/static/rapture/resources/images/shared/icon-info.png'));
+    me.preloadImage(NX.util.Url.cacheBustingUrl(NX.util.Url.baseUrl + '/static/rapture/resources/images/shared/icon-question.png'));
+    me.preloadImage(NX.util.Url.cacheBustingUrl(NX.util.Url.baseUrl + '/static/rapture/resources/images/shared/icon-warning.png'));
   },
 
   /**
@@ -100,7 +96,7 @@ Ext.define('NX.controller.Icon', {
     });
 
     // create the style sheet
-    me.stylesheet = Ext.util.CSS.createStyleSheet(styles.join(' '));
+    me.stylesheet = Ext.util.CSS.createStyleSheet(styles.join(' '), 'nx-icons');
 
     //<if debug>
     me.logDebug('Stylesheet installed with', me.stylesheet.cssRules.length, 'rules');
@@ -161,9 +157,9 @@ Ext.define('NX.controller.Icon', {
 
     // If icon contains 'variants' field then create an icon for each variant
     if (Ext.isArray(icon.variants)) {
+      var copy = Ext.clone(icon);
+      delete copy.variants;
       Ext.each(icon.variants, function (variant) {
-        var copy = Ext.clone(icon);
-        delete copy.variants;
         copy.variant = variant;
         me.addIcon(copy);
       });

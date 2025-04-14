@@ -61,12 +61,12 @@ public class SslCertificateAuditor
       data.setDomain(DOMAIN);
       data.setType(type(event.getClass()));
 
-      Map<String, Object> attributes = data.getAttributes();
+      Map<String, String> attributes = data.getAttributes();
       attributes.put("alias", event.getAlias());
       attributes.put("type", certificate.getType());
 
       if (certificate instanceof X509Certificate) {
-        X509Certificate x509 = (X509Certificate) certificate;
+        X509Certificate x509 = (X509Certificate)certificate;
         Map<String, String> rdns = parseLdapName(x509.getSubjectX500Principal().getName());
         data.setContext(rdns.get("CN"));
         attributes.putAll(rdns);

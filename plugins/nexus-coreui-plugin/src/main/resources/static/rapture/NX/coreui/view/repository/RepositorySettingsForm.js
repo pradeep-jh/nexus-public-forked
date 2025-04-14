@@ -6,10 +6,6 @@
  * This program and the accompanying materials are made available under the terms of the Eclipse Public License Version 1.0,
  * which accompanies this distribution and is available at http://www.eclipse.org/legal/epl-v10.html.
  *
- * Sonatype Nexus (TM) Open Source Version is distributed with Sencha Ext JS pursuant to a FLOSS Exception agreed upon
- * between Sonatype, Inc. and Sencha Inc. Sencha Ext JS is licensed under GPL v3 and cannot be redistributed as part of a
- * closed source work.
- *
  * Sonatype Nexus (TM) Professional Version is available from Sonatype, Inc. "Sonatype" and "Sonatype Nexus" are trademarks
  * of Sonatype, Inc. Apache Maven is a trademark of the Apache Software Foundation. M2eclipse is a trademark of the
  * Eclipse Foundation. All other trademarks are the property of their respective owners.
@@ -26,8 +22,7 @@ Ext.define('NX.coreui.view.repository.RepositorySettingsForm', {
   alias: 'widget.nx-coreui-repository-settings-form',
   requires: [
     'NX.Conditions',
-    'NX.I18n',
-    'NX.util.Validator'
+    'NX.I18n'
   ],
 
   api: {
@@ -37,8 +32,6 @@ Ext.define('NX.coreui.view.repository.RepositorySettingsForm', {
   initComponent: function() {
     var me = this,
         permittedCondition;
-
-    me.addListener('remotevalidation', me.handleRemoteValidationError);
 
     me.settingsFormSuccessMessage = function(data) {
       return NX.I18n.get('Repository_RepositorySettingsForm_Update_Success') + data['name'];
@@ -126,66 +119,47 @@ Ext.define('NX.coreui.view.repository.RepositorySettingsForm', {
     //map repository attributes raw map structure to/from a flattened representation
     Ext.override(me.getForm(), {
       getValues: function() {
-        return me.doGetValues(this.callParent(arguments));
-        },
-      setValues: function(values) { 
-        me.doSetValues(values);
+        var processed = { attributes: {} },
+            values = this.callParent(arguments);
+
+        Ext.Object.each(values, function(key, value) {
+          var segments = key.split('.'),
+              parent = processed;
+
+          Ext.each(segments, function(segment, pos) {
+            if (pos === segments.length - 1) {
+              parent[segment] = value;
+            }
+            else {
+              if (!parent[segment]) {
+                parent[segment] = {};
+              }
+              parent = parent[segment];
+            }
+          });
+        });
+
+        return processed;
+      },
+
+      setValues: function(values) {
+        var process = function(child, prefix) {
+              Ext.Object.each(child, function(key, value) {
+                var newPrefix = (prefix ? prefix + '.' : '') + key;
+                if (Ext.isObject(value)) {
+                  process(value, newPrefix);
+                }
+                else {
+                  values[newPrefix] = value;
+                }
+              });
+            };
+
+        process(values);
+
         this.callParent(arguments);
       }
     });
-  },
-
-  doGetValues: function(values) {
-    var processed = { attributes: {} };
-
-    Ext.Object.each(values, function(key, value) {
-      var segments = key.split('.'),
-          parent = processed;
-
-      Ext.each(segments, function(segment, pos) {
-        if (pos === segments.length - 1) {
-          parent[segment] = value;
-        }
-        else {
-          if (!parent[segment]) {
-            parent[segment] = {};
-          }
-          parent = parent[segment];
-        }
-      });
-    });
-
-    return processed;
-  },
-
-  doSetValues: function(values) {
-    var process = function(child, prefix) {
-      Ext.Object.each(child, function(key, value) {
-        var newPrefix = (prefix ? prefix + '.' : '') + key;
-        if (Ext.isObject(value)) {
-          process(value, newPrefix);
-        }
-        else {
-          values[newPrefix] = value;
-        }
-      });
-    };
-
-    process(values);
-  },
-
-  handleRemoteValidationError: function(validationMap) {
-    Object.keys(validationMap).forEach(function (key) {
-      const errorMsg = validationMap[key];
-
-      if (!key.startsWith("attributes.")) {
-        key = "attributes." + key;
-      }
-
-      Ext.ComponentQuery.query('form[settingsForm=true] [name=' + key + ']')
-        .forEach(function(component) {
-          component.markInvalid(errorMsg);
-        });
-    });
   }
+
 });

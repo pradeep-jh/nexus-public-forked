@@ -12,20 +12,15 @@
  */
 package org.sonatype.nexus.security.token;
 
-import java.util.Optional;
 import javax.annotation.Nullable;
-import javax.inject.Inject;
-import javax.inject.Provider;
-import javax.servlet.http.HttpServletRequest;
 
 import org.sonatype.nexus.security.UserPrincipalsHelper;
 import org.sonatype.nexus.security.authc.NexusApiKeyAuthenticationToken;
-import org.sonatype.nexus.security.authc.apikey.ApiKey;
-import org.sonatype.nexus.security.authc.apikey.ApiKeyService;
+import org.sonatype.nexus.security.authc.apikey.ApiKeyStore;
 import org.sonatype.nexus.security.user.UserNotFoundException;
+import org.sonatype.nexus.security.user.UserStatus;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.authc.AuthenticationInfo;
 import org.apache.shiro.authc.AuthenticationToken;
 import org.apache.shiro.authc.SimpleAuthenticationInfo;
@@ -46,34 +41,25 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public abstract class BearerTokenRealm
     extends AuthenticatingRealm
 {
-  public static final String IS_TOKEN_AUTH_KEY = BearerTokenRealm.class.getName() + ".IS_TOKEN";
-
   @VisibleForTesting
   static final String ANONYMOUS_USER = "anonymous";
 
   private final Logger log = LoggerFactory.getLogger(getClass());
 
-  private final ApiKeyService keyStore;
+  private final ApiKeyStore keyStore;
 
   private final UserPrincipalsHelper principalsHelper;
 
   private final String format;
 
-  private Provider<HttpServletRequest> requestProvider;
-
-  protected BearerTokenRealm(final ApiKeyService keyStore,
+  public BearerTokenRealm(final ApiKeyStore keyStore,
                           final UserPrincipalsHelper principalsHelper,
                           final String format) {
     this.keyStore = checkNotNull(keyStore);
     this.principalsHelper = checkNotNull(principalsHelper);
     this.format = checkNotNull(format);
     setName(format);
-    setAuthenticationCachingEnabled(true);
-  }
-
-  @Inject
-  protected void setRequestProvider(final Provider<HttpServletRequest> requestProvider) {
-    this.requestProvider = checkNotNull(requestProvider);
+    setAuthenticationCachingEnabled(false);
   }
 
   @Override
@@ -85,9 +71,11 @@ public abstract class BearerTokenRealm
   protected AuthenticationInfo doGetAuthenticationInfo(final AuthenticationToken token)
   {
     checkNotNull(token);
-    return getPrincipals(token).map(principals -> {
+    final PrincipalCollection principals = keyStore.getPrincipals(format, (char[]) token.getCredentials());
+    if (null != principals) {
       try {
-        if (anonymousAndSupported(principals) || principalsHelper.getUserStatus(principals).isActive()) {
+        if (anonymousAndSupported(principals) || UserStatus.active.equals(principalsHelper.getUserStatus(principals))) {
+          ((NexusApiKeyAuthenticationToken) token).setPrincipal(principals.getPrimaryPrincipal());
           return new SimpleAuthenticationInfo(principals, token.getCredentials());
         }
       }
@@ -95,40 +83,24 @@ public abstract class BearerTokenRealm
         log.debug("Realm did not find user", e);
         keyStore.deleteApiKeys(principals);
       }
-      return null;
-    }).orElse(null);
+    }
+    return null;
   }
 
   @Override
   @Nullable
   protected Object getAuthenticationCacheKey(@Nullable final AuthenticationToken token) {
     if (token != null) {
-      return getPrincipals(token)
-          .map(PrincipalCollection::getPrimaryPrincipal)
-          .orElse(null);
+      PrincipalCollection principals = keyStore.getPrincipals(format, (char[]) token.getCredentials());
+      if (principals != null) {
+        return principals.getPrimaryPrincipal();
+      }
     }
     return null;
   }
 
-  @Override
-  protected void assertCredentialsMatch(final AuthenticationToken token, final AuthenticationInfo info)
-      throws AuthenticationException
-  {
-    super.assertCredentialsMatch(token, info);
-    //after successful assertion it means we authenticated successfully, so now we can set attributes
-    requestProvider.get().setAttribute(IS_TOKEN_AUTH_KEY, Boolean.TRUE);
-    getPrincipals(token)
-        .map(PrincipalCollection::getPrimaryPrincipal)
-        .ifPresent(principal -> ((NexusApiKeyAuthenticationToken) token).setPrincipal(principal));
-  }
-
   protected boolean isAnonymousSupported() {
     return false;
-  }
-
-  private Optional<PrincipalCollection> getPrincipals(final AuthenticationToken token) {
-    return keyStore.getApiKeyByToken(format, (char[]) token.getCredentials())
-        .map(ApiKey::getPrincipals);
   }
 
   private boolean anonymousAndSupported(final PrincipalCollection principals) {

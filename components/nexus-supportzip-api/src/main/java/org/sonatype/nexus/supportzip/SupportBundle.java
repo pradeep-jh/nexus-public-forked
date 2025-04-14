@@ -38,17 +38,13 @@ public class SupportBundle
     enum Type
     {
       SYSINFO,
-      DBINFO,
       THREAD,
       METRICS,
       CONFIG,
       SECURITY,
       LOG,
       TASKLOG,
-      AUDITLOG,
-      JMX,
-      REPLICATIONLOG,
-      ARCHIVEDLOG
+      JMX
     }
 
     /**

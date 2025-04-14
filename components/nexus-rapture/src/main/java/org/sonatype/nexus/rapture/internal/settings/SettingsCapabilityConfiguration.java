@@ -15,7 +15,6 @@ package org.sonatype.nexus.rapture.internal.settings;
 import java.util.Map;
 
 import org.sonatype.nexus.common.text.Strings2;
-import org.sonatype.nexus.rapture.settings.RaptureSettings;
 
 import com.google.common.collect.Maps;
 
@@ -38,10 +37,6 @@ public class SettingsCapabilityConfiguration
 
   public static final String SESSION_TIMEOUT = "sessionTimeout";
 
-  public static final String REQUEST_TIMEOUT = "requestTimeout";
-
-  public static final String LONG_REQUEST_TIMEOUT = "longRequestTimeout";
-
   public static final String TITLE = "title";
 
   public SettingsCapabilityConfiguration() {
@@ -58,8 +53,6 @@ public class SettingsCapabilityConfiguration
         parseInteger(properties.get(STATUS_INTERVAL_ANONYMOUS), DEFAULT_STATUS_INTERVAL_ANONYMOUS)
     );
     setSessionTimeout(parseInteger(properties.get(SESSION_TIMEOUT), DEFAULT_SESSION_TIMEOUT));
-    setRequestTimeout(parseInteger(properties.get(REQUEST_TIMEOUT), DEFAULT_REQUEST_TIMEOUT));
-    setLongRequestTimeout(parseInteger(properties.get(LONG_REQUEST_TIMEOUT), DEFAULT_LONG_REQUEST_TIMEOUT));
     setTitle(parseString(properties.get(TITLE), DEFAULT_TITLE));
   }
 
@@ -69,8 +62,6 @@ public class SettingsCapabilityConfiguration
     props.put(STATUS_INTERVAL_AUTHENTICATED, Integer.toString(getStatusIntervalAuthenticated()));
     props.put(STATUS_INTERVAL_ANONYMOUS, Integer.toString(getStatusIntervalAnonymous()));
     props.put(SESSION_TIMEOUT, Integer.toString(getSessionTimeout()));
-    props.put(REQUEST_TIMEOUT, Integer.toString(getRequestTimeout()));
-    props.put(LONG_REQUEST_TIMEOUT, Integer.toString(getLongRequestTimeout()));
     props.put(TITLE, getTitle());
     return props;
   }
@@ -109,8 +100,6 @@ public class SettingsCapabilityConfiguration
         + ", statusIntervalAuthenticated=" + getStatusIntervalAuthenticated()
         + ", statusIntervalAnonymous=" + getStatusIntervalAnonymous()
         + ", sessionTimeout=" + getSessionTimeout()
-        + ", requestTimeout=" + getRequestTimeout()
-        + ", longRequestTimeout=" + getLongRequestTimeout()
         + "}";
   }
 }

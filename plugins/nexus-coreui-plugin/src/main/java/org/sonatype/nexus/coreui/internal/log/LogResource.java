@@ -12,22 +12,26 @@
  */
 package org.sonatype.nexus.coreui.internal.log;
 
+import java.io.InputStream;
+
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.POST;
+import javax.ws.rs.GET;
+import javax.ws.rs.NotFoundException;
 import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Response;
 
 import org.sonatype.goodies.common.ComponentSupport;
-import org.sonatype.nexus.common.log.LogMarker;
-import org.sonatype.nexus.rest.APIConstants;
+import org.sonatype.nexus.common.log.LogManager;
 import org.sonatype.nexus.rest.Resource;
 
-import com.google.common.base.Strings;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.net.HttpHeaders.CONTENT_DISPOSITION;
 import static javax.ws.rs.core.MediaType.TEXT_PLAIN;
 
 /**
@@ -42,29 +46,45 @@ public class LogResource
     extends ComponentSupport
     implements Resource
 {
-  public static final String RESOURCE_URI = APIConstants.INTERNAL_API_PREFIX + "/logging/log";
+  public static final String RESOURCE_URI = "/logging/log";
 
-  public static final String DEFAULT_MARK = "MARK";
-
-  private final LogMarker logMarker;
+  private final LogManager logManager;
 
   @Inject
-  public LogResource(final LogMarker logMarker) {
-    this.logMarker = checkNotNull(logMarker);
+  public LogResource(final LogManager logManager) {
+    this.logManager = checkNotNull(logManager);
   }
 
   /**
+   * Downloads a part of nexus.log (specified by fromByte/bytesCount) or full nexus.log (if fromByte/bytesCount are
+   * null).
+   *
+   * @param fromByte   starting position
+   * @param bytesCount number of bytes
+   * @return part or full nexus.log
+   * @throws Exception If getting log fails
    */
-  @POST
-  @Path("/mark")
-  @Consumes({TEXT_PLAIN})
-  @RequiresPermissions("nexus:logging:create")
-  public void mark(final String message) {
-    if (Strings.isNullOrEmpty(message)) {
-      logMarker.markLog(DEFAULT_MARK);
+  @GET
+  @Produces({TEXT_PLAIN})
+  @RequiresPermissions("nexus:logging:read")
+  public Response get(@QueryParam("fromByte") final Long fromByte,
+                      @QueryParam("bytesCount") final Long bytesCount)
+      throws Exception
+  {
+    Long from = fromByte;
+    if (from == null || from < 0) {
+      from = 0L;
     }
-    else {
-      logMarker.markLog(message);
+    Long count = bytesCount;
+    if (count == null) {
+      count = Long.MAX_VALUE;
     }
+    InputStream log = logManager.getLogFileStream("nexus.log", from, count);
+    if (log == null) {
+      throw new NotFoundException("nexus.log not found");
+    }
+    return Response.ok(log)
+        .header(CONTENT_DISPOSITION, "attachment; filename=\"nexus.log\"")
+        .build();
   }
 }

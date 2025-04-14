@@ -12,35 +12,33 @@
  */
 package com.sonatype.nexus.ssl.plugin.internal.keystore;
 
-import org.sonatype.nexus.common.entity.HasName;
+import org.sonatype.nexus.common.entity.Entity;
 
 /**
- * {@link java.security.KeyStore} data.
- *
- * @since 3.21
+ * The persisted data of a named {@link java.security.KeyStore}.
+ * 
+ * @since 3.1
  */
 public class KeyStoreData
-    implements HasName
+    extends Entity
 {
   private String name;
 
   private byte[] bytes;
 
-  @Override
   public String getName() {
     return name;
   }
 
-  @Override
   public void setName(final String name) {
     this.name = name;
   }
 
-  public byte[] getBytes() { // NOSONAR
-    return bytes; // NOSONAR: this is just a temporary transfer object
+  public byte[] getBytes() {
+    return bytes; // NOSONAR
   }
 
   public void setBytes(final byte[] bytes) { // NOSONAR
-    this.bytes = bytes; // NOSONAR: this is just a temporary transfer object
+    this.bytes = bytes; // NOSONAR
   }
 }

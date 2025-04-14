@@ -46,11 +46,6 @@ public interface ApplicationLicense
   boolean isExpired();
 
   /**
-   * Returns {@code true} if license is installed and is an evaluation license.
-   */
-  boolean isEvaluation();
-
-  /**
    * Returns license attributes.
    *
    * This is an immutable view of additional information about the current license.
@@ -64,13 +59,6 @@ public interface ApplicationLicense
    */
   @Nullable
   String getFingerprint();
-
-  /**
-   * Refreshes the cached license details with the latest from the license manager.
-   *
-   * @since 3.16
-   */
-  void refresh();
 
   /**
    * Keys for Attribute values associated with this license.

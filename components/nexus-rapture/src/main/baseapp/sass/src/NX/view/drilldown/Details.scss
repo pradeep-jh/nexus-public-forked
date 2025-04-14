@@ -10,22 +10,16 @@
 .x-panel-nx-drilldown-message {
   padding-left: 8px !important;
   padding-right: 8px !important;
-  padding-top: 2px !important;
   background-color: $color-white;
 
   .x-panel-header {
     padding: 8px;
     border: 1px solid !important;
-    height: fit-content;
+    height: 32px;
     border-radius: 8px;
 
     img {
       margin-right: 5px !important;
-    }
-
-    .x-title-text {
-      overflow: unset;
-      white-space: unset;
     }
   }
 }
@@ -42,8 +36,4 @@
     border-color: $color-cerulean-blue !important;
     background-color: $color-light-smoke;
   }
-}
-
-.x-docked-top.nx-drilldown-info {
-  padding: 10px 0 0 0;
 }

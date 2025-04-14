@@ -13,43 +13,35 @@
 package org.sonatype.nexus.extender;
 
 import java.lang.management.ManagementFactory;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.Dictionary;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
+
 import javax.servlet.Filter;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 
-import org.sonatype.nexus.common.app.ApplicationVersion;
-import org.sonatype.nexus.common.app.ManagedLifecycle.Phase;
 import org.sonatype.nexus.common.app.ManagedLifecycleManager;
 
 import com.codahale.metrics.SharedMetricRegistries;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.google.inject.Module;
 import com.google.inject.Provider;
 import com.google.inject.servlet.GuiceFilter;
 import org.apache.karaf.features.Feature;
 import org.apache.karaf.features.FeaturesService;
 import org.apache.karaf.features.FeaturesService.Option;
-import org.apache.karaf.features.Repository;
+import org.eclipse.sisu.bean.BeanManager;
 import org.eclipse.sisu.inject.BeanLocator;
 import org.eclipse.sisu.wire.ParameterKeys;
 import org.eclipse.sisu.wire.WireModule;
@@ -70,7 +62,6 @@ import org.slf4j.LoggerFactory;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Collections.singletonMap;
-import static java.util.regex.Pattern.compile;
 import static org.apache.karaf.features.FeaturesService.Option.NoAutoRefreshBundles;
 import static org.apache.karaf.features.FeaturesService.Option.NoAutoRefreshManagedBundles;
 import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.CAPABILITIES;
@@ -78,8 +69,6 @@ import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.KERNEL;
 import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.OFF;
 import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.SECURITY;
 import static org.sonatype.nexus.common.app.ManagedLifecycle.Phase.TASKS;
-import static org.sonatype.nexus.common.property.SystemPropertiesHelper.getBoolean;
-import static org.sonatype.nexus.common.text.Strings2.isEmpty;
 
 /**
  * {@link ServletContextListener} that bootstraps the core Nexus application.
@@ -99,31 +88,6 @@ public class NexusContextListener
    * Start-level at which point any additional Nexus plugins/features should be available.
    */
   public static final int NEXUS_PLUGIN_START_LEVEL = 200;
-
-  private static final List<String> SUPPORTED_EDITIONS = Collections.unmodifiableList(Arrays.asList(
-      "oss",
-      "pro",
-      "community"));
-
-  private static final String EDITIONS_PATTERN = String.format(
-      "(?<edition>(%s)(,(%s))*)",
-      String.join("|", SUPPORTED_EDITIONS),
-      String.join("|", SUPPORTED_EDITIONS));
-
-  private static final Pattern INSTALL_MODE_FEATURE_FLAG_PATTERN = compile(
-      "(?:" + EDITIONS_PATTERN + ":)?featureFlag:(?<enabled>enabledByDefault:)?(?<flag>.+)");
-
-  private static final String EDITION = "edition";
-
-  private static final String ENABLED = "enabled";
-
-  private static final String FLAG = "flag";
-
-  private static final String NEXUS_LIFECYCLE_STARTUP_PHASE = "nexus.lifecycle.startupPhase";
-
-  private static final String NEXUS_FULL_EDITION = "nexus-full-edition";
-
-  private static final String UNKNOWN = "unknown";
 
   static {
     boolean hasPaxExam;
@@ -157,8 +121,6 @@ public class NexusContextListener
 
   private ServiceRegistration<Filter> registration;
 
-  private Phase startupPhase;
-
   public NexusContextListener(final NexusBundleExtender extender) {
     this.extender = checkNotNull(extender);
   }
@@ -188,8 +150,7 @@ public class NexusContextListener
     try {
       lifecycleManager = injector.getInstance(ManagedLifecycleManager.class);
 
-      checkStartupPhase();
-      moveToPhase(KERNEL);
+      lifecycleManager.to(KERNEL);
 
       // assign higher start level to any bundles installed after this point to hold back activation
       bundleContext.addBundleListener((SynchronousBundleListener) (e) -> {
@@ -199,13 +160,13 @@ public class NexusContextListener
       });
 
       // if we know what to install go ahead and continue activation then register filter when done
-      String featureNames = selectNexusFeatures();
+      String featureNames = (String) nexusProperties.get("nexus-features");
       if (!Strings.isNullOrEmpty(featureNames)) {
         installNexusFeatures(featureNames);
       }
       // otherwise just activate security and register the filter to support install/upgrade wizard
       else {
-        moveToPhase(SECURITY);
+        lifecycleManager.to(SECURITY);
         registerNexusFilter();
       }
     }
@@ -224,12 +185,10 @@ public class NexusContextListener
     if (event.getType() == FrameworkEvent.STARTLEVEL_CHANGED) {
       // feature bundles have all been activated at this point
 
-      boolean continueStartup = true;
       try {
-        moveToPhase(CAPABILITIES);
+        lifecycleManager.to(CAPABILITIES);
       }
       catch (final Exception e) {
-        continueStartup = false;
         log.error("Failed to start nexus", e);
         if (!HAS_PAX_EXAM) {
           try {
@@ -250,13 +209,11 @@ public class NexusContextListener
         registerLocatorWithPaxExam(injector.getProvider(BeanLocator.class));
       }
 
-      if (continueStartup) {
-        try {
-          moveToPhase(TASKS);
-        }
-        catch (final Exception e) {
-          log.warn("Scheduler did not start", e);
-        }
+      try {
+        lifecycleManager.to(TASKS);
+      }
+      catch (final Exception e) {
+        log.warn("Scheduler did not start", e);
       }
     }
   }
@@ -273,11 +230,15 @@ public class NexusContextListener
 
     // log uptime before triggering activity which may run into problems
     long uptime = ManagementFactory.getRuntimeMXBean().getUptime();
-    log.info("Uptime: {} ({})", PeriodFormat.getDefault().print(new Period(uptime)),
-        System.getProperty(NEXUS_FULL_EDITION, UNKNOWN));
+    log.info("Uptime: {}", PeriodFormat.getDefault().print(new Period(uptime)));
 
     try {
-      moveToPhase(OFF);
+      lifecycleManager.to(KERNEL);
+
+      // dispose of JSR-250 components before logging goes
+      injector.getInstance(BeanManager.class).unmanage();
+
+      lifecycleManager.to(OFF);
     }
     catch (final Exception e) {
       log.error("Failed to stop nexus", e);
@@ -300,102 +261,7 @@ public class NexusContextListener
   }
 
   /**
-   * Checks whether we should limit application startup to a particular lifecycle phase.
-   */
-  private void checkStartupPhase() {
-    String startupPhaseValue = (String) nexusProperties.get(NEXUS_LIFECYCLE_STARTUP_PHASE);
-    if (!isEmpty(startupPhaseValue)) {
-      try {
-        startupPhase = Phase.valueOf(startupPhaseValue);
-        log.info("Running lifecycle phases {}", EnumSet.range(KERNEL, startupPhase));
-      }
-      catch (IllegalArgumentException e) {
-        log.error("Unknown value for {}: {}", NEXUS_LIFECYCLE_STARTUP_PHASE, startupPhaseValue);
-        throw e;
-      }
-    }
-    else {
-      log.info("Running lifecycle phases {}", EnumSet.complementOf(EnumSet.of(OFF)));
-    }
-  }
-
-  /**
-   * Moves the application lifecycle on to a new phase.
-   *
-   * When {@link #startupPhase} is set startup will never go past that phase.
-   */
-  private void moveToPhase(final Phase phase) throws Exception {
-    if (startupPhase != null && phase.ordinal() > startupPhase.ordinal()) {
-      lifecycleManager.to(startupPhase); // this far, no further
-    }
-    else {
-      lifecycleManager.to(phase);
-    }
-  }
-
-  /**
-   * Select features to install.
-   */
-  private String selectNexusFeatures() {
-    // start with the features listed under $nexus-features
-    StringBuilder featureNames = new StringBuilder().append(nexusProperties.get("nexus-features"));
-    try {
-      // next add any optional features that have been feature-flagged
-      Repository flagsRepository = featuresService.getRepository("nexus-flags-feature");
-      if (flagsRepository != null) {
-        String edition = injector.getInstance(ApplicationVersion.class).getEdition();
-        for (Feature feature : flagsRepository.getFeatures()) {
-          if (isFeatureFlagEnabled(edition, feature.getInstall())) {
-            if (featureNames.length() > 0) {
-              featureNames.append(',');
-            }
-            featureNames.append(feature.getName());
-          }
-        }
-      }
-    }
-    catch (Exception e) {
-      log.warn("Problem selecting from nexus-flags-feature", e);
-    }
-    return featureNames.toString();
-  }
-
-  /**
-   * Is the given install flag enabled?
-   */
-  @VisibleForTesting
-  boolean isFeatureFlagEnabled(final String edition, final String installMode) {
-    if (installMode != null) {
-      // repurpose Karaf's installMode to pass along feature-flag details
-      Matcher matcher = INSTALL_MODE_FEATURE_FLAG_PATTERN.matcher(installMode);
-      if (matcher.matches()) {
-        boolean enabled = getBoolean(matcher.group(FLAG), matcher.group(ENABLED) != null);
-        if (!enabled) {
-          return false;
-        }
-
-        String editions = matcher.group(EDITION);
-        if (editions == null) {
-          return true;
-        }
-        Set<String> editionsSet = extractEditions(editions);
-        return editionsSet.stream().anyMatch(it -> it.equalsIgnoreCase(edition));
-      }
-      else {
-        log.warn("Malformed feature flag: '{}'", installMode);
-      }
-    }
-    return false;
-  }
-
-  private Set<String> extractEditions(final String editions) {
-    return Arrays.stream(editions.split(","))
-        .map(String::toLowerCase)
-        .collect(Collectors.toSet());
-  }
-
-  /**
-   * Install selected features.
+   * Install all features listed under "nexus-features".
    */
   private void installNexusFeatures(final String featureNames) throws Exception {
     final Set<Feature> features = new LinkedHashSet<>();
@@ -412,7 +278,7 @@ public class NexusContextListener
 
     log.info("Installing: {}", features);
 
-    Set<String> featureIds = new LinkedHashSet<>(features.size());
+    Set<String> featureIds = new HashSet<>(features.size());
     for (final Feature f : features) {
       // feature might already be installed in the cache; if so then skip installation
       if (!featuresService.isInstalled(f)) {
@@ -460,7 +326,7 @@ public class NexusContextListener
     {
       @Override
       public void injectFields(final Object target) {
-        Module testModule = new WireModule(new AbstractModule()
+        Guice.createInjector(new WireModule(new AbstractModule()
         {
           @Override
           protected void configure() {
@@ -475,15 +341,7 @@ public class NexusContextListener
             // inject the test-instance
             requestInjection(target);
           }
-        });
-
-        // lock locator to avoid a potential concurrency issue while injecting the target
-        // (just in case there was a startup problem that left things in an odd state and
-        // a Jetty thread is now trying to initialize the same singletons via the filter)
-        // - locking the locator holds back dynamic injection while we populate the test
-        synchronized (locatorProvider.get()) {
-          Guice.createInjector(testModule);
-        }
+        }));
       }
     }, examProperties);
   }

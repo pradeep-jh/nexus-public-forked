@@ -12,6 +12,8 @@
  */
 package org.sonatype.nexus.blobstore;
 
+import javax.inject.Named;
+
 import org.sonatype.nexus.blobstore.api.BlobId;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -21,6 +23,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
  *
  * @since 3.1
  */
+@Named("temporary")
 public class TemporaryLocationStrategy
     extends LocationStrategySupport
 {

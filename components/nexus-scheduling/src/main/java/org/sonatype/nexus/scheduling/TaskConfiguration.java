@@ -15,24 +15,20 @@ package org.sonatype.nexus.scheduling;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.function.Function;
+import java.util.Map.Entry;
 
 import javax.annotation.Nullable;
 
 import org.sonatype.nexus.logging.task.TaskLogInfo;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import org.joda.time.DateTime;
-import org.joda.time.base.AbstractInstant;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
+
+// FIXME: Revisit this overly complex configuration container class
 
 /**
  * The task configuration backed by plain map.
@@ -50,64 +46,38 @@ import static com.google.common.base.Preconditions.checkState;
  * value, you can use some sentinel value to mark "undefined" state. Still, the best is to not set the mapping at all,
  * as that also might be interpret as "unset".
  *
- * Many of the methods do this: set the key-value if value is non-null, otherwise REMOVE it.
- * Many getters accept a "default value" that is returned when the key is not present in the map.
+ * Many of the methods does this: set the key-value is value is non-null, otherwise REMOVE it.
+ * Also, many getter method accept "default value", that are returned in case mapping of key is not present in the map.
  *
  * This class is not thread safe.
  *
  * @since 3.0
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class TaskConfiguration
+public final class TaskConfiguration
     implements TaskLogInfo
 {
-  public static final String LAST_RUN_STATE_END_STATE = "lastRunState.endState";
+  // TODO: keys which start with "." are considered "private" for some strange reason
 
-  public static final String LAST_RUN_STATE_RUN_STARTED = "lastRunState.runStarted";
+  private static final String ID_KEY = ".id";
 
-  public static final String LAST_RUN_STATE_RUN_DURATION = "lastRunState.runDuration";
+  private static final String NAME_KEY = ".name";
 
-  public static final String PROGRESS_KEY = ".progress";
+  private static final String TYPE_ID_KEY = ".typeId";
 
-  public static final String RUN_WHEN_FROZEN = ".runWhenFrozen";
+  private static final String TYPE_NAME_KEY = ".typeName";
 
-  public static final String READ_ONLY_UI_KEY = ".readOnlyUi";
+  private static final String ENABLED_KEY = ".enabled";
 
-  static final String ID_KEY = ".id";
+  private static final String VISIBLE_KEY = ".visible";
 
-  static final String NAME_KEY = ".name";
+  private static final String ALERT_EMAIL_KEY = ".alertEmail";
 
-  static final String TYPE_ID_KEY = ".typeId";
+  private static final String CREATED_KEY = ".created";
 
-  static final String TYPE_NAME_KEY = ".typeName";
+  private static final String UPDATED_KEY = ".updated";
 
-  static final String ENABLED_KEY = ".enabled";
+  private static final String MESSAGE_KEY = ".message";
 
-  static final String VISIBLE_KEY = ".visible";
-
-  static final String ALERT_EMAIL_KEY = ".alertEmail";
-
-  static final String NOTIFICATION_CONDITION_KEY = ".notificationCondition";
-
-  static final String CREATED_KEY = ".created";
-
-  static final String UPDATED_KEY = ".updated";
-
-  static final String MESSAGE_KEY = ".message";
-
-  static final String RECOVERABLE_KEY = ".recoverable";
-
-  static final String EXPOSED_KEY = ".exposed";
-
-  static final String LOG_STATE_KEY = ".logState";
-
-  /**
-   * Set a task config key to this value to indicate that the config key should be removed from the task config upon
-   * task completion.
-   */
-  public static final String REMOVE_ATTRIBUTE_MARKER = "-1";
-
-  @JsonProperty("configuration")
   private final Map<String, String> configuration;
 
   public TaskConfiguration() {
@@ -121,8 +91,13 @@ public class TaskConfiguration
   }
 
   public void validate() {
-    checkState(!Strings.isNullOrEmpty(getId()), "Incomplete task configuration: id");
-    checkState(!Strings.isNullOrEmpty(getTypeId()), "Incomplete task configuration: typeId");
+    // FIXME: These are state-checks not argument checks!
+    checkArgument(!Strings.isNullOrEmpty(getId()), "Incomplete task configuration: id");
+    checkArgument(!Strings.isNullOrEmpty(getTypeId()), "Incomplete task configuration: typeId");
+    for (Entry<?, ?> entry : configuration.entrySet()) {
+      checkArgument(entry.getKey() instanceof String && entry.getValue() instanceof String,
+          "Invalid entry in map: %s", configuration);
+    }
   }
 
   public String getTaskLogName() {
@@ -152,13 +127,16 @@ public class TaskConfiguration
   // Core properties
   //
 
+  // FIXME: Some of this screams out for a builer pattern, as we expect things like id to be non-null
+  // FIXME: and this correctness is only enforced via validate helper
+
   public String getId() {
     return getString(ID_KEY);
   }
 
   public void setId(final String id) {
     checkNotNull(id);
-    setString(ID_KEY, id);
+    configuration.put(ID_KEY, id);
   }
 
   public String getName() {
@@ -167,7 +145,7 @@ public class TaskConfiguration
 
   public void setName(final String name) {
     checkNotNull(name);
-    setString(NAME_KEY, name);
+    configuration.put(NAME_KEY, name);
   }
 
   public String getTypeId() {
@@ -176,7 +154,7 @@ public class TaskConfiguration
 
   public void setTypeId(final String typeId) {
     checkNotNull(typeId);
-    setString(TYPE_ID_KEY, typeId);
+    configuration.put(TYPE_ID_KEY, typeId);
   }
 
   public String getTypeName() {
@@ -185,7 +163,7 @@ public class TaskConfiguration
 
   public void setTypeName(final String typeName) {
     checkNotNull(typeName);
-    setString(TYPE_NAME_KEY, typeName);
+    configuration.put(TYPE_NAME_KEY, typeName);
   }
 
   public boolean isEnabled() {
@@ -193,23 +171,16 @@ public class TaskConfiguration
   }
 
   public void setEnabled(final boolean enabled) {
-    setBoolean(ENABLED_KEY, enabled);
+    configuration.put(ENABLED_KEY, Boolean.toString(enabled));
   }
 
   public boolean isVisible() {
     return getBoolean(VISIBLE_KEY, true);
   }
 
+
   public void setVisible(final boolean visible) {
-    setBoolean(VISIBLE_KEY, visible);
-  }
-
-  public boolean isExposed() {
-    return getBoolean(EXPOSED_KEY, true);
-  }
-
-  public void setExposed(final boolean exposed) {
-    setBoolean(EXPOSED_KEY, exposed);
+    configuration.put(VISIBLE_KEY, Boolean.toString(visible));
   }
 
   @Nullable
@@ -218,15 +189,12 @@ public class TaskConfiguration
   }
 
   public void setAlertEmail(final String email) {
-    setString(ALERT_EMAIL_KEY, email);
-  }
-
-  public TaskNotificationCondition getNotificationCondition() {
-    return TaskNotificationCondition.valueOf(getString(NOTIFICATION_CONDITION_KEY, TaskNotificationCondition.DEFAULT.name()));
-  }
-
-  public void setNotificationCondition(final TaskNotificationCondition condition) {
-    setString(NOTIFICATION_CONDITION_KEY, condition.name());
+    if (Strings.isNullOrEmpty(email)) {
+      configuration.remove(ALERT_EMAIL_KEY);
+    }
+    else {
+      configuration.put(ALERT_EMAIL_KEY, email);
+    }
   }
 
   @Nullable
@@ -255,105 +223,56 @@ public class TaskConfiguration
   }
 
   public void setMessage(final String message) {
-    setString(MESSAGE_KEY, message);
-  }
-
-  public boolean isRecoverable() {
-    return getBoolean(RECOVERABLE_KEY, false);
-  }
-
-  public void setRecoverable(final boolean requestRecovery) {
-    setBoolean(RECOVERABLE_KEY, requestRecovery);
-  }
-
-  public boolean hasLastRunState() {
-    return getString(LAST_RUN_STATE_END_STATE) != null;
-  }
-
-  @Nullable
-  public LastRunState getLastRunState() {
-    if (hasLastRunState()) {
-      String endStateString = getString(LAST_RUN_STATE_END_STATE);
-      long runStarted = getLong(LAST_RUN_STATE_RUN_STARTED, System.currentTimeMillis());
-      long runDuration = getLong(LAST_RUN_STATE_RUN_DURATION, 0);
-      return new LastRunStateImpl(TaskState.valueOf(endStateString), new Date(runStarted), runDuration);
+    if (Strings.isNullOrEmpty(message)) {
+      configuration.remove(MESSAGE_KEY);
     }
-    return null;
-  }
-
-  public void setLastRunState(final TaskState endState, final Date runStarted, final long runDuration) {
-    checkNotNull(endState);
-    checkNotNull(runStarted);
-    checkArgument(runDuration >= 0);
-
-    setString(LAST_RUN_STATE_END_STATE, endState.name());
-    setLong(LAST_RUN_STATE_RUN_STARTED, runStarted.getTime());
-    setLong(LAST_RUN_STATE_RUN_DURATION, runDuration);
-  }
-
-  public boolean isLogTaskState() {
-    return getBoolean(LOG_STATE_KEY, true);
-  }
-
-  public void setLogTaskState(final boolean logTaskState) {
-    setBoolean(LOG_STATE_KEY, logTaskState);
-  }
-
-  public String getProgress() {
-    return getString(PROGRESS_KEY);
-  }
-
-  public void setProgress(final String progress) {
-    setString(PROGRESS_KEY, progress);
-  }
-
-  public void setReadOnlyUi(final boolean readOnlyUi) {
-    setBoolean(READ_ONLY_UI_KEY, readOnlyUi);
-  }
-
-  public boolean isReadOnlyUi() {
-    return getBoolean(READ_ONLY_UI_KEY, false);
+    else {
+      configuration.put(MESSAGE_KEY, message);
+    }
   }
 
   //
   // Typed configuration helpers
   //
 
+  // FIXME: Consider changing set null to remove sematics, this could lead to confusing results
+
   public Date getDate(final String key, final Date defaultValue) {
-    return Optional.ofNullable(key)
-        .map(this::getString)
-        .map(DateTime::new)
-        .map(AbstractInstant::toDate)
-        .orElse(defaultValue);
+    if (configuration.containsKey(key)) {
+      // TODO: will NPE if value is null
+      return new DateTime(getString(key)).toDate();
+    }
+    else {
+      return defaultValue;
+    }
   }
 
   public void setDate(final String key, final Date date) {
-    setString(key, date, d -> new DateTime(d).toString());
+    checkNotNull(key);
+    if (date == null) {
+      configuration.remove(key);
+    }
+    else {
+      configuration.put(key, new DateTime(date).toString());
+    }
   }
 
-  @Override
   public boolean getBoolean(final String key, final boolean defaultValue) {
     return Boolean.parseBoolean(getString(key, String.valueOf(defaultValue)));
   }
 
   public void setBoolean(final String key, final boolean value) {
-    setString(key, value, String::valueOf);
+    checkNotNull(key);
+    configuration.put(key, String.valueOf(value));
   }
 
-  @Nullable
-  public Integer getInteger(final String key) {
-    return Optional.ofNullable(getString(key))
-        .map(Integer::parseInt)
-        .orElse(null);
-  }
-
-  @Override
   public int getInteger(final String key, final int defaultValue) {
     return Integer.parseInt(getString(key, String.valueOf(defaultValue)));
   }
 
   public void setInteger(final String key, final int value) {
-    setString(key, value, String::valueOf);
+    checkNotNull(key);
+    configuration.put(key, String.valueOf(value));
   }
 
   public long getLong(final String key, final long defaultValue) {
@@ -361,10 +280,10 @@ public class TaskConfiguration
   }
 
   public void setLong(final String key, final long value) {
-    setString(key, value, String::valueOf);
+    checkNotNull(key);
+    configuration.put(key, String.valueOf(value));
   }
 
-  @Override
   @Nullable
   public String getString(final String key) {
     return getString(key, null);
@@ -372,20 +291,21 @@ public class TaskConfiguration
 
   public String getString(final String key, final String defaultValue) {
     checkNotNull(key);
-    return configuration.getOrDefault(key, defaultValue);
+    if (configuration.containsKey(key)) {
+      return configuration.get(key);
+    }
+    else {
+      return defaultValue;
+    }
   }
 
   public void setString(final String key, final String value) {
-    setString(key, value, Function.identity());
-  }
-
-  <T> void setString(final String key, final T value, Function<T, String> f) {
     checkNotNull(key);
-    if (value == null || Strings.isNullOrEmpty(f.apply(value))) {
+    if (value == null) {
       configuration.remove(key);
     }
     else {
-      configuration.put(key, f.apply(value));
+      configuration.put(key, value);
     }
   }
 
@@ -395,76 +315,5 @@ public class TaskConfiguration
   public boolean containsKey(final String key) {
     checkNotNull(key);
     return configuration.containsKey(key);
-  }
-
-  /**
-   * @since 3.33
-   */
-  public void addAll(final Map<String, String> attributes) {
-    attributes.entrySet().forEach(entry -> configuration.put(entry.getKey(), entry.getValue()));
-  }
-
-  /**
-   * {@link LastRunState} implementation.
-   */
-  private static class LastRunStateImpl
-      implements LastRunState
-  {
-    private final TaskState endState;
-
-    private final Date runStarted;
-
-    private final long runDuration;
-
-    public LastRunStateImpl(final TaskState endState, final Date runStarted, final long runDuration) {
-      this.endState = endState;
-      this.runStarted = runStarted;
-      this.runDuration = runDuration;
-    }
-
-    @Override
-    public TaskState getEndState() {
-      return endState;
-    }
-
-    @Override
-    public Date getRunStarted() {
-      return runStarted;
-    }
-
-    @Override
-    public long getRunDuration() {
-      return runDuration;
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(endState, runDuration, runStarted);
-    }
-
-    @Override
-    public boolean equals(final Object obj) {
-      if (this == obj) {
-        return true;
-      }
-      if (obj == null) {
-        return false;
-      }
-      if (getClass() != obj.getClass()) {
-        return false;
-      }
-      LastRunStateImpl other = (LastRunStateImpl) obj;
-      return endState == other.endState && runDuration == other.runDuration
-          && Objects.equals(runStarted, other.runStarted);
-    }
-
-    @Override
-    public String toString() {
-      return getClass().getSimpleName() + "{" +
-          "endState=" + endState +
-          ", runStarted=" + runStarted +
-          ", runDuration=" + runDuration +
-          '}';
-    }
   }
 }

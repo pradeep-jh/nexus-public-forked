@@ -19,15 +19,13 @@ import org.sonatype.nexus.repository.Format;
 import org.sonatype.nexus.repository.Repository;
 import org.sonatype.nexus.repository.RepositoryTaskSupport;
 import org.sonatype.nexus.repository.Type;
-import org.sonatype.nexus.repository.maven.MavenMetadataRebuildFacet;
+import org.sonatype.nexus.repository.maven.MavenHostedFacet;
 import org.sonatype.nexus.repository.maven.internal.Maven2Format;
 import org.sonatype.nexus.repository.types.HostedType;
-import org.sonatype.nexus.scheduling.Cancelable;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.sonatype.nexus.repository.maven.tasks.RebuildMaven2MetadataTaskDescriptor.ARTIFACTID_FIELD_ID;
 import static org.sonatype.nexus.repository.maven.tasks.RebuildMaven2MetadataTaskDescriptor.BASEVERSION_FIELD_ID;
-import static org.sonatype.nexus.repository.maven.tasks.RebuildMaven2MetadataTaskDescriptor.CASCADE_REBUILD;
 import static org.sonatype.nexus.repository.maven.tasks.RebuildMaven2MetadataTaskDescriptor.GROUPID_FIELD_ID;
 import static org.sonatype.nexus.repository.maven.tasks.RebuildMaven2MetadataTaskDescriptor.REBUILD_CHECKSUMS;
 
@@ -39,7 +37,6 @@ import static org.sonatype.nexus.repository.maven.tasks.RebuildMaven2MetadataTas
 @Named
 public class RebuildMaven2MetadataTask
     extends RepositoryTaskSupport
-    implements Cancelable
 {
 
   private final Type hostedType;
@@ -57,14 +54,12 @@ public class RebuildMaven2MetadataTask
 
   @Override
   protected void execute(final Repository repository) {
-    MavenMetadataRebuildFacet mavenHostedFacet = repository.facet(MavenMetadataRebuildFacet.class);
+    MavenHostedFacet mavenHostedFacet = repository.facet(MavenHostedFacet.class);
     mavenHostedFacet.rebuildMetadata(
         getConfiguration().getString(GROUPID_FIELD_ID),
         getConfiguration().getString(ARTIFACTID_FIELD_ID),
         getConfiguration().getString(BASEVERSION_FIELD_ID),
-        getConfiguration().getBoolean(REBUILD_CHECKSUMS, false),
-        getConfiguration().getBoolean(CASCADE_REBUILD, true),
-        false
+        getConfiguration().getBoolean(REBUILD_CHECKSUMS, false)
     );
   }
 

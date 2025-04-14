@@ -13,9 +13,6 @@
 package org.sonatype.nexus.blobstore.api;
 
 import java.io.Serializable;
-import java.time.OffsetDateTime;
-
-import javax.annotation.Nullable;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -25,31 +22,16 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * @since 3.0
  */
 public class BlobId
-    implements Serializable, Comparable<BlobId>
+  implements Serializable, Comparable<BlobId>
 {
   private final String id;
 
-  private final OffsetDateTime blobCreatedRef;
-
-  /**
-   * @deprecated Use {@link #BlobId(String, OffsetDateTime)} instead.
-   */
-  @Deprecated
   public BlobId(final String id) {
-    this(id, null);
-  }
-
-  public BlobId(final String id, @Nullable OffsetDateTime blobCreatedRef) {
     this.id = checkNotNull(id);
-    this.blobCreatedRef = blobCreatedRef;
   }
 
   public String asUniqueString() {
     return id;
-  }
-
-  public OffsetDateTime getBlobCreatedRef() {
-    return blobCreatedRef;
   }
 
   @Override

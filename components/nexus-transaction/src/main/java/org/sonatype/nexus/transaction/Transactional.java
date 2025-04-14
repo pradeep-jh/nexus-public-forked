@@ -26,18 +26,9 @@ import java.lang.annotation.Target;
  * @since 3.0
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
+@Target({ ElementType.METHOD, ElementType.ANNOTATION_TYPE })
 public @interface Transactional
 {
-  String DEFAULT_REASON = "transaction";
-
-  /**
-   * The reason for this transactional operation.
-   *
-   * @since 3.20
-   */
-  String reason() default DEFAULT_REASON;
-
   /**
    * List of exceptions to commit (not rollback) on.
    */
@@ -56,11 +47,6 @@ public @interface Transactional
    * updates where it's safe to proceed even if the commit threw an exception.
    */
   Class<? extends Exception>[] swallow() default {};
-
-  /**
-   * Sets the isolation level to be used for the transaction. Note this is unsupported on OrientDB.
-   */
-  TransactionIsolation isolation() default TransactionIsolation.STANDARD;
 
   /**
    * Helper to apply this transactional behaviour to lambdas.
